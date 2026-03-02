@@ -1,0 +1,10 @@
+{
+  "host": "192.168.1.100",
+  "port": 5432,
+  "database": "ludoteca_pos",
+  "user": "ludoteca_user",
+  "password": "tu_password_seguro",
+  "max": 20,
+  "idleTimeoutMillis": 30000,
+  "connectionTimeoutMillis": 2000
+}

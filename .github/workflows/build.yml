@@ -1,0 +1,33 @@
+name: Build Windows Installer
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: "18"
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build React
+        run: npm run build
+
+      - name: Build Windows installer
+        run: npx electron-builder --win --x64
+
+      - name: Upload installer
+        uses: actions/upload-artifact@v3
+        with:
+          name: windows-installer
+          path: release/*.exe
