@@ -3,275 +3,148 @@ const { getDatabase } = require("./database.cjs");
 async function migrateDatabase() {
   const db = getDatabase();
 
-  return new Promise((resolve, reject) => {
-    // Verificar si las columnas existen
-    db.all("PRAGMA table_info(sales)", (err, columns) => {
-        if (err) {
-          reject(err);
-          return;
-        }
+  try {
+    console.log("🔄 Ejecutando migraciones...");
 
-        const columnNames = columns.map((col) => col.name);
-        const migrations = [];
+    // Verificar columnas de sales
+    const salesColumns = db.prepare("PRAGMA table_info(sales)").all();
+    const salesColumnNames = salesColumns.map((col) => col.name);
 
-        // Agregar columna subtotal si no existe
-        if (!columnNames.includes("subtotal")) {
-          migrations.push(
-            "ALTER TABLE sales ADD COLUMN subtotal REAL NOT NULL DEFAULT 0",
-          );
-        }
+    if (!salesColumnNames.includes("subtotal")) {
+      db.prepare(
+        "ALTER TABLE sales ADD COLUMN subtotal REAL NOT NULL DEFAULT 0",
+      ).run();
+      console.log("✅ Agregada columna subtotal a sales");
+    }
 
-        // Agregar columna discount si no existe
-        if (!columnNames.includes("discount")) {
-          migrations.push(
-            "ALTER TABLE sales ADD COLUMN discount REAL DEFAULT 0",
-          );
-        }
+    if (!salesColumnNames.includes("discount")) {
+      db.prepare("ALTER TABLE sales ADD COLUMN discount REAL DEFAULT 0").run();
+      console.log("✅ Agregada columna discount a sales");
+    }
 
-        // Agregar columna cash_box_id si no existe
-        if (!columnNames.includes("cash_box_id")) {
-          migrations.push("ALTER TABLE sales ADD COLUMN cash_box_id INTEGER");
-        }
+    if (!salesColumnNames.includes("cash_box_id")) {
+      db.prepare("ALTER TABLE sales ADD COLUMN cash_box_id INTEGER").run();
+      console.log("✅ Agregada columna cash_box_id a sales");
+    }
 
-        // Verificar columnas de products_services
-        db.all("PRAGMA table_info(products_services)", (err, prodColumns) => {
-          if (err) {
-            reject(err);
-            return;
-          }
+    // Verificar columnas de products_services
+    const prodColumns = db
+      .prepare("PRAGMA table_info(products_services)")
+      .all();
+    const prodColumnNames = prodColumns.map((col) => col.name);
 
-          const prodColumnNames = prodColumns.map((col) => col.name);
+    if (!prodColumnNames.includes("stock")) {
+      db.prepare(
+        "ALTER TABLE products_services ADD COLUMN stock INTEGER DEFAULT 0",
+      ).run();
+      console.log("✅ Agregada columna stock a products_services");
+    }
 
-          // Agregar columna stock si no existe
-          if (!prodColumnNames.includes("stock")) {
-            migrations.push(
-              "ALTER TABLE products_services ADD COLUMN stock INTEGER DEFAULT 0",
-            );
-          }
+    if (!prodColumnNames.includes("category")) {
+      db.prepare(
+        "ALTER TABLE products_services ADD COLUMN category TEXT",
+      ).run();
+      console.log("✅ Agregada columna category a products_services");
+    }
 
-          // Verificar columnas de clients
-          db.all("PRAGMA table_info(clients)", (err, clientColumns) => {
-            if (err) {
-              reject(err);
-              return;
-            }
+    if (!prodColumnNames.includes("barcode")) {
+      db.prepare("ALTER TABLE products_services ADD COLUMN barcode TEXT").run();
+      console.log("✅ Agregada columna barcode a products_services");
+    }
 
-            const clientColumnNames = clientColumns.map((col) => col.name);
+    // Verificar columnas de clients
+    const clientColumns = db.prepare("PRAGMA table_info(clients)").all();
+    const clientColumnNames = clientColumns.map((col) => col.name);
 
-            // Agregar nuevas columnas a clients si no existen
-            if (!clientColumnNames.includes("emergency_phone")) {
-              migrations.push(
-                "ALTER TABLE clients ADD COLUMN emergency_phone TEXT",
-              );
-            }
-            if (!clientColumnNames.includes("email")) {
-              migrations.push("ALTER TABLE clients ADD COLUMN email TEXT");
-            }
-            if (!clientColumnNames.includes("child_name")) {
-              migrations.push("ALTER TABLE clients ADD COLUMN child_name TEXT");
-            }
-            if (!clientColumnNames.includes("child_age")) {
-              migrations.push(
-                "ALTER TABLE clients ADD COLUMN child_age INTEGER",
-              );
-            }
-            if (!clientColumnNames.includes("allergies")) {
-              migrations.push("ALTER TABLE clients ADD COLUMN allergies TEXT");
-            }
-            if (!clientColumnNames.includes("special_notes")) {
-              migrations.push(
-                "ALTER TABLE clients ADD COLUMN special_notes TEXT",
-              );
-            }
+    if (!clientColumnNames.includes("emergency_phone")) {
+      db.prepare("ALTER TABLE clients ADD COLUMN emergency_phone TEXT").run();
+      console.log("✅ Agregada columna emergency_phone a clients");
+    }
 
-            // Agregar columna category si no existe
-            if (!prodColumnNames.includes("category")) {
-              migrations.push(
-                "ALTER TABLE products_services ADD COLUMN category TEXT",
-              );
-            }
+    if (!clientColumnNames.includes("email")) {
+      db.prepare("ALTER TABLE clients ADD COLUMN email TEXT").run();
+      console.log("✅ Agregada columna email a clients");
+    }
 
-            // Agregar columna barcode si no existe (sin UNIQUE porque SQLite no lo permite en ALTER TABLE)
-            if (!prodColumnNames.includes("barcode")) {
-              migrations.push(
-                "ALTER TABLE products_services ADD COLUMN barcode TEXT",
-              );
-            }
+    if (!clientColumnNames.includes("child_name")) {
+      db.prepare("ALTER TABLE clients ADD COLUMN child_name TEXT").run();
+      console.log("✅ Agregada columna child_name a clients");
+    }
 
-            // Verificar columnas de active_sessions
-            db.all(
-              "PRAGMA table_info(active_sessions)",
-              (err, sessionColumns) => {
-                if (err) {
-                  reject(err);
-                  return;
-                }
+    if (!clientColumnNames.includes("child_age")) {
+      db.prepare("ALTER TABLE clients ADD COLUMN child_age INTEGER").run();
+      console.log("✅ Agregada columna child_age a clients");
+    }
 
-                const sessionColumnNames = sessionColumns.map(
-                  (col) => col.name,
-                );
+    if (!clientColumnNames.includes("allergies")) {
+      db.prepare("ALTER TABLE clients ADD COLUMN allergies TEXT").run();
+      console.log("✅ Agregada columna allergies a clients");
+    }
 
-                // Agregar columna duration_minutes si no existe
-                if (!sessionColumnNames.includes("duration_minutes")) {
-                  migrations.push(
-                    "ALTER TABLE active_sessions ADD COLUMN duration_minutes INTEGER",
-                  );
-                }
+    if (!clientColumnNames.includes("special_notes")) {
+      db.prepare("ALTER TABLE clients ADD COLUMN special_notes TEXT").run();
+      console.log("✅ Agregada columna special_notes a clients");
+    }
 
-                // Agregar columna end_time si no existe
-                if (!sessionColumnNames.includes("end_time")) {
-                  migrations.push(
-                    "ALTER TABLE active_sessions ADD COLUMN end_time TEXT",
-                  );
-                }
+    // Verificar columnas de active_sessions
+    const sessionColumns = db
+      .prepare("PRAGMA table_info(active_sessions)")
+      .all();
+    const sessionColumnNames = sessionColumns.map((col) => col.name);
 
-                // Agregar columna elapsed_minutes si no existe
-                if (!sessionColumnNames.includes("elapsed_minutes")) {
-                  migrations.push(
-                    "ALTER TABLE active_sessions ADD COLUMN elapsed_minutes INTEGER",
-                  );
-                }
+    if (!sessionColumnNames.includes("duration_minutes")) {
+      db.prepare(
+        "ALTER TABLE active_sessions ADD COLUMN duration_minutes INTEGER",
+      ).run();
+      console.log("✅ Agregada columna duration_minutes a active_sessions");
+    }
 
-                // Migración especial: Corregir timestamps de UTC a hora local
-                // Esta migración se ejecuta siempre para corregir datos existentes
-                migrations.push({
-                  type: "fix_timestamps",
-                  description: "Corregir timestamps de UTC a hora local",
-                });
+    if (!sessionColumnNames.includes("end_time")) {
+      db.prepare("ALTER TABLE active_sessions ADD COLUMN end_time TEXT").run();
+      console.log("✅ Agregada columna end_time a active_sessions");
+    }
 
-                // Ejecutar migraciones
-                let completed = 0;
-                let hasError = false;
+    if (!sessionColumnNames.includes("elapsed_minutes")) {
+      db.prepare(
+        "ALTER TABLE active_sessions ADD COLUMN elapsed_minutes INTEGER",
+      ).run();
+      console.log("✅ Agregada columna elapsed_minutes a active_sessions");
+    }
 
-                if (migrations.length === 0) {
-                  console.log("✅ Base de datos ya está actualizada");
-                  resolve();
-                  return;
-                }
+    // Corregir timestamps de UTC a hora local
+    const sales = db
+      .prepare("SELECT id, timestamp FROM sales WHERE timestamp LIKE '%T%'")
+      .all();
 
-                console.log(
-                  `🔄 Ejecutando ${migrations.length} migraciones...`,
-                );
+    if (sales && sales.length > 0) {
+      console.log(`🔄 Corrigiendo ${sales.length} timestamps en sales...`);
 
-                const executeMigration = (migration, index) => {
-                  // Si es una migración especial de timestamps
-                  if (
-                    typeof migration === "object" &&
-                    migration.type === "fix_timestamps"
-                  ) {
-                    console.log(`🔄 ${migration.description}...`);
+      const updateStmt = db.prepare(
+        "UPDATE sales SET timestamp = ? WHERE id = ?",
+      );
 
-                    // Obtener todas las ventas con timestamps en formato ISO
-                    db.all(
-                      "SELECT id, timestamp FROM sales WHERE timestamp LIKE '%T%'",
-                      (err, sales) => {
-                        if (err) {
-                          console.error("Error obteniendo ventas:", err);
-                          completed++;
-                          checkCompletion();
-                          return;
-                        }
+      for (const sale of sales) {
+        const utcDate = new Date(sale.timestamp);
+        const year = utcDate.getFullYear();
+        const month = String(utcDate.getMonth() + 1).padStart(2, "0");
+        const day = String(utcDate.getDate()).padStart(2, "0");
+        const hours = String(utcDate.getHours()).padStart(2, "0");
+        const minutes = String(utcDate.getMinutes()).padStart(2, "0");
+        const seconds = String(utcDate.getSeconds()).padStart(2, "0");
+        const localTimestamp = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
 
-                        if (!sales || sales.length === 0) {
-                          console.log(
-                            "✅ No hay timestamps para corregir en sales",
-                          );
-                          completed++;
-                          checkCompletion();
-                          return;
-                        }
+        updateStmt.run(localTimestamp, sale.id);
+      }
 
-                        console.log(
-                          `📝 Corrigiendo ${sales.length} timestamps en sales...`,
-                        );
-                        let fixed = 0;
+      console.log(`✅ ${sales.length} timestamps corregidos en sales`);
+    }
 
-                        sales.forEach((sale) => {
-                          // Convertir de UTC a hora local
-                          const utcDate = new Date(sale.timestamp);
-                          const year = utcDate.getFullYear();
-                          const month = String(utcDate.getMonth() + 1).padStart(
-                            2,
-                            "0",
-                          );
-                          const day = String(utcDate.getDate()).padStart(
-                            2,
-                            "0",
-                          );
-                          const hours = String(utcDate.getHours()).padStart(
-                            2,
-                            "0",
-                          );
-                          const minutes = String(utcDate.getMinutes()).padStart(
-                            2,
-                            "0",
-                          );
-                          const seconds = String(utcDate.getSeconds()).padStart(
-                            2,
-                            "0",
-                          );
-                          const localTimestamp = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
-
-                          db.run(
-                            "UPDATE sales SET timestamp = ? WHERE id = ?",
-                            [localTimestamp, sale.id],
-                            (err) => {
-                              if (err) {
-                                console.error(
-                                  `Error actualizando venta ${sale.id}:`,
-                                  err,
-                                );
-                              }
-                              fixed++;
-                              if (fixed === sales.length) {
-                                console.log(
-                                  `✅ ${fixed} timestamps corregidos en sales`,
-                                );
-                                completed++;
-                                checkCompletion();
-                              }
-                            },
-                          );
-                        });
-                      },
-                    );
-
-                    return;
-                  }
-
-                  // Migración SQL normal
-                  db.run(migration, (err) => {
-                    if (err && !hasError) {
-                      hasError = true;
-                      console.error(`❌ Error en migración ${index + 1}:`, err);
-                      reject(err);
-                      return;
-                    }
-                    completed++;
-                    console.log(
-                      `✅ Migración ${completed}/${migrations.length} completada`,
-                    );
-                    checkCompletion();
-                  });
-                };
-
-                const checkCompletion = () => {
-                  if (completed === migrations.length && !hasError) {
-                    console.log("✅ Todas las migraciones completadas");
-                    resolve();
-                  }
-                };
-
-                migrations.forEach((migration, index) => {
-                  executeMigration(migration, index);
-                });
-              },
-            );
-          });
-        });
-      });
-    });
-  });
+    console.log("✅ Todas las migraciones completadas");
+    return Promise.resolve();
+  } catch (error) {
+    console.error("❌ Error en migraciones:", error);
+    return Promise.reject(error);
+  }
 }
 
 module.exports = { migrateDatabase };
