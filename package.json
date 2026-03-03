@@ -131,8 +131,7 @@
       "shortcutName": "Ludoteca POS",
       "perMachine": true,
       "deleteAppDataOnUninstall": false,
-      "runAfterFinish": false,
-      "include": "build/installer.nsh"
+      "runAfterFinish": false
     },
     "extraResources": [
       {
