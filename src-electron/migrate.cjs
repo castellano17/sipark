@@ -4,9 +4,8 @@ async function migrateDatabase() {
   const db = getDatabase();
 
   return new Promise((resolve, reject) => {
-    db.serialize(() => {
-      // Verificar si las columnas existen
-      db.all("PRAGMA table_info(sales)", (err, columns) => {
+    // Verificar si las columnas existen
+    db.all("PRAGMA table_info(sales)", (err, columns) => {
         if (err) {
           reject(err);
           return;
