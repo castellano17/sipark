@@ -80,8 +80,10 @@
       "node_modules/sqlite3/lib/binding/napi-v*-win32-x64/node_sqlite3.node"
     ],
     "asarUnpack": [
-      "node_modules/better-sqlite3/**/*",
-      "node_modules/bcrypt/**/*",
+      "node_modules/pg/**/*",
+      "node_modules/pg-types/**/*",
+      "node_modules/pg-pool/**/*",
+      "node_modules/bcryptjs/**/*",
       "dist/**/*"
     ],
     "npmRebuild": false,
