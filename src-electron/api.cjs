@@ -18,10 +18,22 @@ function getLocalTimestamp() {
 
 async function getClients() {
   try {
-    const sql = `SELECT id, name, parent_name, phone, emergency_phone, email, 
-                 child_name, child_age, allergies, special_notes, photo_path, 
-                 created_at FROM clients ORDER BY name`;
-    return await allAsync(sql);
+    // Intentar primero con is_member
+    try {
+      const sql = `SELECT id, name, parent_name, phone, emergency_phone, email, 
+                   child_name, child_age, allergies, special_notes, photo_path, 
+                   is_member, created_at FROM clients ORDER BY name`;
+      return await allAsync(sql);
+    } catch (err) {
+      // Si falla (columna no existe), intentar sin is_member
+      console.warn("Columna is_member no existe, usando fallback");
+      const sql = `SELECT id, name, parent_name, phone, emergency_phone, email, 
+                   child_name, child_age, allergies, special_notes, photo_path, 
+                   created_at FROM clients ORDER BY name`;
+      const clients = await allAsync(sql);
+      // Agregar is_member = false a cada cliente
+      return clients.map((c) => ({ ...c, is_member: false }));
+    }
   } catch (error) {
     console.error("Error obteniendo clientes:", error);
     throw error;
@@ -152,10 +164,26 @@ async function deleteClient(id) {
 
 async function getClientById(clientId) {
   try {
-    const sql = `SELECT id, name, parent_name, phone, emergency_phone, email, 
-                 child_name, child_age, allergies, special_notes, photo_path, 
-                 created_at FROM clients WHERE id = ?`;
-    return await getAsync(sql, [clientId]);
+    // Intentar primero con is_member
+    try {
+      const sql = `SELECT id, name, parent_name, phone, emergency_phone, email, 
+                   child_name, child_age, allergies, special_notes, photo_path, 
+                   is_member, created_at FROM clients WHERE id = ?`;
+      return await getAsync(sql, [clientId]);
+    } catch (err) {
+      // Si falla, intentar sin is_member
+      console.warn(
+        "Columna is_member no existe en getClientById, usando fallback",
+      );
+      const sql = `SELECT id, name, parent_name, phone, emergency_phone, email, 
+                   child_name, child_age, allergies, special_notes, photo_path, 
+                   created_at FROM clients WHERE id = ?`;
+      const client = await getAsync(sql, [clientId]);
+      if (client) {
+        client.is_member = false;
+      }
+      return client;
+    }
   } catch (error) {
     console.error("Error obteniendo cliente:", error);
     throw error;

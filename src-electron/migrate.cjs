@@ -6,6 +6,26 @@ async function migrateDatabase() {
   try {
     console.log("🔄 Ejecutando migraciones...");
 
+    // FORZAR la adición de is_member si no existe
+    try {
+      // Verificar si la columna existe
+      const clientColumns = db.prepare("PRAGMA table_info(clients)").all();
+      const hasIsMember = clientColumns.some((col) => col.name === "is_member");
+
+      if (!hasIsMember) {
+        console.log("⚠️  Columna is_member NO existe, agregando AHORA...");
+        db.prepare(
+          "ALTER TABLE clients ADD COLUMN is_member BOOLEAN DEFAULT 0",
+        ).run();
+        console.log("✅ Columna is_member agregada exitosamente");
+      } else {
+        console.log("✅ Columna is_member ya existe");
+      }
+    } catch (err) {
+      console.error("❌ Error agregando is_member:", err.message);
+      // Continuar aunque falle
+    }
+
     // Verificar columnas de clients
     const clientColumns = db.prepare("PRAGMA table_info(clients)").all();
     const clientColumnNames = clientColumns.map((col) => col.name);

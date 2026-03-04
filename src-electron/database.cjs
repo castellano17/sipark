@@ -43,6 +43,7 @@ function createTables() {
         allergies TEXT,
         special_notes TEXT,
         photo_path TEXT,
+        is_member BOOLEAN DEFAULT 0,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
       )`,
       `CREATE TABLE IF NOT EXISTS active_sessions (
