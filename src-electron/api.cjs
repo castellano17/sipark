@@ -219,6 +219,7 @@ async function startSession(clientId, packageId, durationMinutes = 60) {
 
 async function getActiveSessions() {
   try {
+    console.log("📋 Obteniendo sesiones activas...");
     const sql = `
       SELECT 
         s.id,
@@ -236,9 +237,12 @@ async function getActiveSessions() {
       WHERE s.status = 'active'
       ORDER BY s.start_time DESC
     `;
-    return await allAsync(sql);
+    const result = await allAsync(sql);
+    console.log(`✅ ${result.length} sesiones activas encontradas`);
+    return result;
   } catch (error) {
-    console.error("Error obteniendo sesiones activas:", error);
+    console.error("❌ Error obteniendo sesiones activas:", error);
+    console.error("SQL que falló:", error.message);
     throw error;
   }
 }
