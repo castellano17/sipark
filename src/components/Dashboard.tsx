@@ -146,60 +146,44 @@ export const Dashboard: React.FC<DashboardProps> = ({
   };
 
   const loadWeekReservations = async () => {
-    // Aquí cargarías las reservaciones reales desde la base de datos
-    // Por ahora usamos datos de ejemplo con fechas
-    const reservations = [
-      {
-        id: 1,
-        date: new Date(2026, 2, 1), // 1 de marzo 2026
-        time: "10:00 AM",
-        title: "Fiesta Infantil",
-        client: "María González",
-        color: "bg-blue-500",
-      },
-      {
-        id: 2,
-        date: new Date(2026, 2, 1), // 1 de marzo 2026
-        time: "2:00 PM",
-        title: "Sesión de Juegos",
-        client: "Carlos Pérez",
-        color: "bg-purple-500",
-      },
-      {
-        id: 3,
-        date: new Date(2026, 2, 5), // 5 de marzo 2026
-        time: "11:00 AM",
-        title: "Cumpleaños",
-        client: "Ana Martínez",
-        color: "bg-pink-500",
-      },
-      {
-        id: 4,
-        date: new Date(2026, 2, 5), // 5 de marzo 2026
-        time: "4:00 PM",
-        title: "Evento Especial",
-        client: "Luis Rodríguez",
-        color: "bg-cyan-500",
-      },
-      {
-        id: 5,
-        date: new Date(2026, 2, 10), // 10 de marzo 2026
-        time: "9:00 AM",
-        title: "Reservación Matutina",
-        client: "Patricia López",
-        color: "bg-green-500",
-      },
-      {
-        id: 6,
-        date: new Date(2026, 2, 15), // 15 de marzo 2026
-        time: "3:00 PM",
-        title: "Fiesta Temática",
-        client: "Roberto Sánchez",
-        color: "bg-orange-500",
-      },
-    ];
-    setAllReservations(reservations);
-    filterReservationsByDate(selectedDate, reservations);
+    try {
+      // Obtener el primer y último día del mes actual
+      const firstDay = new Date(
+        currentDate.getFullYear(),
+        currentDate.getMonth(),
+        1,
+      );
+      const lastDay = new Date(
+        currentDate.getFullYear(),
+        currentDate.getMonth() + 1,
+        0,
+      );
+
+      const result = await window.api.getReservationsByDateRange(
+        firstDay.toISOString().split("T")[0],
+        lastDay.toISOString().split("T")[0],
+      );
+
+      if (result.success) {
+        const reservations = result.data.map((res: any) => ({
+          id: res.id,
+          date: new Date(res.event_date + "T" + res.event_time),
+          time: res.event_time,
+          title: res.package_name,
+          client: res.client_name,
+          color:
+            res.status === "confirmed"
+              ? "bg-green-500"
+              : res.status === "cancelled"
+                ? "bg-red-500"
+                : "bg-blue-500",
+        }));
+        setAllReservations(reservations);
+        filterReservationsByDate(selectedDate, reservations);
+      }
+    } catch (error) {
+      console.error("Error cargando reservaciones:", error);
+    }
   };
 
   const filterReservationsByDate = (
@@ -709,6 +693,13 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   {weekReservations.map((reservation) => (
                     <div
                       key={reservation.id}
+                      onClick={() => {
+                        sessionStorage.setItem(
+                          "selectedReservationId",
+                          reservation.id.toString(),
+                        );
+                        onNavigate("/reservaciones");
+                      }}
                       className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
                     >
                       <div className="text-center min-w-[70px]">

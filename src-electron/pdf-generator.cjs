@@ -535,8 +535,447 @@ async function generateMembershipPDF(pdfData) {
   }
 }
 
+/**
+ * Genera un PDF de reservación
+ */
+async function generateReservationPDF(reservationData) {
+  try {
+    const userDataPath = app.getPath("userData");
+    const pdfDir = path.join(userDataPath, "pdfs");
+
+    if (!fs.existsSync(pdfDir)) {
+      fs.mkdirSync(pdfDir, { recursive: true });
+    }
+
+    const companySettings = await getCompanySettings();
+
+    const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+    const filename = `reservacion_${reservationData.id}_${timestamp}.pdf`;
+    const filepath = path.join(pdfDir, filename);
+
+    return new Promise((resolve, reject) => {
+      const doc = new PDFDocument({ margin: 50 });
+      const stream = fs.createWriteStream(filepath);
+
+      stream.on("finish", () => {
+        resolve(filepath);
+      });
+
+      stream.on("error", reject);
+
+      doc.pipe(stream);
+
+      // Encabezado
+      doc.fontSize(10).font("Helvetica").fillColor("#666666");
+      doc.text(companySettings.businessName, { align: "center" });
+      if (companySettings.businessAddress) {
+        doc.text(companySettings.businessAddress, { align: "center" });
+      }
+      if (companySettings.businessPhone) {
+        doc.text(companySettings.businessPhone, { align: "center" });
+      }
+      doc.moveDown();
+
+      // Título
+      doc
+        .fontSize(24)
+        .font("Helvetica-Bold")
+        .fillColor("#2563eb")
+        .text("RESERVACIÓN", { align: "center" });
+      doc.moveDown();
+
+      // Estado
+      const statusText =
+        reservationData.status === "pending"
+          ? "PENDIENTE"
+          : reservationData.status === "confirmed"
+            ? "CONFIRMADA"
+            : "CANCELADA";
+      const statusColor =
+        reservationData.status === "pending"
+          ? "#eab308"
+          : reservationData.status === "confirmed"
+            ? "#16a34a"
+            : "#dc2626";
+
+      doc
+        .fontSize(14)
+        .font("Helvetica-Bold")
+        .fillColor(statusColor)
+        .text(`Estado: ${statusText}`, { align: "center" });
+      doc.moveDown(2);
+
+      // Información del cliente
+      doc.fontSize(16).font("Helvetica-Bold").fillColor("black");
+      doc.text("INFORMACIÓN DEL CLIENTE");
+      doc.moveDown(0.5);
+
+      doc.fontSize(12).font("Helvetica").fillColor("#333333");
+      doc.text(`Nombre: ${reservationData.client_name}`);
+      doc.text(`Teléfono: ${reservationData.client_phone}`);
+      if (reservationData.client_email) {
+        doc.text(`Email: ${reservationData.client_email}`);
+      }
+      doc.moveDown(1.5);
+
+      // Información del evento
+      doc.fontSize(16).font("Helvetica-Bold").fillColor("black");
+      doc.text("INFORMACIÓN DEL EVENTO");
+      doc.moveDown(0.5);
+
+      doc.fontSize(12).font("Helvetica").fillColor("#333333");
+      const eventDate = new Date(reservationData.event_date);
+      doc.text(
+        `Fecha: ${eventDate.toLocaleDateString("es-ES", {
+          weekday: "long",
+          year: "numeric",
+          month: "long",
+          day: "numeric",
+        })}`,
+      );
+      doc.text(`Hora: ${reservationData.event_time}`);
+      doc.moveDown(1.5);
+
+      // Paquete seleccionado
+      doc.fontSize(16).font("Helvetica-Bold").fillColor("black");
+      doc.text("PAQUETE SELECCIONADO");
+      doc.moveDown(0.5);
+
+      doc.fontSize(12).font("Helvetica").fillColor("#333333");
+      doc.text(reservationData.package_name);
+      doc.moveDown(1.5);
+
+      // Resumen de pagos
+      doc.fontSize(16).font("Helvetica-Bold").fillColor("black");
+      doc.text("RESUMEN DE PAGOS");
+      doc.moveDown(0.5);
+
+      const startX = 50;
+      const startY = doc.y;
+
+      // Línea superior
+      doc
+        .moveTo(startX, startY)
+        .lineTo(550, startY)
+        .strokeColor("#cccccc")
+        .stroke();
+
+      doc.y = startY + 10;
+
+      // Total
+      doc.fontSize(12).font("Helvetica").fillColor("#333333");
+      doc.text("Total:", startX + 10, doc.y);
+      doc.text(
+        `$${reservationData.total_amount.toFixed(2)}`,
+        startX + 400,
+        doc.y,
+        { width: 100, align: "right" },
+      );
+      doc.moveDown(0.5);
+
+      // Anticipo
+      doc.text("Anticipo:", startX + 10, doc.y);
+      doc.text(
+        `$${reservationData.deposit_amount.toFixed(2)}`,
+        startX + 400,
+        doc.y,
+        { width: 100, align: "right" },
+      );
+      doc.moveDown(0.5);
+
+      // Línea separadora
+      const lineY = doc.y + 5;
+      doc
+        .moveTo(startX, lineY)
+        .lineTo(550, lineY)
+        .strokeColor("#cccccc")
+        .stroke();
+
+      doc.y = lineY + 10;
+
+      // Pendiente
+      doc.fontSize(14).font("Helvetica-Bold").fillColor("#dc2626");
+      doc.text("Pendiente:", startX + 10, doc.y);
+      doc.text(
+        `$${(reservationData.total_amount - reservationData.deposit_amount).toFixed(2)}`,
+        startX + 400,
+        doc.y,
+        { width: 100, align: "right" },
+      );
+      doc.moveDown(1.5);
+
+      // Notas
+      if (reservationData.notes) {
+        doc.fontSize(16).font("Helvetica-Bold").fillColor("black");
+        doc.text("NOTAS");
+        doc.moveDown(0.5);
+
+        doc.fontSize(11).font("Helvetica").fillColor("#666666");
+        doc.text(reservationData.notes, {
+          width: 500,
+          align: "justify",
+        });
+        doc.moveDown(1.5);
+      }
+
+      // Pie de página
+      doc.moveDown(2);
+      doc.fontSize(9).font("Helvetica").fillColor("#666666");
+      doc.text(`Fecha de emisión: ${new Date().toLocaleString("es-ES")}`, {
+        align: "center",
+      });
+      doc.text(`ID Reservación: #${reservationData.id}`, { align: "center" });
+      doc.moveDown();
+      doc.text("¡Gracias por su preferencia!", { align: "center" });
+
+      doc.end();
+    });
+  } catch (error) {
+    console.error("Error generando PDF de reservación:", error);
+    throw error;
+  }
+}
+
+/**
+ * Genera un PDF de cotización
+ */
+async function generateQuotationPDF(quotationData) {
+  try {
+    const userDataPath = app.getPath("userData");
+    const pdfDir = path.join(userDataPath, "pdfs");
+
+    if (!fs.existsSync(pdfDir)) {
+      fs.mkdirSync(pdfDir, { recursive: true });
+    }
+
+    const companySettings = await getCompanySettings();
+
+    const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+    const filename = `cotizacion_${quotationData.quotation_number}_${timestamp}.pdf`;
+    const filepath = path.join(pdfDir, filename);
+
+    return new Promise((resolve, reject) => {
+      const doc = new PDFDocument({ margin: 50 });
+      const stream = fs.createWriteStream(filepath);
+
+      stream.on("finish", () => {
+        resolve(filepath);
+      });
+
+      stream.on("error", reject);
+
+      doc.pipe(stream);
+
+      // Encabezado
+      doc.fontSize(10).font("Helvetica").fillColor("#666666");
+      doc.text(companySettings.businessName, { align: "center" });
+      if (companySettings.businessAddress) {
+        doc.text(companySettings.businessAddress, { align: "center" });
+      }
+      if (companySettings.businessPhone) {
+        doc.text(companySettings.businessPhone, { align: "center" });
+      }
+      doc.moveDown();
+
+      // Título
+      doc
+        .fontSize(24)
+        .font("Helvetica-Bold")
+        .fillColor("#9333ea")
+        .text("COTIZACIÓN", { align: "center" });
+      doc.moveDown();
+
+      // Número y fecha
+      doc.fontSize(12).font("Helvetica").fillColor("#333333");
+      doc.text(`Número: ${quotationData.quotation_number}`);
+      doc.text(
+        `Fecha: ${new Date(quotationData.created_at).toLocaleDateString("es-ES")}`,
+      );
+      if (quotationData.valid_until) {
+        doc.text(
+          `Válida hasta: ${new Date(quotationData.valid_until).toLocaleDateString("es-ES")}`,
+        );
+      }
+      doc.moveDown(1.5);
+
+      // Información del cliente
+      doc.fontSize(14).font("Helvetica-Bold").fillColor("black");
+      doc.text("CLIENTE");
+      doc.moveDown(0.5);
+
+      doc.fontSize(11).font("Helvetica").fillColor("#333333");
+      doc.text(`Nombre: ${quotationData.client_name}`);
+      if (quotationData.client_phone) {
+        doc.text(`Teléfono: ${quotationData.client_phone}`);
+      }
+      if (quotationData.client_email) {
+        doc.text(`Email: ${quotationData.client_email}`);
+      }
+      if (quotationData.client_address) {
+        doc.text(`Dirección: ${quotationData.client_address}`);
+      }
+      doc.moveDown(1.5);
+
+      // Tabla de items
+      doc.fontSize(14).font("Helvetica-Bold").fillColor("black");
+      doc.text("DETALLE");
+      doc.moveDown(0.5);
+
+      const tableTop = doc.y;
+      const itemX = 50;
+      const qtyX = 320;
+      const priceX = 380;
+      const totalX = 480;
+
+      // Encabezados de tabla
+      doc.fontSize(10).font("Helvetica-Bold").fillColor("#666666");
+      doc.text("Descripción", itemX, tableTop);
+      doc.text("Cant.", qtyX, tableTop, { width: 50, align: "center" });
+      doc.text("Precio", priceX, tableTop, { width: 80, align: "right" });
+      doc.text("Subtotal", totalX, tableTop, { width: 80, align: "right" });
+
+      // Línea debajo de encabezados
+      doc
+        .moveTo(itemX, tableTop + 15)
+        .lineTo(560, tableTop + 15)
+        .strokeColor("#cccccc")
+        .stroke();
+
+      let yPosition = tableTop + 25;
+
+      // Items
+      doc.fontSize(10).font("Helvetica").fillColor("#333333");
+      quotationData.items.forEach((item) => {
+        if (yPosition > 700) {
+          doc.addPage();
+          yPosition = 50;
+        }
+
+        doc.text(item.description, itemX, yPosition, { width: 260 });
+        doc.text(item.quantity.toString(), qtyX, yPosition, {
+          width: 50,
+          align: "center",
+        });
+        doc.text(`$${item.unit_price.toFixed(2)}`, priceX, yPosition, {
+          width: 80,
+          align: "right",
+        });
+        doc.text(`$${item.subtotal.toFixed(2)}`, totalX, yPosition, {
+          width: 80,
+          align: "right",
+        });
+
+        yPosition += 25;
+      });
+
+      // Línea antes de totales
+      yPosition += 10;
+      doc
+        .moveTo(itemX, yPosition)
+        .lineTo(560, yPosition)
+        .strokeColor("#cccccc")
+        .stroke();
+
+      yPosition += 15;
+
+      // Totales
+      doc.fontSize(11).font("Helvetica").fillColor("#333333");
+
+      // Subtotal
+      doc.text("Subtotal:", priceX, yPosition, { width: 80, align: "right" });
+      doc.text(`$${quotationData.subtotal.toFixed(2)}`, totalX, yPosition, {
+        width: 80,
+        align: "right",
+      });
+      yPosition += 20;
+
+      // Descuento
+      if (quotationData.discount > 0) {
+        doc
+          .fillColor("#16a34a")
+          .text("Descuento:", priceX, yPosition, { width: 80, align: "right" });
+        doc.text(`-$${quotationData.discount.toFixed(2)}`, totalX, yPosition, {
+          width: 80,
+          align: "right",
+        });
+        yPosition += 20;
+        doc.fillColor("#333333");
+      }
+
+      // Impuesto
+      if (quotationData.tax > 0) {
+        doc.text("Impuesto:", priceX, yPosition, { width: 80, align: "right" });
+        doc.text(`$${quotationData.tax.toFixed(2)}`, totalX, yPosition, {
+          width: 80,
+          align: "right",
+        });
+        yPosition += 20;
+      }
+
+      // Línea antes del total
+      doc
+        .moveTo(priceX, yPosition)
+        .lineTo(560, yPosition)
+        .strokeColor("#333333")
+        .lineWidth(2)
+        .stroke();
+
+      yPosition += 15;
+
+      // Total
+      doc.fontSize(14).font("Helvetica-Bold").fillColor("#9333ea");
+      doc.text("TOTAL:", priceX, yPosition, { width: 80, align: "right" });
+      doc.text(`$${quotationData.total.toFixed(2)}`, totalX, yPosition, {
+        width: 80,
+        align: "right",
+      });
+
+      // Notas
+      if (quotationData.notes) {
+        yPosition += 40;
+        doc.fontSize(12).font("Helvetica-Bold").fillColor("black");
+        doc.text("NOTAS", itemX, yPosition);
+        yPosition += 20;
+
+        doc.fontSize(10).font("Helvetica").fillColor("#666666");
+        doc.text(quotationData.notes, itemX, yPosition, {
+          width: 500,
+          align: "justify",
+        });
+      }
+
+      // Pie de página
+      doc.fontSize(9).font("Helvetica").fillColor("#666666");
+      const footerY = 750;
+      doc.text(
+        `Fecha de emisión: ${new Date().toLocaleString("es-ES")}`,
+        50,
+        footerY,
+        { align: "center" },
+      );
+      doc.text(
+        `Cotización: ${quotationData.quotation_number}`,
+        50,
+        footerY + 15,
+        {
+          align: "center",
+        },
+      );
+      doc.moveDown();
+      doc.text("¡Gracias por su preferencia!", { align: "center" });
+
+      doc.end();
+    });
+  } catch (error) {
+    console.error("Error generando PDF de cotización:", error);
+    throw error;
+  }
+}
+
 module.exports = {
   generateOpeningPDF,
   generateClosingPDF,
   generateMembershipPDF,
+  generateReservationPDF,
+  generateQuotationPDF,
 };

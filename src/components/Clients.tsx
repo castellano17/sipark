@@ -137,7 +137,7 @@ export function Clients() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.name || !formData.phone) {
+    if (!formData.name) {
       error("Complete los campos obligatorios");
       return;
     }
@@ -148,7 +148,7 @@ export function Clients() {
           editingClient.id,
           formData.name,
           formData.parent_name || null,
-          formData.phone,
+          formData.phone || null,
           formData.emergency_phone || null,
           formData.email || null,
           formData.child_name || null,
@@ -161,7 +161,7 @@ export function Clients() {
         await window.api.createClient(
           formData.name,
           formData.parent_name || null,
-          formData.phone,
+          formData.phone || null,
           formData.emergency_phone || null,
           formData.email || null,
           formData.child_name || null,
@@ -389,7 +389,7 @@ export function Clients() {
 
                     <div>
                       <label className="block text-sm font-medium mb-2">
-                        Teléfono Principal *
+                        Teléfono Principal
                       </label>
                       <Input
                         type="tel"
@@ -397,7 +397,6 @@ export function Clients() {
                         onChange={(e) =>
                           setFormData({ ...formData, phone: e.target.value })
                         }
-                        required
                       />
                     </div>
 

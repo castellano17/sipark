@@ -573,8 +573,44 @@ contextBridge.exposeInMainWorld("api", {
   getDefaultPrinter: () => ipcRenderer.invoke("printer:getDefaultPrinter"),
   generateMembershipPDF: (pdfData) =>
     ipcRenderer.invoke("pdf:generateMembershipPDF", pdfData),
+  generateReservationPDF: (reservationData) =>
+    ipcRenderer.invoke("pdf:generateReservationPDF", reservationData),
+  generateQuotationPDF: (quotationData) =>
+    ipcRenderer.invoke("pdf:generateQuotationPDF", quotationData),
 
   // Utilidades de mantenimiento
   fixNegativeCashMovements: () =>
     ipcRenderer.invoke("api:fixNegativeCashMovements"),
+
+  // Reservaciones
+  getAllReservations: () => ipcRenderer.invoke("api:getAllReservations"),
+  getReservationsByDateRange: (startDate, endDate) =>
+    ipcRenderer.invoke("api:getReservationsByDateRange", {
+      startDate,
+      endDate,
+    }),
+  getReservationById: (id) => ipcRenderer.invoke("api:getReservationById", id),
+  createReservation: (data) =>
+    ipcRenderer.invoke("api:createReservation", data),
+  updateReservationStatus: (id, status) =>
+    ipcRenderer.invoke("api:updateReservationStatus", { id, status }),
+  cancelReservation: (id) => ipcRenderer.invoke("api:cancelReservation", id),
+  registerReservationPayment: (reservationId, paymentData) =>
+    ipcRenderer.invoke("api:registerReservationPayment", {
+      reservationId,
+      paymentData,
+    }),
+  completeReservation: (reservationId, paymentData) =>
+    ipcRenderer.invoke("api:completeReservation", {
+      reservationId,
+      paymentData,
+    }),
+
+  // Cotizaciones
+  createQuotation: (data) => ipcRenderer.invoke("api:createQuotation", data),
+  getAllQuotations: () => ipcRenderer.invoke("api:getAllQuotations"),
+  getQuotationById: (id) => ipcRenderer.invoke("api:getQuotationById", id),
+  updateQuotationStatus: (id, status) =>
+    ipcRenderer.invoke("api:updateQuotationStatus", { id, status }),
+  deleteQuotation: (id) => ipcRenderer.invoke("api:deleteQuotation", id),
 });

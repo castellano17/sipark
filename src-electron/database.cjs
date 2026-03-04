@@ -35,7 +35,7 @@ function createTables() {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL,
         parent_name TEXT,
-        phone TEXT NOT NULL,
+        phone TEXT,
         emergency_phone TEXT,
         email TEXT,
         child_name TEXT,
@@ -345,6 +345,61 @@ function createTables() {
         FOREIGN KEY (feature_id) REFERENCES package_features(id) ON DELETE CASCADE,
         UNIQUE(package_id, feature_id)
       )`,
+      `CREATE TABLE IF NOT EXISTS reservations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        client_id INTEGER NOT NULL,
+        client_name TEXT NOT NULL,
+        client_phone TEXT,
+        client_email TEXT,
+        event_date DATE NOT NULL,
+        event_time TEXT NOT NULL,
+        package_id INTEGER NOT NULL,
+        package_name TEXT NOT NULL,
+        total_amount REAL NOT NULL,
+        deposit_amount REAL DEFAULT 0,
+        status TEXT DEFAULT 'pending',
+        payment_status TEXT DEFAULT 'unpaid',
+        sale_id INTEGER,
+        final_sale_id INTEGER,
+        notes TEXT,
+        created_by INTEGER,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        completed_at DATETIME,
+        FOREIGN KEY (client_id) REFERENCES clients(id),
+        FOREIGN KEY (package_id) REFERENCES products_services(id),
+        FOREIGN KEY (created_by) REFERENCES users(id),
+        FOREIGN KEY (sale_id) REFERENCES sales(id),
+        FOREIGN KEY (final_sale_id) REFERENCES sales(id)
+      )`,
+      `CREATE TABLE IF NOT EXISTS quotations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        quotation_number TEXT NOT NULL UNIQUE,
+        client_name TEXT NOT NULL,
+        client_phone TEXT,
+        client_email TEXT,
+        client_address TEXT,
+        subtotal REAL NOT NULL,
+        discount REAL DEFAULT 0,
+        tax REAL DEFAULT 0,
+        total REAL NOT NULL,
+        valid_until DATE,
+        status TEXT DEFAULT 'pending',
+        notes TEXT,
+        created_by INTEGER,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (created_by) REFERENCES users(id)
+      )`,
+      `CREATE TABLE IF NOT EXISTS quotation_items (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        quotation_id INTEGER NOT NULL,
+        product_id INTEGER,
+        description TEXT NOT NULL,
+        quantity INTEGER NOT NULL,
+        unit_price REAL NOT NULL,
+        subtotal REAL NOT NULL,
+        FOREIGN KEY (quotation_id) REFERENCES quotations(id) ON DELETE CASCADE,
+        FOREIGN KEY (product_id) REFERENCES products_services(id)
+      )`,
     ];
 
     tables.forEach((sql) => {
@@ -418,6 +473,13 @@ function migrateMembershipTables() {
         "ALTER TABLE client_memberships ADD COLUMN cancelled_at DATETIME",
         "ALTER TABLE client_memberships ADD COLUMN cancelled_by INTEGER",
         "ALTER TABLE client_memberships ADD COLUMN cancellation_reason TEXT",
+        // Reservations table
+        "ALTER TABLE reservations ADD COLUMN payment_status TEXT DEFAULT 'unpaid'",
+        "ALTER TABLE reservations ADD COLUMN sale_id INTEGER",
+        "ALTER TABLE reservations ADD COLUMN final_sale_id INTEGER",
+        "ALTER TABLE reservations ADD COLUMN completed_at DATETIME",
+        // Sales table
+        "ALTER TABLE sales ADD COLUMN client_name TEXT",
       ];
 
       for (const sql of migrations) {

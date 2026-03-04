@@ -13,6 +13,8 @@ const backupEmail = require("./src-electron/backup-email.cjs");
 const backupGDrive = require("./src-electron/backup-gdrive.cjs");
 const backupScheduler = require("./src-electron/backup-scheduler.cjs");
 const pdfGenerator = require("./src-electron/pdf-generator.cjs");
+const reservationsApi = require("./src-electron/reservations-api.cjs");
+const quotationsApi = require("./src-electron/quotations-api.cjs");
 
 // Hot reload en desarrollo
 if (isDev) {
@@ -707,9 +709,71 @@ function setupIpcHandlers() {
   ipcMain.handle("pdf:generateMembershipPDF", (event, pdfData) =>
     pdfGenerator.generateMembershipPDF(pdfData),
   );
+  ipcMain.handle(
+    "pdf:generateReservationPDF",
+    async (event, reservationData) => {
+      const filepath =
+        await pdfGenerator.generateReservationPDF(reservationData);
+      shell.openPath(filepath);
+      return filepath;
+    },
+  );
+  ipcMain.handle("pdf:generateQuotationPDF", async (event, quotationData) => {
+    const filepath = await pdfGenerator.generateQuotationPDF(quotationData);
+    shell.openPath(filepath);
+    return filepath;
+  });
 
   // Utilidades de mantenimiento
   ipcMain.handle("api:fixNegativeCashMovements", () =>
     api.fixNegativeCashMovements(),
+  );
+
+  // Reservaciones
+  ipcMain.handle("api:createReservation", (event, data) =>
+    reservationsApi.createReservation(data),
+  );
+  ipcMain.handle("api:getAllReservations", () =>
+    reservationsApi.getAllReservations(),
+  );
+  ipcMain.handle(
+    "api:getReservationsByDateRange",
+    (event, { startDate, endDate }) =>
+      reservationsApi.getReservationsByDateRange(startDate, endDate),
+  );
+  ipcMain.handle("api:getReservationById", (event, id) =>
+    reservationsApi.getReservationById(id),
+  );
+  ipcMain.handle("api:updateReservationStatus", (event, { id, status }) =>
+    reservationsApi.updateReservationStatus(id, status),
+  );
+  ipcMain.handle("api:cancelReservation", (event, id) =>
+    reservationsApi.cancelReservation(id),
+  );
+  ipcMain.handle("api:registerReservationPayment", (event, data) =>
+    reservationsApi.registerReservationPayment(
+      data.reservationId,
+      data.paymentData,
+    ),
+  );
+  ipcMain.handle("api:completeReservation", (event, data) =>
+    reservationsApi.completeReservation(data.reservationId, data.paymentData),
+  );
+
+  // Cotizaciones
+  ipcMain.handle("api:createQuotation", (event, data) =>
+    quotationsApi.createQuotation(data),
+  );
+  ipcMain.handle("api:getAllQuotations", () =>
+    quotationsApi.getAllQuotations(),
+  );
+  ipcMain.handle("api:getQuotationById", (event, id) =>
+    quotationsApi.getQuotationById(id),
+  );
+  ipcMain.handle("api:updateQuotationStatus", (event, { id, status }) =>
+    quotationsApi.updateQuotationStatus(id, status),
+  );
+  ipcMain.handle("api:deleteQuotation", (event, id) =>
+    quotationsApi.deleteQuotation(id),
   );
 }
