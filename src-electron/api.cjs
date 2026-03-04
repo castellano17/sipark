@@ -161,24 +161,6 @@ async function getClientById(clientId) {
     throw error;
   }
 }
-  } catch (error) {
-    console.error("Error obteniendo cliente:", error);
-    // Si falla, intentar sin is_member
-    try {
-      const sql = `SELECT id, name, parent_name, phone, emergency_phone, email, 
-                   child_name, child_age, allergies, special_notes, photo_path, 
-                   created_at FROM clients WHERE id = ?`;
-      const client = await getAsync(sql, [clientId]);
-      if (client) {
-        client.is_member = false;
-      }
-      return client;
-    } catch (err) {
-      console.error("Error en fallback:", err);
-      throw error;
-    }
-  }
-}
 
 // ============ SESSIONS ============
 
