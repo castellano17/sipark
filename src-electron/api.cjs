@@ -18,16 +18,39 @@ function getLocalTimestamp() {
 
 async function getClients() {
   try {
-    const sql = "SELECT * FROM clients ORDER BY name";
-    const clients = await allAsync(sql);
+    // Intentar con todas las columnas
+    let sql = "SELECT * FROM clients ORDER BY name";
+    let clients = await allAsync(sql);
+
+    // Si falla, intentar sin is_member
+    if (!clients || clients.length === 0) {
+      sql = `SELECT id, name, parent_name, phone, emergency_phone, email, 
+             child_name, child_age, allergies, special_notes, photo_path, 
+             created_at FROM clients ORDER BY name`;
+      clients = await allAsync(sql);
+    }
+
     // Asegurar que is_member exista en cada cliente
     return clients.map((client) => ({
       ...client,
-      is_member: client.is_member || false,
+      is_member: client.is_member !== undefined ? client.is_member : false,
     }));
   } catch (error) {
     console.error("Error obteniendo clientes:", error);
-    throw error;
+    // Si falla, intentar sin is_member
+    try {
+      const sql = `SELECT id, name, parent_name, phone, emergency_phone, email, 
+                   child_name, child_age, allergies, special_notes, photo_path, 
+                   created_at FROM clients ORDER BY name`;
+      const clients = await allAsync(sql);
+      return clients.map((client) => ({
+        ...client,
+        is_member: false,
+      }));
+    } catch (err) {
+      console.error("Error en fallback:", err);
+      throw error;
+    }
   }
 }
 
@@ -159,12 +182,26 @@ async function getClientById(clientId) {
     const client = await getAsync(sql, [clientId]);
     if (client) {
       // Asegurar que is_member exista
-      client.is_member = client.is_member || false;
+      client.is_member =
+        client.is_member !== undefined ? client.is_member : false;
     }
     return client;
   } catch (error) {
     console.error("Error obteniendo cliente:", error);
-    throw error;
+    // Si falla, intentar sin is_member
+    try {
+      const sql = `SELECT id, name, parent_name, phone, emergency_phone, email, 
+                   child_name, child_age, allergies, special_notes, photo_path, 
+                   created_at FROM clients WHERE id = ?`;
+      const client = await getAsync(sql, [clientId]);
+      if (client) {
+        client.is_member = false;
+      }
+      return client;
+    } catch (err) {
+      console.error("Error en fallback:", err);
+      throw error;
+    }
   }
 }
 
