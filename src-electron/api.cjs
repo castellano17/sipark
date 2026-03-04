@@ -1609,31 +1609,64 @@ async function clearAllData() {
   try {
     console.log("🗑️  Limpiando base de datos...");
 
+    // Deshabilitar temporalmente las claves foráneas
+    await runAsync("PRAGMA foreign_keys = OFF");
+
     // Orden importante: primero las tablas dependientes, luego las principales
     const tables = [
+      // Tablas con dependencias múltiples (primero)
+      "quotation_items",
+      "membership_usage",
+      "membership_renewals",
+      "client_visits",
+      "package_included_features",
+      "reservations",
+      "sales_audit",
+      "price_history",
+      "user_audit_log",
+      "user_permissions",
       "stock_adjustments",
       "purchase_items",
-      "purchase_orders",
       "sale_items",
-      "sales",
       "cash_movements",
-      "cash_boxes",
+
+      // Tablas con dependencias simples
+      "purchase_orders",
+      "sales",
+      "client_memberships",
       "active_sessions",
+      "quotations",
+      "cash_boxes",
+
+      // Tablas base (sin dependencias)
       "products_services",
       "clients",
       "categories",
       "suppliers",
+      "memberships",
+      "package_features",
+      "package_feature_categories",
+      "users",
     ];
 
     for (const table of tables) {
-      await runAsync(`DELETE FROM ${table}`);
-      console.log(`  ✓ Tabla ${table} limpiada`);
+      try {
+        await runAsync(`DELETE FROM ${table}`);
+        console.log(`  ✓ Tabla ${table} limpiada`);
+      } catch (err) {
+        // Si la tabla no existe, continuar
+        if (!err.message.includes("no such table")) {
+          console.warn(`  ⚠ Error limpiando ${table}:`, err.message);
+        }
+      }
     }
 
     // Reiniciar los autoincrement
-    for (const table of tables) {
-      await runAsync(`DELETE FROM sqlite_sequence WHERE name='${table}'`);
-    }
+    await runAsync("DELETE FROM sqlite_sequence");
+    console.log("  ✓ Secuencias reiniciadas");
+
+    // Reactivar las claves foráneas
+    await runAsync("PRAGMA foreign_keys = ON");
 
     console.log("✅ Base de datos limpiada completamente");
     console.log("ℹ️  Configuración del sistema mantenida");
@@ -1641,6 +1674,12 @@ async function clearAllData() {
     return { success: true, message: "Base de datos limpiada exitosamente" };
   } catch (error) {
     console.error("❌ Error limpiando base de datos:", error);
+    // Asegurar que las claves foráneas se reactiven incluso si hay error
+    try {
+      await runAsync("PRAGMA foreign_keys = ON");
+    } catch (e) {
+      // Ignorar error al reactivar
+    }
     throw error;
   }
 }
