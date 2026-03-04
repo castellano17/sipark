@@ -61,7 +61,7 @@ function createWindow() {
 app.on("ready", async () => {
   try {
     await initializeDatabase();
-    // await migrateDatabase(); // No necesario con PostgreSQL - las tablas ya tienen todas las columnas
+    await migrateDatabase();
     seedDatabase();
 
     // Crear primer admin si no existen usuarios
@@ -78,8 +78,7 @@ app.on("ready", async () => {
     createWindow();
 
     // Iniciar programador de respaldos automáticos
-    // TODO: Implementar backups para PostgreSQL
-    // backupScheduler.startBackupScheduler();
+    backupScheduler.startBackupScheduler();
   } catch (error) {
     console.error("Error en app ready:", error);
     app.quit();
