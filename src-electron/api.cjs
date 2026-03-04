@@ -21,11 +21,7 @@ async function getClients() {
     const sql = `SELECT id, name, parent_name, phone, emergency_phone, email, 
                  child_name, child_age, allergies, special_notes, photo_path, 
                  created_at FROM clients ORDER BY name`;
-    const clients = await allAsync(sql);
-    return clients.map((client) => ({
-      ...client,
-      is_member: false,
-    }));
+    return await allAsync(sql);
   } catch (error) {
     console.error("Error obteniendo clientes:", error);
     throw error;
@@ -159,11 +155,12 @@ async function getClientById(clientId) {
     const sql = `SELECT id, name, parent_name, phone, emergency_phone, email, 
                  child_name, child_age, allergies, special_notes, photo_path, 
                  created_at FROM clients WHERE id = ?`;
-    const client = await getAsync(sql, [clientId]);
-    if (client) {
-      client.is_member = false;
-    }
-    return client;
+    return await getAsync(sql, [clientId]);
+  } catch (error) {
+    console.error("Error obteniendo cliente:", error);
+    throw error;
+  }
+}
   } catch (error) {
     console.error("Error obteniendo cliente:", error);
     // Si falla, intentar sin is_member

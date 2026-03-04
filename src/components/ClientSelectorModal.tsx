@@ -74,10 +74,9 @@ export function ClientSelectorModal({
           variant="outline"
           onClick={() =>
             onSelect({
-              id: -1, // Usar -1 para indicar "sin cliente"
+              id: -1,
               name: "Cliente General",
               created_at: "",
-              is_member: false,
             })
           }
           className="mb-4 gap-2"
@@ -116,11 +115,6 @@ export function ClientSelectorModal({
                       </div>
                     )}
                   </div>
-                  {client.is_member && (
-                    <div className="bg-yellow-100 text-yellow-800 text-xs px-2 py-1 rounded">
-                      VIP
-                    </div>
-                  )}
                 </div>
               </Card>
             ))
