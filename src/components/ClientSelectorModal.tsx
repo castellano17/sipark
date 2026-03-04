@@ -122,9 +122,6 @@ export function ClientSelectorModal({
                     </div>
                   )}
                 </div>
-                    </div>
-                  )}
-                </div>
               </Card>
             ))
           )}
