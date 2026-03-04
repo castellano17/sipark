@@ -1,5 +1,5 @@
 // API de Gestión de Usuarios
-const bcrypt = require("bcrypt");
+const bcrypt = require("bcryptjs");
 const { runAsync, getAsync, allAsync } = require("./database-pg.cjs");
 
 const SALT_ROUNDS = 10;
