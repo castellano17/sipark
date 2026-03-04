@@ -77,7 +77,6 @@ export function ClientSelectorModal({
               id: -1,
               name: "Cliente General",
               created_at: "",
-              is_member: false,
             })
           }
           className="mb-4 gap-2"
@@ -116,11 +115,6 @@ export function ClientSelectorModal({
                       </div>
                     )}
                   </div>
-                  {client.is_member && (
-                    <div className="bg-yellow-100 text-yellow-800 text-xs px-2 py-1 rounded">
-                      VIP
-                    </div>
-                  )}
                 </div>
               </Card>
             ))
