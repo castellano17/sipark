@@ -2,7 +2,7 @@ const { app, BrowserWindow, ipcMain, shell } = require("electron");
 const path = require("path");
 // Detectar si estamos en desarrollo sin dependencias externas
 const isDev = !app.isPackaged;
-const { initializeDatabase } = require("./src-electron/database-pg.cjs");
+const { initializeDatabase } = require("./src-electron/database.cjs");
 const { migrateDatabase } = require("./src-electron/migrate.cjs");
 const { seedDatabase } = require("./src-electron/seed.cjs");
 const api = require("./src-electron/api.cjs");
