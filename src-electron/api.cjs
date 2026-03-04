@@ -18,39 +18,17 @@ function getLocalTimestamp() {
 
 async function getClients() {
   try {
-    // Intentar con todas las columnas
-    let sql = "SELECT * FROM clients ORDER BY name";
-    let clients = await allAsync(sql);
-
-    // Si falla, intentar sin is_member
-    if (!clients || clients.length === 0) {
-      sql = `SELECT id, name, parent_name, phone, emergency_phone, email, 
-             child_name, child_age, allergies, special_notes, photo_path, 
-             created_at FROM clients ORDER BY name`;
-      clients = await allAsync(sql);
-    }
-
-    // Asegurar que is_member exista en cada cliente
+    const sql = `SELECT id, name, parent_name, phone, emergency_phone, email, 
+                 child_name, child_age, allergies, special_notes, photo_path, 
+                 created_at FROM clients ORDER BY name`;
+    const clients = await allAsync(sql);
     return clients.map((client) => ({
       ...client,
-      is_member: client.is_member !== undefined ? client.is_member : false,
+      is_member: false,
     }));
   } catch (error) {
     console.error("Error obteniendo clientes:", error);
-    // Si falla, intentar sin is_member
-    try {
-      const sql = `SELECT id, name, parent_name, phone, emergency_phone, email, 
-                   child_name, child_age, allergies, special_notes, photo_path, 
-                   created_at FROM clients ORDER BY name`;
-      const clients = await allAsync(sql);
-      return clients.map((client) => ({
-        ...client,
-        is_member: false,
-      }));
-    } catch (err) {
-      console.error("Error en fallback:", err);
-      throw error;
-    }
+    throw error;
   }
 }
 
@@ -178,12 +156,12 @@ async function deleteClient(id) {
 
 async function getClientById(clientId) {
   try {
-    const sql = "SELECT * FROM clients WHERE id = ?";
+    const sql = `SELECT id, name, parent_name, phone, emergency_phone, email, 
+                 child_name, child_age, allergies, special_notes, photo_path, 
+                 created_at FROM clients WHERE id = ?`;
     const client = await getAsync(sql, [clientId]);
     if (client) {
-      // Asegurar que is_member exista
-      client.is_member =
-        client.is_member !== undefined ? client.is_member : false;
+      client.is_member = false;
     }
     return client;
   } catch (error) {
