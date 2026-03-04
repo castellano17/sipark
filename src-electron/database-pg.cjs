@@ -77,18 +77,6 @@ async function createTables() {
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )`,
 
-    `CREATE TABLE IF NOT EXISTS active_sessions (
-      id SERIAL PRIMARY KEY,
-      client_id INTEGER NOT NULL,
-      start_time TIMESTAMP NOT NULL,
-      end_time TIMESTAMP,
-      elapsed_minutes INTEGER,
-      package_id INTEGER,
-      status VARCHAR(50) DEFAULT 'active',
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (client_id) REFERENCES clients(id)
-    )`,
-
     `CREATE TABLE IF NOT EXISTS products_services (
       id SERIAL PRIMARY KEY,
       name VARCHAR(255) NOT NULL,
@@ -99,6 +87,32 @@ async function createTables() {
       stock INTEGER DEFAULT 0,
       duration_minutes INTEGER,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )`,
+
+    `CREATE TABLE IF NOT EXISTS cash_boxes (
+      id SERIAL PRIMARY KEY,
+      opening_amount DECIMAL(10,2) NOT NULL,
+      closing_amount DECIMAL(10,2),
+      expected_amount DECIMAL(10,2),
+      difference DECIMAL(10,2),
+      opened_at TIMESTAMP NOT NULL,
+      closed_at TIMESTAMP,
+      opened_by VARCHAR(100),
+      closed_by VARCHAR(100),
+      status VARCHAR(50) DEFAULT 'open',
+      notes TEXT
+    )`,
+
+    `CREATE TABLE IF NOT EXISTS active_sessions (
+      id SERIAL PRIMARY KEY,
+      client_id INTEGER NOT NULL,
+      start_time TIMESTAMP NOT NULL,
+      end_time TIMESTAMP,
+      elapsed_minutes INTEGER,
+      package_id INTEGER,
+      status VARCHAR(50) DEFAULT 'active',
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (client_id) REFERENCES clients(id)
     )`,
 
     `CREATE TABLE IF NOT EXISTS sales (
@@ -126,20 +140,6 @@ async function createTables() {
       FOREIGN KEY (product_id) REFERENCES products_services(id)
     )`,
 
-    `CREATE TABLE IF NOT EXISTS cash_boxes (
-      id SERIAL PRIMARY KEY,
-      opening_amount DECIMAL(10,2) NOT NULL,
-      closing_amount DECIMAL(10,2),
-      expected_amount DECIMAL(10,2),
-      difference DECIMAL(10,2),
-      opened_at TIMESTAMP NOT NULL,
-      closed_at TIMESTAMP,
-      opened_by VARCHAR(100),
-      closed_by VARCHAR(100),
-      status VARCHAR(50) DEFAULT 'open',
-      notes TEXT
-    )`,
-
     `CREATE TABLE IF NOT EXISTS cash_movements (
       id SERIAL PRIMARY KEY,
       cash_box_id INTEGER NOT NULL,
@@ -155,6 +155,26 @@ async function createTables() {
       value TEXT NOT NULL,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )`,
+
+    `CREATE TABLE IF NOT EXISTS users (
+      id SERIAL PRIMARY KEY,
+      username VARCHAR(50) NOT NULL UNIQUE,
+      password VARCHAR(255) NOT NULL,
+      first_name VARCHAR(100) NOT NULL,
+      last_name VARCHAR(100) NOT NULL,
+      email VARCHAR(100),
+      phone VARCHAR(50),
+      photo_path TEXT,
+      role VARCHAR(50) NOT NULL,
+      is_active BOOLEAN DEFAULT TRUE,
+      last_login TIMESTAMP,
+      created_by INTEGER,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_by INTEGER,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (created_by) REFERENCES users(id),
+      FOREIGN KEY (updated_by) REFERENCES users(id)
     )`,
 
     `CREATE TABLE IF NOT EXISTS suppliers (
@@ -210,26 +230,6 @@ async function createTables() {
       created_by VARCHAR(100),
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (product_id) REFERENCES products_services(id)
-    )`,
-
-    `CREATE TABLE IF NOT EXISTS users (
-      id SERIAL PRIMARY KEY,
-      username VARCHAR(50) NOT NULL UNIQUE,
-      password VARCHAR(255) NOT NULL,
-      first_name VARCHAR(100) NOT NULL,
-      last_name VARCHAR(100) NOT NULL,
-      email VARCHAR(100),
-      phone VARCHAR(50),
-      photo_path TEXT,
-      role VARCHAR(50) NOT NULL,
-      is_active BOOLEAN DEFAULT TRUE,
-      last_login TIMESTAMP,
-      created_by INTEGER,
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      updated_by INTEGER,
-      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (created_by) REFERENCES users(id),
-      FOREIGN KEY (updated_by) REFERENCES users(id)
     )`,
 
     `CREATE TABLE IF NOT EXISTS user_permissions (
@@ -325,6 +325,62 @@ async function createTables() {
       FOREIGN KEY (feature_id) REFERENCES package_features(id) ON DELETE CASCADE,
       UNIQUE(package_id, feature_id)
     )`,
+
+    `CREATE TABLE IF NOT EXISTS reservations (
+      id SERIAL PRIMARY KEY,
+      client_id INTEGER NOT NULL,
+      client_name VARCHAR(255),
+      client_phone VARCHAR(50),
+      client_email VARCHAR(255),
+      package_id INTEGER,
+      package_name VARCHAR(255),
+      event_date DATE NOT NULL,
+      event_time TIME NOT NULL,
+      num_children INTEGER NOT NULL,
+      status VARCHAR(20) DEFAULT 'pending',
+      total_amount DECIMAL(10,2) NOT NULL,
+      deposit_amount DECIMAL(10,2) DEFAULT 0,
+      notes TEXT,
+      created_by INTEGER,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (client_id) REFERENCES clients(id),
+      FOREIGN KEY (package_id) REFERENCES products_services(id),
+      FOREIGN KEY (created_by) REFERENCES users(id)
+    )`,
+
+    `CREATE TABLE IF NOT EXISTS quotations (
+      id SERIAL PRIMARY KEY,
+      quotation_number VARCHAR(50) NOT NULL UNIQUE,
+      client_id INTEGER NOT NULL,
+      client_name VARCHAR(255) NOT NULL,
+      client_phone VARCHAR(50),
+      client_email VARCHAR(255),
+      event_date DATE,
+      event_time TIME,
+      num_children INTEGER,
+      total_amount DECIMAL(10,2) NOT NULL,
+      discount DECIMAL(10,2) DEFAULT 0,
+      final_amount DECIMAL(10,2) NOT NULL,
+      status VARCHAR(20) DEFAULT 'pending',
+      notes TEXT,
+      valid_until DATE,
+      created_by INTEGER,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (client_id) REFERENCES clients(id),
+      FOREIGN KEY (created_by) REFERENCES users(id)
+    )`,
+
+    `CREATE TABLE IF NOT EXISTS quotation_items (
+      id SERIAL PRIMARY KEY,
+      quotation_id INTEGER NOT NULL,
+      product_id INTEGER,
+      product_name VARCHAR(255) NOT NULL,
+      quantity INTEGER NOT NULL,
+      unit_price DECIMAL(10,2) NOT NULL,
+      subtotal DECIMAL(10,2) NOT NULL,
+      FOREIGN KEY (quotation_id) REFERENCES quotations(id) ON DELETE CASCADE,
+      FOREIGN KEY (product_id) REFERENCES products_services(id)
+    )`,
   ];
 
   for (const sql of tables) {
@@ -372,9 +428,35 @@ function getDatabase() {
   return pool;
 }
 
+// Función helper para convertir sintaxis SQLite a PostgreSQL
+function convertSqliteToPostgres(sql) {
+  let pgSql = sql;
+
+  // Convertir ? a $1, $2, $3, etc.
+  let paramIndex = 1;
+  pgSql = pgSql.replace(/\?/g, () => `$${paramIndex++}`);
+
+  // Convertir DATE(column) a column::DATE
+  pgSql = pgSql.replace(/DATE\((\w+)\)/gi, "$1::DATE");
+
+  // Convertir strftime('%H', column) a EXTRACT(HOUR FROM column)
+  pgSql = pgSql.replace(/strftime\('%H',\s*(\w+)\)/gi, "EXTRACT(HOUR FROM $1)");
+
+  // Convertir CAST(strftime('%H', column) AS INTEGER) a EXTRACT(HOUR FROM column)::INTEGER
+  pgSql = pgSql.replace(
+    /CAST\(strftime\('%H',\s*(\w+)\)\s+AS\s+INTEGER\)/gi,
+    "EXTRACT(HOUR FROM $1)::INTEGER",
+  );
+
+  return pgSql;
+}
+
 async function runAsync(sql, params = []) {
   try {
-    const result = await pool.query(sql, params);
+    // Convertir sintaxis SQLite a PostgreSQL
+    const pgSql = convertSqliteToPostgres(sql);
+
+    const result = await pool.query(pgSql, params);
     return {
       lastID: result.rows[0]?.id || null,
       changes: result.rowCount,
@@ -388,7 +470,10 @@ async function runAsync(sql, params = []) {
 
 async function getAsync(sql, params = []) {
   try {
-    const result = await pool.query(sql, params);
+    // Convertir sintaxis SQLite a PostgreSQL
+    const pgSql = convertSqliteToPostgres(sql);
+
+    const result = await pool.query(pgSql, params);
     return result.rows[0] || null;
   } catch (error) {
     console.error("Error en getAsync:", error.message);
@@ -398,7 +483,10 @@ async function getAsync(sql, params = []) {
 
 async function allAsync(sql, params = []) {
   try {
-    const result = await pool.query(sql, params);
+    // Convertir sintaxis SQLite a PostgreSQL
+    const pgSql = convertSqliteToPostgres(sql);
+
+    const result = await pool.query(pgSql, params);
     return result.rows || [];
   } catch (error) {
     console.error("Error en allAsync:", error.message);

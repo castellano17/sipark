@@ -1,7 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 const { app, dialog } = require("electron");
-const { getDatabase } = require("./database.cjs");
+const { getDatabase } = require("./database-pg.cjs");
 
 /**
  * Obtiene el directorio de respaldos

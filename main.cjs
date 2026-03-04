@@ -2,7 +2,7 @@ const { app, BrowserWindow, ipcMain, shell } = require("electron");
 const path = require("path");
 // Detectar si estamos en desarrollo sin dependencias externas
 const isDev = !app.isPackaged;
-const { initializeDatabase } = require("./src-electron/database.cjs");
+const { initializeDatabase } = require("./src-electron/database-pg.cjs");
 const { migrateDatabase } = require("./src-electron/migrate.cjs");
 const { seedDatabase } = require("./src-electron/seed.cjs");
 const api = require("./src-electron/api.cjs");
@@ -61,7 +61,7 @@ function createWindow() {
 app.on("ready", async () => {
   try {
     await initializeDatabase();
-    await migrateDatabase();
+    // await migrateDatabase(); // No necesario con PostgreSQL - las tablas ya tienen todas las columnas
     seedDatabase();
 
     // Crear primer admin si no existen usuarios
@@ -78,7 +78,8 @@ app.on("ready", async () => {
     createWindow();
 
     // Iniciar programador de respaldos automáticos
-    backupScheduler.startBackupScheduler();
+    // TODO: Implementar backups para PostgreSQL
+    // backupScheduler.startBackupScheduler();
   } catch (error) {
     console.error("Error en app ready:", error);
     app.quit();

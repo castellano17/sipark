@@ -1,4 +1,4 @@
-const { runAsync, getAsync, allAsync } = require("./database.cjs");
+const { runAsync, getAsync, allAsync } = require("./database-pg.cjs");
 
 // ============ HELPERS ============
 
@@ -199,10 +199,11 @@ async function getActiveSessions() {
         s.start_time,
         s.package_id,
         s.status,
-        s.duration_minutes,
+        s.elapsed_minutes,
         c.name as client_name,
         c.photo_path,
-        p.name as package_name
+        p.name as package_name,
+        p.duration_minutes as package_duration
       FROM active_sessions s
       JOIN clients c ON s.client_id = c.id
       LEFT JOIN products_services p ON s.package_id = p.id
@@ -455,13 +456,13 @@ async function getExecutiveDashboard() {
     const clientsThisWeek = await getAsync(
       `SELECT COUNT(DISTINCT client_id) as count
       FROM sales
-      WHERE DATE(timestamp) >= DATE('now', '-7 days') AND client_id IS NOT NULL`,
+      WHERE timestamp::DATE >= CURRENT_DATE - INTERVAL '7 days' AND client_id IS NOT NULL`,
     );
 
     const clientsThisMonth = await getAsync(
       `SELECT COUNT(DISTINCT client_id) as count
       FROM sales
-      WHERE DATE(timestamp) >= ? AND client_id IS NOT NULL`,
+      WHERE timestamp::DATE >= $1 AND client_id IS NOT NULL`,
       [firstDayOfMonth],
     );
 
@@ -530,12 +531,12 @@ async function getExecutiveDashboard() {
     // Ventas de los últimos 30 días (para gráfico)
     const last30DaysSales = await allAsync(
       `SELECT 
-        DATE(timestamp) as date,
+        timestamp::DATE as date,
         COUNT(*) as count,
         SUM(total) as total
       FROM sales
-      WHERE DATE(timestamp) >= DATE('now', '-30 days')
-      GROUP BY DATE(timestamp)
+      WHERE timestamp::DATE >= CURRENT_DATE - INTERVAL '30 days'
+      GROUP BY timestamp::DATE
       ORDER BY date ASC`,
     );
 
@@ -1935,9 +1936,9 @@ async function getClientActiveMembership(clientId) {
         m.priority_level
       FROM client_memberships cm
       INNER JOIN memberships m ON cm.membership_id = m.id
-      WHERE cm.client_id = ?
+      WHERE cm.client_id = $1
         AND cm.status = 'active'
-        AND cm.end_date >= date('now')
+        AND cm.end_date >= CURRENT_DATE
       ORDER BY cm.end_date DESC
       LIMIT 1
     `;
@@ -2748,11 +2749,11 @@ async function getSalesByHour(startDate, endDate) {
   try {
     const salesByHour = await allAsync(
       `SELECT 
-        CAST(strftime('%H', timestamp) AS INTEGER) as hour,
+        EXTRACT(HOUR FROM timestamp)::INTEGER as hour,
         COUNT(*) as transaction_count,
         SUM(total) as total_amount
       FROM sales
-      WHERE DATE(timestamp) >= ? AND DATE(timestamp) <= ?
+      WHERE timestamp::DATE >= $1 AND timestamp::DATE <= $2
       GROUP BY hour
       ORDER BY hour ASC`,
       [startDate, endDate],
@@ -3487,13 +3488,13 @@ async function getHourlyOccupancy(startDate, endDate) {
     // Obtener todas las sesiones en el rango de fechas
     const sql = `
       SELECT 
-        strftime('%H', start_time) as hour,
+        EXTRACT(HOUR FROM start_time)::TEXT as hour,
         COUNT(*) as session_count,
-        AVG(duration_minutes) as avg_duration
+        AVG(elapsed_minutes) as avg_duration
       FROM active_sessions
-      WHERE DATE(start_time) >= ? AND DATE(start_time) <= ?
+      WHERE start_time::DATE >= $1 AND start_time::DATE <= $2
         AND status = 'completed'
-      GROUP BY strftime('%H', start_time)
+      GROUP BY EXTRACT(HOUR FROM start_time)
       ORDER BY hour
     `;
 
@@ -3562,7 +3563,7 @@ async function getActiveMemberships(statusFilter = "all") {
         cm.status,
         cm.payment_amount,
         cm.notes,
-        CAST((julianday(cm.end_date) - julianday('now')) AS INTEGER) as days_remaining
+        CAST((cm.end_date - CURRENT_DATE) AS INTEGER) as days_remaining
       FROM client_memberships cm
       INNER JOIN clients c ON cm.client_id = c.id
       INNER JOIN memberships m ON cm.membership_id = m.id
@@ -3573,9 +3574,9 @@ async function getActiveMemberships(statusFilter = "all") {
     if (statusFilter === "active") {
       sql += ` WHERE cm.status = 'active'`;
     } else if (statusFilter === "expired") {
-      sql += ` WHERE cm.status = 'expired' OR cm.end_date < date('now')`;
+      sql += ` WHERE cm.status = 'expired' OR cm.end_date < CURRENT_DATE`;
     } else if (statusFilter === "expiring_soon") {
-      sql += ` WHERE cm.status = 'active' AND cm.end_date BETWEEN date('now') AND date('now', '+7 days')`;
+      sql += ` WHERE cm.status = 'active' AND cm.end_date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '7 days'`;
     }
 
     sql += ` ORDER BY cm.end_date ASC`;
@@ -3635,12 +3636,12 @@ async function getExpiringMemberships(daysThreshold = 30) {
         cm.end_date,
         cm.status,
         cm.payment_amount,
-        CAST((julianday(cm.end_date) - julianday('now')) AS INTEGER) as days_remaining
+        CAST((cm.end_date - CURRENT_DATE) AS INTEGER) as days_remaining
       FROM client_memberships cm
       INNER JOIN clients c ON cm.client_id = c.id
       INNER JOIN memberships m ON cm.membership_id = m.id
       WHERE cm.status = 'active' 
-        AND cm.end_date BETWEEN date('now') AND date('now', '+' || ? || ' days')
+        AND cm.end_date BETWEEN CURRENT_DATE AND CURRENT_DATE + ($1 || ' days')::INTERVAL
       ORDER BY cm.end_date ASC
     `;
 
