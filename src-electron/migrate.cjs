@@ -86,6 +86,13 @@ async function migrateDatabase() {
       console.log("✅ Agregada columna special_notes a clients");
     }
 
+    if (!clientColumnNames.includes("is_member")) {
+      db.prepare(
+        "ALTER TABLE clients ADD COLUMN is_member BOOLEAN DEFAULT 0",
+      ).run();
+      console.log("✅ Agregada columna is_member a clients");
+    }
+
     // Verificar columnas de active_sessions
     const sessionColumns = db
       .prepare("PRAGMA table_info(active_sessions)")

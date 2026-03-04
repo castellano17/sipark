@@ -8,6 +8,8 @@
     "dev:electron": "concurrently \"npm run dev:web\" \"sleep 3 && electron .\"",
     "dev:web": "vite",
     "build": "vite build",
+    "build:win": "npm run prepare-sqlite3 && npm run build && electron-builder --win --x64",
+    "build:mac": "npm run build && electron-builder --mac",
     "build:check": "tsc && vite build",
     "preview": "vite preview",
     "type-check": "tsc --noEmit",

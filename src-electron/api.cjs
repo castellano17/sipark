@@ -968,8 +968,8 @@ async function createSession(
         clientId = generalClient.id;
       } else {
         const result = await runAsync(
-          "INSERT INTO clients (name, parent_name, phone, is_member) VALUES (?, ?, ?, ?)",
-          ["Cliente General", "Sin Registro", "0000000000", 0],
+          "INSERT INTO clients (name, parent_name, phone) VALUES (?, ?, ?)",
+          ["Cliente General", "Sin Registro", "0000000000"],
         );
         clientId = result.lastID;
       }
@@ -984,8 +984,8 @@ async function createSession(
         clientId = existingClient.id;
       } else {
         const result = await runAsync(
-          "INSERT INTO clients (name, parent_name, phone, is_member) VALUES (?, ?, ?, ?)",
-          [clientName, parentName, phone, 0],
+          "INSERT INTO clients (name, parent_name, phone) VALUES (?, ?, ?)",
+          [clientName, parentName, phone],
         );
         clientId = result.lastID;
       }
