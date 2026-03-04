@@ -18,10 +18,13 @@ function getLocalTimestamp() {
 
 async function getClients() {
   try {
-    const sql = `SELECT id, name, parent_name, phone, emergency_phone, email, 
-                 child_name, child_age, allergies, special_notes, photo_path, 
-                 created_at FROM clients ORDER BY name`;
-    return await allAsync(sql);
+    const sql = "SELECT * FROM clients ORDER BY name";
+    const clients = await allAsync(sql);
+    // Asegurar que is_member exista en cada cliente
+    return clients.map((client) => ({
+      ...client,
+      is_member: client.is_member || false,
+    }));
   } catch (error) {
     console.error("Error obteniendo clientes:", error);
     throw error;
@@ -152,10 +155,13 @@ async function deleteClient(id) {
 
 async function getClientById(clientId) {
   try {
-    const sql = `SELECT id, name, parent_name, phone, emergency_phone, email, 
-                 child_name, child_age, allergies, special_notes, photo_path, 
-                 created_at FROM clients WHERE id = ?`;
-    return await getAsync(sql, [clientId]);
+    const sql = "SELECT * FROM clients WHERE id = ?";
+    const client = await getAsync(sql, [clientId]);
+    if (client) {
+      // Asegurar que is_member exista
+      client.is_member = client.is_member || false;
+    }
+    return client;
   } catch (error) {
     console.error("Error obteniendo cliente:", error);
     throw error;

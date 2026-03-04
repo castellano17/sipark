@@ -5,25 +5,46 @@ async function migrateDatabase() {
 
   try {
     console.log("🔄 Ejecutando migraciones...");
-    console.log("📍 Ruta de la base de datos:", db.name);
 
-    // Verificar columnas de clients PRIMERO
+    // Verificar columnas de clients
     const clientColumns = db.prepare("PRAGMA table_info(clients)").all();
     const clientColumnNames = clientColumns.map((col) => col.name);
 
-    console.log(
-      "📋 Columnas actuales de clients:",
-      clientColumnNames.join(", "),
-    );
+    if (!clientColumnNames.includes("emergency_phone")) {
+      db.prepare("ALTER TABLE clients ADD COLUMN emergency_phone TEXT").run();
+      console.log("✅ Agregada columna emergency_phone a clients");
+    }
+
+    if (!clientColumnNames.includes("email")) {
+      db.prepare("ALTER TABLE clients ADD COLUMN email TEXT").run();
+      console.log("✅ Agregada columna email a clients");
+    }
+
+    if (!clientColumnNames.includes("child_name")) {
+      db.prepare("ALTER TABLE clients ADD COLUMN child_name TEXT").run();
+      console.log("✅ Agregada columna child_name a clients");
+    }
+
+    if (!clientColumnNames.includes("child_age")) {
+      db.prepare("ALTER TABLE clients ADD COLUMN child_age INTEGER").run();
+      console.log("✅ Agregada columna child_age a clients");
+    }
+
+    if (!clientColumnNames.includes("allergies")) {
+      db.prepare("ALTER TABLE clients ADD COLUMN allergies TEXT").run();
+      console.log("✅ Agregada columna allergies a clients");
+    }
+
+    if (!clientColumnNames.includes("special_notes")) {
+      db.prepare("ALTER TABLE clients ADD COLUMN special_notes TEXT").run();
+      console.log("✅ Agregada columna special_notes a clients");
+    }
 
     if (!clientColumnNames.includes("is_member")) {
-      console.log("⚠️  Columna is_member NO existe, agregando...");
       db.prepare(
         "ALTER TABLE clients ADD COLUMN is_member BOOLEAN DEFAULT 0",
       ).run();
       console.log("✅ Agregada columna is_member a clients");
-    } else {
-      console.log("✅ Columna is_member ya existe");
     }
 
     // Verificar columnas de sales

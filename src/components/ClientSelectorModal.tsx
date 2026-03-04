@@ -116,9 +116,12 @@ export function ClientSelectorModal({
                       </div>
                     )}
                   </div>
-                  {client.is_member === true && (
+                  {client.is_member && (
                     <div className="bg-yellow-100 text-yellow-800 text-xs px-2 py-1 rounded">
                       VIP
+                    </div>
+                  )}
+                </div>
                     </div>
                   )}
                 </div>
