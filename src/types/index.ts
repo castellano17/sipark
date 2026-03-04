@@ -42,7 +42,7 @@ export interface Client {
   parent_name?: string;
   phone?: string;
   photo_path?: string;
-  is_member: boolean;
+  is_member?: boolean;
   created_at: string;
 }
 
