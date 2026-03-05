@@ -428,7 +428,7 @@ function getDatabase() {
 
 function runAsync(sql, params = []) {
   return new Promise((resolve, reject) => {
-    db.run(sql, params, function(err) {
+    db.run(sql, params, function (err) {
       if (err) {
         reject(err);
       } else {
@@ -463,8 +463,6 @@ function allAsync(sql, params = []) {
       }
     });
   });
-}
-  }
 }
 
 // Función de migración para agregar columnas a tablas existentes
