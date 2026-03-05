@@ -37,7 +37,8 @@ function initializeDatabase() {
 }
 
 function createTables() {
-  const tables = [
+  try {
+    const tables = [
       `CREATE TABLE IF NOT EXISTS clients (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL,
