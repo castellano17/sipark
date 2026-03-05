@@ -1,4 +1,4 @@
-const Database = require("better-sqlite3");
+const sqlite3 = require("sqlite3").verbose();
 const path = require("path");
 const { app } = require("electron");
 const fs = require("fs");
@@ -6,31 +6,38 @@ const fs = require("fs");
 let db = null;
 
 function initializeDatabase() {
-  try {
-    const userDataPath = app.getPath("userData");
-    const dbPath = path.join(userDataPath, "sipark.db");
+  return new Promise((resolve, reject) => {
+    try {
+      const userDataPath = app.getPath("userData");
+      const dbPath = path.join(userDataPath, "sipark.db");
 
-    if (!fs.existsSync(userDataPath)) {
-      fs.mkdirSync(userDataPath, { recursive: true });
+      if (!fs.existsSync(userDataPath)) {
+        fs.mkdirSync(userDataPath, { recursive: true });
+      }
+
+      db = new sqlite3.Database(dbPath, (err) => {
+        if (err) {
+          console.error("❌ Error abriendo BD:", err);
+          reject(err);
+          return;
+        }
+
+        db.run("PRAGMA foreign_keys = ON");
+        createTables();
+        migrateMembershipTables();
+
+        console.log("✅ Base de datos inicializada:", dbPath);
+        resolve(db);
+      });
+    } catch (error) {
+      console.error("❌ Error inicializando BD:", error);
+      reject(error);
     }
-
-    db = new Database(dbPath);
-    db.pragma("foreign_keys = ON");
-
-    createTables();
-    migrateMembershipTables();
-
-    console.log("✅ Base de datos inicializada:", dbPath);
-    return Promise.resolve(db);
-  } catch (error) {
-    console.error("❌ Error inicializando BD:", error);
-    return Promise.reject(error);
-  }
+  });
 }
 
 function createTables() {
-  try {
-    const tables = [
+  const tables = [
       `CREATE TABLE IF NOT EXISTS clients (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL,
@@ -403,7 +410,7 @@ function createTables() {
     ];
 
     tables.forEach((sql) => {
-      db.exec(sql);
+      db.run(sql);
     });
   } catch (error) {
     console.error("Error creando tablas:", error);
@@ -419,35 +426,43 @@ function getDatabase() {
 }
 
 function runAsync(sql, params = []) {
-  try {
-    const stmt = db.prepare(sql);
-    const result = stmt.run(...params);
-    return Promise.resolve({
-      lastID: result.lastInsertRowid,
-      changes: result.changes,
+  return new Promise((resolve, reject) => {
+    db.run(sql, params, function(err) {
+      if (err) {
+        reject(err);
+      } else {
+        resolve({
+          lastID: this.lastID,
+          changes: this.changes,
+        });
+      }
     });
-  } catch (err) {
-    return Promise.reject(err);
-  }
+  });
 }
 
 function getAsync(sql, params = []) {
-  try {
-    const stmt = db.prepare(sql);
-    const row = stmt.get(...params);
-    return Promise.resolve(row);
-  } catch (err) {
-    return Promise.reject(err);
-  }
+  return new Promise((resolve, reject) => {
+    db.get(sql, params, (err, row) => {
+      if (err) {
+        reject(err);
+      } else {
+        resolve(row);
+      }
+    });
+  });
 }
 
 function allAsync(sql, params = []) {
-  try {
-    const stmt = db.prepare(sql);
-    const rows = stmt.all(...params);
-    return Promise.resolve(rows || []);
-  } catch (err) {
-    return Promise.reject(err);
+  return new Promise((resolve, reject) => {
+    db.all(sql, params, (err, rows) => {
+      if (err) {
+        reject(err);
+      } else {
+        resolve(rows || []);
+      }
+    });
+  });
+}
   }
 }
 
