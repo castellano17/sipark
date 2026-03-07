@@ -200,7 +200,8 @@ async function createUser(userData, createdBy) {
     const result = await runAsync(
       `INSERT INTO users 
        (username, password, first_name, last_name, email, phone, photo_path, role, created_by)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+       RETURNING id`,
       [
         username,
         hashedPassword,
