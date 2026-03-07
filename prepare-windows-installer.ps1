@@ -15,7 +15,8 @@ Write-Host ""
 
 # URLs de descarga
 $PostgresUrl = "https://get.enterprisedb.com/postgresql/postgresql-$PostgresVersion-windows-x64-binaries.zip"
-$PostgresZip = "postgresql-portable.zip"
+$PostgresZip = Join-Path (Get-Location) "postgresql-portable.zip"
+$TempDir = Join-Path (Get-Location) "temp-postgres"
 
 # Crear directorio de salida
 if (Test-Path $OutputDir) {
@@ -43,12 +44,20 @@ try {
     }
 }
 catch {
-    Write-Host "Error descargando PostgreSQL" -ForegroundColor Red
+    Write-Host "Error descargando PostgreSQL: $_" -ForegroundColor Red
     Write-Host "Por favor descarga manualmente desde:" -ForegroundColor Yellow
     Write-Host $PostgresUrl -ForegroundColor Cyan
     Write-Host "Y colocalo como: $PostgresZip" -ForegroundColor Yellow
     exit 1
 }
+
+# Verificar que el archivo existe
+if (-not (Test-Path $PostgresZip)) {
+    Write-Host "Error: No se encontro el archivo $PostgresZip" -ForegroundColor Red
+    exit 1
+}
+
+Write-Host "Archivo ZIP encontrado: $PostgresZip" -ForegroundColor Green
 
 # Extraer PostgreSQL
 Write-Host ""
@@ -57,23 +66,23 @@ Write-Host "Por favor espera..." -ForegroundColor Yellow
 
 try {
     # Limpiar directorio temporal si existe
-    if (Test-Path ".\temp-postgres") {
-        Remove-Item -Path ".\temp-postgres" -Recurse -Force
+    if (Test-Path $TempDir) {
+        Remove-Item -Path $TempDir -Recurse -Force
     }
     
-    # Extraer con Add-Type (más rápido que Expand-Archive)
+    # Extraer con Add-Type (mas rapido que Expand-Archive)
     Add-Type -AssemblyName System.IO.Compression.FileSystem
-    [System.IO.Compression.ZipFile]::ExtractToDirectory($PostgresZip, ".\temp-postgres")
+    [System.IO.Compression.ZipFile]::ExtractToDirectory($PostgresZip, $TempDir)
     
     Write-Host "Archivo extraido, buscando directorio pgsql..." -ForegroundColor Cyan
     
     # Buscar directorio pgsql
-    $pgsqlDir = Get-ChildItem -Path ".\temp-postgres" -Directory -Filter "pgsql" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+    $pgsqlDir = Get-ChildItem -Path $TempDir -Directory -Filter "pgsql" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
     
     if (-not $pgsqlDir) {
         # Intentar buscar sin filtro
         Write-Host "Buscando estructura alternativa..." -ForegroundColor Yellow
-        $pgsqlDir = Get-ChildItem -Path ".\temp-postgres" -Directory -Recurse | Where-Object { $_.Name -eq "pgsql" } | Select-Object -First 1
+        $pgsqlDir = Get-ChildItem -Path $TempDir -Directory -Recurse | Where-Object { $_.Name -eq "pgsql" } | Select-Object -First 1
     }
     
     if ($pgsqlDir) {
@@ -117,20 +126,24 @@ try {
     else {
         Write-Host "No se encontro el directorio pgsql" -ForegroundColor Red
         Write-Host "Contenido de temp-postgres:" -ForegroundColor Yellow
-        Get-ChildItem -Path ".\temp-postgres" -Recurse -Depth 2 | Select-Object FullName | Format-Table
+        Get-ChildItem -Path $TempDir -Recurse -Depth 2 | Select-Object FullName | Format-Table
         exit 1
     }
     
     # Limpiar
     Write-Host "Limpiando archivos temporales..." -ForegroundColor Cyan
-    Remove-Item -Path ".\temp-postgres" -Recurse -Force
-    # Mantener el ZIP por si se necesita de nuevo
-    # Remove-Item -Path $PostgresZip -Force
+    Remove-Item -Path $TempDir -Recurse -Force
     Write-Host "Limpieza completada (ZIP conservado para futuras compilaciones)" -ForegroundColor Green
 }
 catch {
     Write-Host "Error extrayendo PostgreSQL: $_" -ForegroundColor Red
     Write-Host "Stack trace: $($_.ScriptStackTrace)" -ForegroundColor Red
+    
+    # Limpiar en caso de error
+    if (Test-Path $TempDir) {
+        Remove-Item -Path $TempDir -Recurse -Force -ErrorAction SilentlyContinue
+    }
+    
     exit 1
 }
 
