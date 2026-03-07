@@ -99,6 +99,7 @@ async function createTables() {
       category VARCHAR(100),
       barcode VARCHAR(100) UNIQUE,
       stock INTEGER DEFAULT 0,
+      min_stock INTEGER DEFAULT 0,
       duration_minutes INTEGER,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )`,
