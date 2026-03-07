@@ -227,20 +227,20 @@ async function createUser(userData, createdBy) {
           [
             userId,
             perm.module,
-            perm.can_view ? 1 : 0,
-            perm.can_create ? 1 : 0,
-            perm.can_edit ? 1 : 0,
-            perm.can_delete ? 1 : 0,
+            perm.can_view,
+            perm.can_create,
+            perm.can_edit,
+            perm.can_delete,
           ],
         );
       }
     } else {
-      // Si no se proporcionan permisos, crear todos los módulos con permisos en 0
+      // Si no se proporcionan permisos, crear todos los módulos con permisos en false
       for (const module of AVAILABLE_MODULES) {
         await runAsync(
           `INSERT INTO user_permissions 
            (user_id, module, can_view, can_create, can_edit, can_delete)
-           VALUES (?, ?, 0, 0, 0, 0)`,
+           VALUES (?, ?, false, false, false, false)`,
           [userId, module],
         );
       }
@@ -339,10 +339,10 @@ async function updateUser(userId, userData, updatedBy) {
           [
             userId,
             perm.module,
-            perm.can_view ? 1 : 0,
-            perm.can_create ? 1 : 0,
-            perm.can_edit ? 1 : 0,
-            perm.can_delete ? 1 : 0,
+            perm.can_view,
+            perm.can_create,
+            perm.can_edit,
+            perm.can_delete,
           ],
         );
       }
