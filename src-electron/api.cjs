@@ -53,6 +53,7 @@ async function createClient(
     const sql = `
       INSERT INTO clients (name, parent_name, phone, emergency_phone, email, child_name, child_age, allergies, special_notes)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      RETURNING id
     `;
     const result = await runAsync(sql, [
       name,
@@ -168,7 +169,8 @@ async function startSession(clientId, packageId, durationMinutes = 60) {
   try {
     const startTime = getLocalTimestamp();
     const sql =
-      "INSERT INTO active_sessions (client_id, start_time, package_id, status) VALUES (?, ?, ?, ?)";
+      "INSERT INTO active_sessions (client_id, start_time, package_id, status) VALUES (?, ?, ?, ?)
+      RETURNING id";
     const result = await runAsync(sql, [
       clientId,
       startTime,
@@ -280,7 +282,8 @@ async function createProductService(
 ) {
   try {
     const sql =
-      "INSERT INTO products_services (name, price, type, category, barcode, stock, duration_minutes) VALUES (?, ?, ?, ?, ?, ?, ?)";
+      "INSERT INTO products_services (name, price, type, category, barcode, stock, duration_minutes) VALUES (?, ?, ?, ?, ?, ?, ?)
+      RETURNING id";
     const result = await runAsync(sql, [
       name,
       price,
@@ -977,7 +980,8 @@ async function createSession(
         clientId = generalClient.id;
       } else {
         const result = await runAsync(
-          "INSERT INTO clients (name, parent_name, phone) VALUES (?, ?, ?)",
+          "INSERT INTO clients (name, parent_name, phone) VALUES (?, ?, ?)
+      RETURNING id",
           ["Cliente General", "Sin Registro", "0000000000"],
         );
         clientId = result.lastID;
@@ -993,7 +997,8 @@ async function createSession(
         clientId = existingClient.id;
       } else {
         const result = await runAsync(
-          "INSERT INTO clients (name, parent_name, phone) VALUES (?, ?, ?)",
+          "INSERT INTO clients (name, parent_name, phone) VALUES (?, ?, ?)
+      RETURNING id",
           [clientName, parentName, phone],
         );
         clientId = result.lastID;
@@ -1003,7 +1008,8 @@ async function createSession(
     // Crear sesión
     const startTime = getLocalTimestamp();
     const sessionResult = await runAsync(
-      "INSERT INTO active_sessions (client_id, start_time, package_id, duration_minutes, status) VALUES (?, ?, ?, ?, ?)",
+      "INSERT INTO active_sessions (client_id, start_time, package_id, duration_minutes, status) VALUES (?, ?, ?, ?, ?)
+      RETURNING id",
       [clientId, startTime, packageId, durationMinutes, "active"],
     );
 
@@ -1029,6 +1035,7 @@ async function openCashBox(openingAmount, openedBy = "Admin") {
     const sql = `
       INSERT INTO cash_boxes (opening_amount, opened_at, opened_by, status)
       VALUES (?, ?, ?, 'open')
+      RETURNING id
     `;
     const result = await runAsync(sql, [
       openingAmount,
@@ -1185,6 +1192,7 @@ async function createSaleWithItems(saleData) {
     const saleSql = `
       INSERT INTO sales (client_id, subtotal, discount, total, payment_method, cash_box_id, timestamp)
       VALUES (?, ?, ?, ?, ?, ?, ?)
+      RETURNING id
     `;
     const saleResult = await runAsync(saleSql, [
       client_id || null,
@@ -1412,6 +1420,7 @@ async function createSupplier(name, contactName, phone, email, address, notes) {
     const sql = `
       INSERT INTO suppliers (name, contact_name, phone, email, address, notes)
       VALUES (?, ?, ?, ?, ?, ?)
+      RETURNING id
     `;
     const result = await runAsync(sql, [
       name,
@@ -1474,12 +1483,18 @@ async function getCategories() {
 }
 
 async function createCategory(name, description) {
+  console.log("🔧 API: createCategory llamado con:", { name, description });
   try {
-    const sql = "INSERT INTO categories (name, description) VALUES (?, ?)";
+    const sql =
+      "INSERT INTO categories (name, description) VALUES (?, ?) RETURNING id";
+    console.log("🔧 API: Ejecutando SQL:", sql);
     const result = await runAsync(sql, [name, description]);
+    console.log("🔧 API: Resultado de runAsync:", result);
+    console.log("✅ API: Categoría creada con ID:", result.lastID);
     return result.lastID;
   } catch (error) {
-    console.error("Error creando categoría:", error);
+    console.error("❌ API: Error creando categoría:", error);
+    console.error("❌ API: Stack trace:", error.stack);
     throw error;
   }
 }
@@ -1522,6 +1537,7 @@ async function createPurchaseOrder(purchaseData) {
     const poSql = `
       INSERT INTO purchase_orders (supplier_id, invoice_number, invoice_date, total_amount, total_items, notes, created_at)
       VALUES (?, ?, ?, ?, ?, ?, ?)
+      RETURNING id
     `;
     const poResult = await runAsync(poSql, [
       supplier_id,
@@ -1864,6 +1880,7 @@ async function assignMembership(
     const sql = `
       INSERT INTO client_memberships (client_id, membership_id, start_date, end_date, status, payment_amount, payment_method, notes, created_by, created_at)
       VALUES (?, ?, ?, ?, 'active', ?, ?, ?, ?, ?)
+      RETURNING id
     `;
     const result = await runAsync(sql, [
       clientId,
@@ -2079,6 +2096,7 @@ async function createClientVisit(
     const sql = `
       INSERT INTO client_visits (client_id, visit_date, check_in_time, amount_paid, notes, created_by, created_at)
       VALUES (?, ?, ?, ?, ?, ?, ?)
+      RETURNING id
     `;
     const result = await runAsync(sql, [
       clientId,
@@ -2132,7 +2150,8 @@ async function createPackageFeature(name, description, category) {
   try {
     const sql = `
       INSERT INTO package_features (name, description, category, is_active)
-      VALUES (?, ?, ?, 1)
+      VALUES (?, ?, ?, true)
+      RETURNING id
     `;
     const result = await runAsync(sql, [name, description, category]);
     return result.lastID;
@@ -2225,7 +2244,8 @@ async function createPackageFeatureCategory(name, description) {
   try {
     const sql = `
       INSERT INTO package_feature_categories (name, description, is_active)
-      VALUES (?, ?, 1)
+      VALUES (?, ?, true)
+      RETURNING id
     `;
     const result = await runAsync(sql, [name, description]);
     return result.lastID;

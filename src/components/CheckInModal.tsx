@@ -655,7 +655,7 @@ export const CheckInModal: React.FC<CheckInModalProps> = ({
                                 : "text-blue-600"
                             }`}
                           >
-                            ${pkg.price.toFixed(2)}
+                            ${Number(pkg.price).toFixed(2)}
                           </div>
                         </div>
                         {pkg.category && (

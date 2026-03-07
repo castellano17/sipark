@@ -123,6 +123,7 @@ async function createTables() {
       start_time TIMESTAMP NOT NULL,
       end_time TIMESTAMP,
       elapsed_minutes INTEGER,
+      duration_minutes INTEGER,
       package_id INTEGER,
       status VARCHAR(50) DEFAULT 'active',
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -296,12 +297,50 @@ async function createTables() {
       end_date DATE NOT NULL,
       status VARCHAR(20) DEFAULT 'active',
       payment_amount DECIMAL(10,2) NOT NULL,
+      payment_method VARCHAR(50),
       notes TEXT,
       created_by INTEGER,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (client_id) REFERENCES clients(id),
       FOREIGN KEY (membership_id) REFERENCES memberships(id),
       FOREIGN KEY (created_by) REFERENCES users(id)
+    )`,
+
+    `CREATE TABLE IF NOT EXISTS membership_renewals (
+      id SERIAL PRIMARY KEY,
+      client_id INTEGER NOT NULL,
+      old_membership_id INTEGER NOT NULL,
+      new_membership_id INTEGER NOT NULL,
+      renewal_date DATE NOT NULL,
+      old_end_date DATE NOT NULL,
+      new_end_date DATE NOT NULL,
+      payment_amount DECIMAL(10,2) NOT NULL,
+      payment_method VARCHAR(50),
+      discount_applied DECIMAL(10,2) DEFAULT 0,
+      notes TEXT,
+      processed_by INTEGER,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (client_id) REFERENCES clients(id),
+      FOREIGN KEY (old_membership_id) REFERENCES memberships(id),
+      FOREIGN KEY (new_membership_id) REFERENCES memberships(id),
+      FOREIGN KEY (processed_by) REFERENCES users(id)
+    )`,
+
+    `CREATE TABLE IF NOT EXISTS membership_usage (
+      id SERIAL PRIMARY KEY,
+      client_membership_id INTEGER NOT NULL,
+      client_id INTEGER NOT NULL,
+      usage_date DATE NOT NULL,
+      usage_type VARCHAR(50) NOT NULL,
+      session_id INTEGER,
+      sale_id INTEGER,
+      discount_applied DECIMAL(10,2) DEFAULT 0,
+      notes TEXT,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (client_membership_id) REFERENCES client_memberships(id),
+      FOREIGN KEY (client_id) REFERENCES clients(id),
+      FOREIGN KEY (session_id) REFERENCES active_sessions(id),
+      FOREIGN KEY (sale_id) REFERENCES sales(id)
     )`,
 
     `CREATE TABLE IF NOT EXISTS client_visits (
@@ -491,15 +530,24 @@ async function runAsync(sql, params = []) {
   try {
     // Convertir sintaxis SQLite a PostgreSQL
     const pgSql = convertSqliteToPostgres(sql);
+    console.log("🔧 DB: SQL original:", sql);
+    console.log("🔧 DB: SQL convertido:", pgSql);
+    console.log("🔧 DB: Parámetros:", params);
 
     const result = await pool.query(pgSql, params);
+    console.log("🔧 DB: Resultado query:", {
+      rowCount: result.rowCount,
+      rows: result.rows,
+    });
+
     return {
       lastID: result.rows[0]?.id || null,
       changes: result.rowCount,
       rows: result.rows,
     };
   } catch (error) {
-    console.error("Error en runAsync:", error.message);
+    console.error("❌ DB: Error en runAsync:", error.message);
+    console.error("❌ DB: Stack:", error.stack);
     throw error;
   }
 }

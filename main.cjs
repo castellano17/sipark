@@ -487,9 +487,17 @@ function setupIpcHandlers() {
 
   // Categories
   ipcMain.handle("api:getCategories", () => api.getCategories());
-  ipcMain.handle("api:createCategory", (event, data) =>
-    api.createCategory(data.name, data.description),
-  );
+  ipcMain.handle("api:createCategory", async (event, data) => {
+    console.log("📝 IPC: createCategory llamado con:", data);
+    try {
+      const result = await api.createCategory(data.name, data.description);
+      console.log("✅ IPC: createCategory exitoso, ID:", result);
+      return result;
+    } catch (error) {
+      console.error("❌ IPC: createCategory falló:", error);
+      throw error;
+    }
+  });
   ipcMain.handle("api:updateCategory", (event, data) =>
     api.updateCategory(data.id, data.name, data.description),
   );

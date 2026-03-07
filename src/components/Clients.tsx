@@ -732,7 +732,10 @@ function MembershipModal({
                           <p>
                             Fin: {new Date(cm.end_date).toLocaleDateString()}
                           </p>
-                          <p>Monto pagado: ${cm.payment_amount.toFixed(2)}</p>
+                          <p>
+                            Monto pagado: $
+                            {Number(cm.payment_amount).toFixed(2)}
+                          </p>
                           {cm.notes && <p>Notas: {cm.notes}</p>}
                         </div>
                       </div>
@@ -929,7 +932,7 @@ function VisitsModal({
                           {formatDuration(visit.duration_minutes)}
                         </td>
                         <td className="px-4 py-3 text-sm">
-                          ${visit.amount_paid.toFixed(2)}
+                          ${Number(visit.amount_paid).toFixed(2)}
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-600">
                           {visit.notes || "-"}

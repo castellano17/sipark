@@ -383,7 +383,7 @@ export const Cotizaciones: React.FC = () => {
                       {new Date(quotation.created_at).toLocaleDateString()}
                     </td>
                     <td className="p-3 text-right font-medium">
-                      ${quotation.total.toFixed(2)}
+                      ${Number(quotation.total).toFixed(2)}
                     </td>
                     <td className="p-3 text-center">
                       <span
@@ -579,7 +579,7 @@ export const Cotizaciones: React.FC = () => {
                                         {product.name}
                                       </div>
                                       <div className="text-xs text-gray-500">
-                                        ${product.price.toFixed(2)}
+                                        ${Number(product.price).toFixed(2)}
                                       </div>
                                     </div>
                                   ))}
@@ -629,7 +629,7 @@ export const Cotizaciones: React.FC = () => {
                           </label>
                           <input
                             type="text"
-                            value={`$${item.subtotal.toFixed(2)}`}
+                            value={`$${Number(item.subtotal).toFixed(2)}`}
                             disabled
                             className="w-full p-2 border rounded text-sm bg-gray-100"
                           />
@@ -822,10 +822,10 @@ export const Cotizaciones: React.FC = () => {
                             <td className="p-2">{item.description}</td>
                             <td className="p-2 text-center">{item.quantity}</td>
                             <td className="p-2 text-right">
-                              ${item.unit_price.toFixed(2)}
+                              ${Number(item.unit_price).toFixed(2)}
                             </td>
                             <td className="p-2 text-right font-medium">
-                              ${item.subtotal.toFixed(2)}
+                              ${Number(item.subtotal).toFixed(2)}
                             </td>
                           </tr>
                         ),
@@ -841,25 +841,25 @@ export const Cotizaciones: React.FC = () => {
                   <div className="flex justify-between">
                     <span>Subtotal:</span>
                     <span className="font-semibold">
-                      ${selectedQuotation.subtotal.toFixed(2)}
+                      ${Number(selectedQuotation.subtotal).toFixed(2)}
                     </span>
                   </div>
                   {selectedQuotation.discount > 0 && (
                     <div className="flex justify-between text-green-600">
                       <span>Descuento:</span>
-                      <span>-${selectedQuotation.discount.toFixed(2)}</span>
+                      <span>-${Number(selectedQuotation.discount).toFixed(2)}</span>
                     </div>
                   )}
                   {selectedQuotation.tax > 0 && (
                     <div className="flex justify-between">
                       <span>Impuesto:</span>
-                      <span>${selectedQuotation.tax.toFixed(2)}</span>
+                      <span>${Number(selectedQuotation.tax).toFixed(2)}</span>
                     </div>
                   )}
                   <div className="border-t-2 pt-2 flex justify-between text-xl font-bold">
                     <span>Total:</span>
                     <span className="text-purple-600">
-                      ${selectedQuotation.total.toFixed(2)}
+                      ${Number(selectedQuotation.total).toFixed(2)}
                     </span>
                   </div>
                 </div>

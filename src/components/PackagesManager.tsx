@@ -294,7 +294,7 @@ export const PackagesManager: React.FC = () => {
                         {pkg.name}
                       </h3>
                       <p className="text-2xl font-bold text-blue-600">
-                        ${pkg.price.toFixed(2)}
+                        ${Number(pkg.price).toFixed(2)}
                       </p>
                     </div>
                     <div className="flex gap-2">
@@ -596,7 +596,7 @@ export const PackagesManager: React.FC = () => {
                 {deleteTarget.name}
               </p>
               <p className="text-sm text-slate-600 mt-1">
-                ${deleteTarget.price.toFixed(2)}
+                ${Number(deleteTarget.price).toFixed(2)}
               </p>
             </div>
           )}

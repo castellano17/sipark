@@ -480,7 +480,7 @@ export const Reservaciones: React.FC = () => {
                     <td className="p-3">{reservation.event_time}</td>
                     <td className="p-3">{reservation.package_name}</td>
                     <td className="p-3 text-right font-medium">
-                      ${reservation.total_amount.toFixed(2)}
+                      ${Number(reservation.total_amount).toFixed(2)}
                     </td>
                     <td className="p-3 text-center">
                       <span
@@ -687,7 +687,7 @@ export const Reservaciones: React.FC = () => {
                             >
                               <div className="font-medium">{pkg.name}</div>
                               <div className="text-sm text-gray-500">
-                                ${pkg.price.toFixed(2)}
+                                ${Number(pkg.price).toFixed(2)}
                               </div>
                             </div>
                           ))
@@ -876,13 +876,13 @@ export const Reservaciones: React.FC = () => {
                   <div className="flex justify-between items-center pb-2 border-b border-slate-200">
                     <span className="text-slate-600">Total</span>
                     <span className="text-xl font-bold text-slate-900">
-                      ${selectedReservation.total_amount.toFixed(2)}
+                      ${Number(selectedReservation.total_amount).toFixed(2)}
                     </span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-slate-600">Anticipo</span>
                     <span className="text-lg font-medium text-green-600">
-                      ${selectedReservation.deposit_amount.toFixed(2)}
+                      ${Number(selectedReservation.deposit_amount).toFixed(2)}
                     </span>
                   </div>
                   <div className="flex justify-between items-center pt-2 border-t-2 border-slate-300">
@@ -1012,13 +1012,13 @@ export const Reservaciones: React.FC = () => {
               <div>
                 <p className="text-sm text-gray-600 mb-2">Total Reservación</p>
                 <p className="text-2xl font-bold">
-                  ${selectedReservation.total_amount.toFixed(2)}
+                  ${Number(selectedReservation.total_amount).toFixed(2)}
                 </p>
               </div>
               <div>
                 <p className="text-sm text-gray-600 mb-2">Ya Pagado</p>
                 <p className="text-lg font-semibold text-green-600">
-                  ${selectedReservation.deposit_amount.toFixed(2)}
+                  ${Number(selectedReservation.deposit_amount).toFixed(2)}
                 </p>
               </div>
               <div>
