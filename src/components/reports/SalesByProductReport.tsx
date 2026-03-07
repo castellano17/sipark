@@ -347,7 +347,9 @@ export function SalesByProductReport({ onBack }: SalesByProductReportProps) {
                     cx="50%"
                     cy="50%"
                     outerRadius={100}
-                    label={(entry) => `${entry.revenue_percentage.toFixed(1)}%`}
+                    label={(entry) =>
+                      `${Number(entry.revenue_percentage).toFixed(1)}%`
+                    }
                   >
                     {data.topProducts.map((entry: any, index: number) => (
                       <Cell
@@ -461,7 +463,7 @@ export function SalesByProductReport({ onBack }: SalesByProductReportProps) {
                         {formatCurrency(product.revenue)}
                       </td>
                       <td className="px-4 py-3 text-sm text-right">
-                        {product.revenue_percentage.toFixed(2)}%
+                        {Number(product.revenue_percentage).toFixed(2)}%
                       </td>
                       <td className="px-4 py-3 text-sm text-right">
                         {product.transactions}

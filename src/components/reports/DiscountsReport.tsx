@@ -364,7 +364,7 @@ export default function DiscountsReport({ onBack }: DiscountsReportProps) {
                                   : "text-blue-600"
                           }`}
                         >
-                          {discount.discount_percentage.toFixed(1)}%
+                          {Number(discount.discount_percentage).toFixed(1)}%
                         </span>
                       </td>
                       <td className="px-4 py-3 text-sm text-right font-bold text-green-600">

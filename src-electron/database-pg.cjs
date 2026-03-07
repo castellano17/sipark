@@ -440,6 +440,29 @@ async function createTables() {
       FOREIGN KEY (quotation_id) REFERENCES quotations(id) ON DELETE CASCADE,
       FOREIGN KEY (product_id) REFERENCES products_services(id)
     )`,
+
+    `CREATE TABLE IF NOT EXISTS price_history (
+      id SERIAL PRIMARY KEY,
+      product_id INTEGER NOT NULL,
+      old_price DECIMAL(10,2) NOT NULL,
+      new_price DECIMAL(10,2) NOT NULL,
+      reason TEXT,
+      changed_by INTEGER,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (product_id) REFERENCES products_services(id),
+      FOREIGN KEY (changed_by) REFERENCES users(id)
+    )`,
+
+    `CREATE TABLE IF NOT EXISTS sales_audit (
+      id SERIAL PRIMARY KEY,
+      sale_id INTEGER NOT NULL,
+      user_id INTEGER,
+      action VARCHAR(50) NOT NULL,
+      details TEXT,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (sale_id) REFERENCES sales(id),
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    )`,
   ];
 
   for (const sql of tables) {
