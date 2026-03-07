@@ -357,17 +357,29 @@ export function CashFlowReport({ onBack }: CashFlowReportProps) {
               <h3 className="font-semibold text-lg">Detalle Diario</h3>
               <div className="flex gap-2">
                 <Button
-                        className="h-8 w-8 p-0" variant="outline" size="sm" onClick={handleExportExcel}>
+                  className="h-8 w-8 p-0"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleExportExcel}
+                >
                   <FileDown className="w-4 h-4 mr-2" />
                   Excel
                 </Button>
                 <Button
-                        className="h-8 w-8 p-0" variant="outline" size="sm" onClick={handleExportPDF}>
+                  className="h-8 w-8 p-0"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleExportPDF}
+                >
                   <FileDown className="w-4 h-4 mr-2" />
                   PDF
                 </Button>
                 <Button
-                        className="h-8 w-8 p-0" variant="outline" size="sm" onClick={handlePrint}>
+                  className="h-8 w-8 p-0"
+                  variant="outline"
+                  size="sm"
+                  onClick={handlePrint}
+                >
                   <Printer className="w-4 h-4 mr-2" />
                   Imprimir
                 </Button>
@@ -402,7 +414,14 @@ export function CashFlowReport({ onBack }: CashFlowReportProps) {
                 </thead>
                 <tbody className="divide-y">
                   {data.dailyFlow.map((day: any) => (
-                    <tr key={day.date} className="hover:bg-gray-50">
+                    <tr
+                      key={
+                        typeof day.date === "string"
+                          ? day.date
+                          : new Date(day.date).toISOString()
+                      }
+                      className="hover:bg-gray-50"
+                    >
                       <td className="px-4 py-3 text-sm">
                         {new Date(day.date).toLocaleDateString("es-ES")}
                       </td>

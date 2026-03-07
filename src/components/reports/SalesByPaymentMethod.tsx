@@ -258,7 +258,7 @@ export function SalesByPaymentMethod({ onBack }: SalesByPaymentMethodProps) {
                     cx="50%"
                     cy="50%"
                     outerRadius={100}
-                    label={(entry) => `${entry.percentage.toFixed(1)}%`}
+                    label={(entry) => `${Number(entry.percentage).toFixed(1)}%`}
                   >
                     {data.methods.map((entry: any, index: number) => (
                       <Cell
@@ -337,7 +337,7 @@ export function SalesByPaymentMethod({ onBack }: SalesByPaymentMethodProps) {
                           {formatCurrency(method.total_amount)}
                         </td>
                         <td className="px-4 py-3 text-sm text-right">
-                          {method.percentage.toFixed(1)}%
+                          {Number(method.percentage).toFixed(1)}%
                         </td>
                       </tr>
                     ))}

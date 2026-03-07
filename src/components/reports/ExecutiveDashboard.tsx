@@ -388,7 +388,7 @@ export function ExecutiveDashboard({ onBack }: ExecutiveDashboardProps) {
                 width={120}
                 style={{ fontSize: "11px" }}
               />
-              <Tooltip formatter={(value: number) => value.toLocaleString()} />
+              <Tooltip formatter={(value: number) => Number(value).toLocaleString()} />
               <Bar
                 dataKey="quantity_sold"
                 fill="#10b981"

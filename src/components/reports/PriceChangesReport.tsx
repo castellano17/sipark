@@ -205,7 +205,7 @@ export function PriceChangesReport({ onBack }: PriceChangesReportProps) {
                     {data.stats.price_increases}
                   </p>
                   <p className="text-xs text-gray-500">
-                    Promedio: +{data.stats.avg_increase.toFixed(1)}%
+                    Promedio: +{Number(data.stats.avg_increase).toFixed(1)}%
                   </p>
                 </div>
                 <DollarSign className="w-8 h-8 text-green-600 mt-2" />
@@ -220,7 +220,7 @@ export function PriceChangesReport({ onBack }: PriceChangesReportProps) {
                     {data.stats.price_decreases}
                   </p>
                   <p className="text-xs text-gray-500">
-                    Promedio: -{data.stats.avg_decrease.toFixed(1)}%
+                    Promedio: -{Number(data.stats.avg_decrease).toFixed(1)}%
                   </p>
                 </div>
                 <DollarSign className="w-8 h-8 text-red-600 mt-2" />

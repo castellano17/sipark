@@ -339,7 +339,7 @@ export function HourlyOccupancy({ onBack }: HourlyOccupancyProps) {
                           {hour.session_count}
                         </td>
                         <td className="px-4 py-3 text-sm text-right font-bold text-indigo-600">
-                          {hour.avg_duration.toFixed(1)}
+                          {Number(hour.avg_duration).toFixed(1)}
                         </td>
                       </tr>
                     ))}

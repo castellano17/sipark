@@ -135,7 +135,7 @@ export function SessionsByPeriodReport({
         },
         {
           label: "Duración Promedio",
-          value: `${data.summary.averageDuration.toFixed(0)} min`,
+          value: `${Number(data.summary.averageDuration).toFixed(0)} min`,
         },
         { label: "Duración Total", value: `${data.summary.totalDuration} min` },
       ],
@@ -161,7 +161,7 @@ export function SessionsByPeriodReport({
         { label: "Total Sesiones", value: data.summary.totalSessions },
         {
           label: "Duración Promedio",
-          value: `${data.summary.averageDuration.toFixed(0)} min`,
+          value: `${Number(data.summary.averageDuration).toFixed(0)} min`,
         },
       ],
     });

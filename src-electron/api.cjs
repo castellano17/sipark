@@ -1954,7 +1954,7 @@ async function getClientActiveMembership(clientId) {
       INNER JOIN memberships m ON cm.membership_id = m.id
       WHERE cm.client_id = ?
         AND cm.status = 'active'
-        AND cm.end_date >= date('now')
+        AND cm.end_date >= CURRENT_DATE
       ORDER BY cm.end_date DESC
       LIMIT 1
     `;
@@ -2423,20 +2423,65 @@ async function getCashFlowReport(startDate, endDate) {
     );
 
     // Combinar todos los movimientos por fecha
+    // Convertir fechas a strings para comparación correcta
     const allDates = new Set([
-      ...salesIncome.map((s) => s.date),
-      ...cashIncome.map((c) => c.date),
-      ...expenses.map((e) => e.date),
-      ...purchases.map((p) => p.date),
+      ...salesIncome.map((s) =>
+        typeof s.date === "string"
+          ? s.date
+          : new Date(s.date).toISOString().split("T")[0],
+      ),
+      ...cashIncome.map((c) =>
+        typeof c.date === "string"
+          ? c.date
+          : new Date(c.date).toISOString().split("T")[0],
+      ),
+      ...expenses.map((e) =>
+        typeof e.date === "string"
+          ? e.date
+          : new Date(e.date).toISOString().split("T")[0],
+      ),
+      ...purchases.map((p) =>
+        typeof p.date === "string"
+          ? p.date
+          : new Date(p.date).toISOString().split("T")[0],
+      ),
     ]);
 
     const dailyFlow = Array.from(allDates)
       .sort()
       .map((date) => {
-        const sales = salesIncome.find((s) => s.date === date)?.amount || 0;
-        const income = cashIncome.find((c) => c.date === date)?.amount || 0;
-        const expense = expenses.find((e) => e.date === date)?.amount || 0;
-        const purchase = purchases.find((p) => p.date === date)?.amount || 0;
+        const sales =
+          salesIncome.find((s) => {
+            const sDate =
+              typeof s.date === "string"
+                ? s.date
+                : new Date(s.date).toISOString().split("T")[0];
+            return sDate === date;
+          })?.amount || 0;
+        const income =
+          cashIncome.find((c) => {
+            const cDate =
+              typeof c.date === "string"
+                ? c.date
+                : new Date(c.date).toISOString().split("T")[0];
+            return cDate === date;
+          })?.amount || 0;
+        const expense =
+          expenses.find((e) => {
+            const eDate =
+              typeof e.date === "string"
+                ? e.date
+                : new Date(e.date).toISOString().split("T")[0];
+            return eDate === date;
+          })?.amount || 0;
+        const purchase =
+          purchases.find((p) => {
+            const pDate =
+              typeof p.date === "string"
+                ? p.date
+                : new Date(p.date).toISOString().split("T")[0];
+            return pDate === date;
+          })?.amount || 0;
 
         const totalIncome = sales + income;
         const totalExpense = expense + purchase;
@@ -2875,9 +2920,19 @@ async function getProductsWithoutMovement(days = 30) {
       FROM products_services ps
       LEFT JOIN sale_items si ON ps.id = si.product_id
       WHERE ps.type = 'product'
-      GROUP BY ps.id
-      HAVING last_sale_date IS NULL OR last_sale_date < ?
-      ORDER BY last_sale_date ASC`,
+      GROUP BY ps.id, ps.name, ps.category, ps.stock, ps.price
+      HAVING (SELECT MAX(s.timestamp) 
+         FROM sales s 
+         JOIN sale_items si2 ON s.id = si2.sale_id 
+         WHERE si2.product_id = ps.id) IS NULL 
+         OR (SELECT MAX(s.timestamp) 
+         FROM sales s 
+         JOIN sale_items si2 ON s.id = si2.sale_id 
+         WHERE si2.product_id = ps.id) < ?
+      ORDER BY (SELECT MAX(s.timestamp) 
+         FROM sales s 
+         JOIN sale_items si2 ON s.id = si2.sale_id 
+         WHERE si2.product_id = ps.id) ASC`,
       [cutoffDateStr],
     );
 
@@ -2926,7 +2981,7 @@ async function getPurchasesBySupplier(startDate, endDate) {
       FROM suppliers s
       LEFT JOIN purchase_orders po ON s.id = po.supplier_id
       WHERE DATE(po.invoice_date) >= ? AND DATE(po.invoice_date) <= ?
-      GROUP BY s.id
+      GROUP BY s.id, s.name, s.phone, s.email
       ORDER BY total_purchased DESC`,
       [startDate, endDate],
     );
@@ -2965,7 +3020,7 @@ async function getMostPurchasedProducts(startDate, endDate, limit = 20) {
       LEFT JOIN products_services p ON pi.product_id = p.id
       LEFT JOIN purchase_orders po ON pi.purchase_order_id = po.id
       WHERE po.invoice_date BETWEEN ? AND ?
-      GROUP BY pi.product_id
+      GROUP BY p.id, p.name, p.category, pi.product_id
       ORDER BY total_quantity DESC
       LIMIT ?`,
       [startDate, endDate, limit],
@@ -3078,8 +3133,8 @@ async function getFrequentClients(startDate, endDate, minVisits = 5) {
       FROM clients c
       JOIN sales s ON c.id = s.client_id
       WHERE DATE(s.timestamp) >= ? AND DATE(s.timestamp) <= ?
-      GROUP BY c.id
-      HAVING visit_count >= ?
+      GROUP BY c.id, c.name, c.phone, c.email
+      HAVING COUNT(s.id) >= ?
       ORDER BY visit_count DESC`,
       [startDate, endDate, minVisits],
     );
@@ -3116,9 +3171,9 @@ async function getInactiveClients(days = 30) {
         SUM(s.total) as total_spent
       FROM clients c
       LEFT JOIN sales s ON c.id = s.client_id
-      GROUP BY c.id
-      HAVING last_visit < ? OR last_visit IS NULL
-      ORDER BY last_visit ASC`,
+      GROUP BY c.id, c.name, c.phone, c.email, c.created_at
+      HAVING MAX(s.timestamp) < ? OR MAX(s.timestamp) IS NULL
+      ORDER BY MAX(s.timestamp) ASC`,
       [cutoffDateStr],
     );
 
@@ -3164,7 +3219,7 @@ async function getSalesByClient(startDate, endDate, limit = 20) {
       FROM clients c
       INNER JOIN sales s ON c.id = s.client_id
       WHERE s.timestamp BETWEEN ? AND ?
-      GROUP BY c.id
+      GROUP BY c.id, c.name, c.phone, c.email
       ORDER BY total_spent DESC
       LIMIT ?`,
       [startDate, endDate, limit],
@@ -3300,18 +3355,17 @@ async function getInventoryValuation(categoryFilter = null) {
         ps.id,
         ps.name,
         ps.type,
-        c.name as category_name,
+        ps.category as category_name,
         ps.stock,
         ps.price,
         (ps.stock * ps.price) as total_value
       FROM products_services ps
-      LEFT JOIN categories c ON ps.category_id = c.id
       WHERE ps.type = 'product' AND ps.stock > 0
     `;
 
     const params = [];
     if (categoryFilter) {
-      sql += ` AND ps.category_id = ?`;
+      sql += ` AND ps.category = ?`;
       params.push(categoryFilter);
     }
 
@@ -3360,7 +3414,7 @@ async function getActiveClients(days = 30) {
       FROM clients c
       INNER JOIN sales s ON c.id = s.client_id
       WHERE s.timestamp >= ?
-      GROUP BY c.id
+      GROUP BY c.id, c.name, c.phone, c.email
       ORDER BY last_visit DESC`,
       [cutoffDateStr],
     );
@@ -3394,7 +3448,7 @@ async function getNewClients(startDate, endDate) {
       FROM clients c
       LEFT JOIN sales s ON c.id = s.client_id
       WHERE c.created_at BETWEEN ? AND ?
-      GROUP BY c.id
+      GROUP BY c.id, c.name, c.phone, c.email, c.created_at
       ORDER BY c.created_at DESC`,
       [startDate, endDate],
     );
@@ -3429,7 +3483,7 @@ async function getBestSellingPackages(startDate, endDate) {
       INNER JOIN client_memberships cm ON m.id = cm.membership_id
       WHERE cm.created_at BETWEEN ? AND ?
         AND cm.status = 'active'
-      GROUP BY m.id
+      GROUP BY m.id, m.name, m.price, m.duration_days
       ORDER BY times_sold DESC`,
       [startDate, endDate],
     );
@@ -3594,9 +3648,9 @@ async function getActiveMemberships(statusFilter = "all") {
     if (statusFilter === "active") {
       sql += ` WHERE cm.status = 'active'`;
     } else if (statusFilter === "expired") {
-      sql += ` WHERE cm.status = 'expired' OR cm.end_date < date('now')`;
+      sql += ` WHERE cm.status = 'expired' OR cm.end_date < CURRENT_DATE`;
     } else if (statusFilter === "expiring_soon") {
-      sql += ` WHERE cm.status = 'active' AND cm.end_date BETWEEN date('now') AND date('now', '+7 days')`;
+      sql += ` WHERE cm.status = 'active' AND cm.end_date BETWEEN CURRENT_DATE AND (CURRENT_DATE + INTERVAL '7 days')`;
     }
 
     sql += ` ORDER BY cm.end_date ASC`;
@@ -3661,7 +3715,7 @@ async function getExpiringMemberships(daysThreshold = 30) {
       INNER JOIN clients c ON cm.client_id = c.id
       INNER JOIN memberships m ON cm.membership_id = m.id
       WHERE cm.status = 'active' 
-        AND cm.end_date BETWEEN date('now') AND date('now', '+' || ? || ' days')
+        AND cm.end_date BETWEEN CURRENT_DATE AND (CURRENT_DATE + (? || ' days')::INTERVAL)
       ORDER BY cm.end_date ASC
     `;
 
@@ -4075,7 +4129,7 @@ async function getUserActivityReport(
       FROM user_audit_log ual
       LEFT JOIN users u ON ual.user_id = u.id
       WHERE ual.created_at BETWEEN ? AND ?${userId ? " AND ual.user_id = ?" : ""}
-      GROUP BY ual.user_id
+      GROUP BY ual.user_id, u.username, u.first_name, u.last_name, u.role
       ORDER BY action_count DESC`,
       userId ? [startDate, endDate, userId] : [startDate, endDate],
     );
@@ -4098,6 +4152,21 @@ async function getInventoryChangesReport(
   productId = null,
 ) {
   try {
+    // Si userId es un número, obtener el username
+    let usernameFilter = null;
+    if (userId) {
+      // Intentar obtener el username si es un ID numérico
+      if (!isNaN(userId)) {
+        const user = await getAsync("SELECT username FROM users WHERE id = ?", [
+          userId,
+        ]);
+        usernameFilter = user?.username || null;
+      } else {
+        // Es un username directamente
+        usernameFilter = userId;
+      }
+    }
+
     let sql = `
       SELECT 
         sa.id,
@@ -4119,9 +4188,9 @@ async function getInventoryChangesReport(
 
     const params = [startDate, endDate];
 
-    if (userId) {
+    if (usernameFilter) {
       sql += ` AND sa.created_by = ?`;
-      params.push(userId);
+      params.push(usernameFilter);
     }
 
     if (productId) {
@@ -4134,6 +4203,19 @@ async function getInventoryChangesReport(
     const changes = await allAsync(sql, params);
 
     // Estadísticas
+    const statsParams = [startDate, endDate];
+    let statsWhere = "";
+
+    if (usernameFilter) {
+      statsWhere += ` AND created_by = ?`;
+      statsParams.push(usernameFilter);
+    }
+
+    if (productId) {
+      statsWhere += ` AND product_id = ?`;
+      statsParams.push(productId);
+    }
+
     const stats = await getAsync(
       `SELECT 
         COUNT(*) as total_adjustments,
@@ -4143,8 +4225,8 @@ async function getInventoryChangesReport(
         COUNT(CASE WHEN adjustment_type = 'increase' THEN 1 END) as increase_count,
         COUNT(CASE WHEN adjustment_type = 'decrease' THEN 1 END) as decrease_count
       FROM stock_adjustments
-      WHERE created_at BETWEEN ? AND ?${userId ? " AND created_by = ?" : ""}${productId ? " AND product_id = ?" : ""}`,
-      [...params],
+      WHERE created_at BETWEEN ? AND ?${statsWhere}`,
+      statsParams,
     );
 
     // Por tipo de ajuste
@@ -4154,22 +4236,24 @@ async function getInventoryChangesReport(
         COUNT(*) as count,
         SUM(quantity) as total_quantity
       FROM stock_adjustments
-      WHERE created_at BETWEEN ? AND ?${userId ? " AND created_by = ?" : ""}${productId ? " AND product_id = ?" : ""}
+      WHERE created_at BETWEEN ? AND ?${statsWhere}
       GROUP BY adjustment_type`,
-      [...params],
+      statsParams,
     );
 
     // Por usuario
     const byUser = await allAsync(
       `SELECT 
-        created_by,
+        sa.created_by,
+        u.username,
         COUNT(*) as adjustment_count,
         SUM(quantity) as total_quantity
-      FROM stock_adjustments
-      WHERE created_at BETWEEN ? AND ?${userId ? " AND created_by = ?" : ""}${productId ? " AND product_id = ?" : ""}
-      GROUP BY created_by
+      FROM stock_adjustments sa
+      LEFT JOIN users u ON sa.created_by = u.username
+      WHERE sa.created_at BETWEEN ? AND ?${statsWhere}
+      GROUP BY sa.created_by, u.username
       ORDER BY adjustment_count DESC`,
-      [...params],
+      statsParams,
     );
 
     return {
@@ -4240,7 +4324,7 @@ async function getSystemAccessReport(startDate, endDate, userId = null) {
       LEFT JOIN users u ON ual.user_id = u.id
       WHERE ual.created_at BETWEEN ? AND ?
         AND (ual.action LIKE '%login%' OR ual.action LIKE '%logout%' OR ual.action LIKE '%access%')${userId ? " AND ual.user_id = ?" : ""}
-      GROUP BY ual.user_id
+      GROUP BY ual.user_id, u.username, u.first_name, u.last_name, u.role
       ORDER BY access_count DESC`,
       userId ? [startDate, endDate, userId] : [startDate, endDate],
     );
@@ -4330,9 +4414,10 @@ async function getPriceChangesReport(startDate, endDate, productId = null) {
       `SELECT 
         changed_by,
         COUNT(*) as change_count
-      FROM price_history
-      WHERE created_at BETWEEN ? AND ?${productId ? " AND product_id = ?" : ""}
-      GROUP BY changed_by
+      FROM price_history ph
+      LEFT JOIN users u ON ph.changed_by = u.id
+      WHERE ph.created_at BETWEEN ? AND ?${productId ? " AND ph.product_id = ?" : ""}
+      GROUP BY ph.changed_by, u.username
       ORDER BY change_count DESC`,
       productId ? [startDate, endDate, productId] : [startDate, endDate],
     );
@@ -4360,7 +4445,6 @@ async function getSalesAuditReport(
         sa.id,
         sa.sale_id,
         sa.action,
-        sa.reason,
         sa.details,
         sa.created_at,
         u.username,
@@ -4427,7 +4511,7 @@ async function getSalesAuditReport(
       FROM sales_audit sa
       LEFT JOIN users u ON sa.user_id = u.id
       WHERE sa.created_at BETWEEN ? AND ?${userId ? " AND sa.user_id = ?" : ""}
-      GROUP BY sa.user_id
+      GROUP BY sa.user_id, u.username, u.first_name, u.last_name, u.role
       ORDER BY audit_count DESC`,
       userId ? [startDate, endDate, userId] : [startDate, endDate],
     );
