@@ -5,15 +5,15 @@
   "homepage": "./",
   "scripts": {
     "dev": "vite",
-    "dev:electron": "concurrently \"npm run dev:web\" \"sleep 3 && electron .\"",
+    "dev:electron": "concurrently \"npm run dev:web\" \"npm run start:electron\"",
     "dev:web": "vite",
+    "start:electron": "wait-on http://localhost:5173 && electron .",
     "build": "vite build",
     "build:win": "npm run build && electron-builder --win --x64",
     "build:mac": "npm run build && electron-builder --mac",
     "build:check": "tsc && vite build",
     "preview": "vite preview",
     "type-check": "tsc --noEmit",
-    "postinstall": "electron-builder install-app-deps",
     "electron:build": "npm run build && electron-builder --win --x64",
     "electron:build:mac": "npm run build && electron-builder --mac",
     "electron:build:dir": "npm run build && electron-builder --win --x64 --dir",
@@ -28,7 +28,6 @@
     "@radix-ui/react-tabs": "^1.1.13",
     "@types/pdfkit": "^0.17.5",
     "bcryptjs": "^2.4.3",
-    "better-sqlite3": "^12.6.2",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.0.0",
     "googleapis": "^144.0.0",
@@ -42,7 +41,6 @@
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "recharts": "^2.10.3",
-    "sqlite3": "^5.1.7",
     "tailwind-merge": "^2.2.0",
     "xlsx": "^0.18.5"
   },
@@ -79,7 +77,6 @@
       "package.json"
     ],
     "asarUnpack": [
-      "node_modules/sqlite3/**/*",
       "node_modules/pg/**/*"
     ],
     "npmRebuild": false,
