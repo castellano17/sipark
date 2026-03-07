@@ -1,4 +1,7 @@
-const { getDatabase } = require("./database.cjs");
+const { getDatabase } = require("./database-pg.cjs");
+
+// NOTA: Las migraciones ya no son necesarias con PostgreSQL
+// Las tablas se crean automáticamente en database-pg.cjs
 
 async function migrateDatabase() {
   const db = getDatabase();
