@@ -8,13 +8,13 @@
     "dev:electron": "concurrently \"npm run dev:web\" \"sleep 3 && electron .\"",
     "dev:web": "vite",
     "build": "vite build",
-    "build:win": "npm run prepare-sqlite3 && npm run build && electron-builder --win --x64",
+    "build:win": "npm run build && electron-builder --win --x64",
     "build:mac": "npm run build && electron-builder --mac",
     "build:check": "tsc && vite build",
     "preview": "vite preview",
     "type-check": "tsc --noEmit",
-    "prepare-sqlite3": "node scripts/download-sqlite3-binaries.js",
-    "electron:build": "npm run prepare-sqlite3 && npm run build && electron-builder --win --x64",
+    "postinstall": "electron-builder install-app-deps",
+    "electron:build": "npm run build && electron-builder --win --x64",
     "electron:build:mac": "npm run build && electron-builder --mac",
     "electron:build:dir": "npm run build && electron-builder --win --x64 --dir",
     "pack": "npm run build && electron-builder --dir",
@@ -79,7 +79,8 @@
       "package.json"
     ],
     "asarUnpack": [
-      "node_modules/sqlite3/**/*"
+      "node_modules/sqlite3/**/*",
+      "node_modules/pg/**/*"
     ],
     "npmRebuild": false,
     "buildDependenciesFromSource": false,
