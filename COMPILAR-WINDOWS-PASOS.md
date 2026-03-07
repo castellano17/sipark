@@ -62,19 +62,63 @@ O instala manualmente desde: https://www.postgresql.org/download/windows/
 
 ### 5. Configurar PostgreSQL
 
-Después de instalar PostgreSQL, crea la base de datos:
+Después de instalar PostgreSQL, configura la base de datos:
+
+#### Opción A: Script Automático (Recomendado)
 
 ```powershell
-# Abre PowerShell y navega a la carpeta de PostgreSQL
+# Ejecuta el script de configuración
+.\setup-database-windows.ps1
+
+# Te pedirá la contraseña de 'postgres' que pusiste al instalar
+# El script creará automáticamente la base de datos y el usuario
+```
+
+#### Opción B: Manual (Si el script no funciona)
+
+```powershell
+# 1. Abre PowerShell y navega a la carpeta de PostgreSQL
 cd "C:\Program Files\PostgreSQL\15\bin"
 
-# Conéctate a PostgreSQL (te pedirá la contraseña que pusiste al instalar)
+# 2. Conéctate a PostgreSQL
 .\psql -U postgres
+# Te pedirá la contraseña que pusiste al instalar PostgreSQL
 
-# Dentro de psql, ejecuta:
+# 3. Dentro de psql (verás el prompt: postgres=#), ejecuta estos comandos UNO POR UNO:
+
 CREATE DATABASE ludoteca_pos;
+
 CREATE USER ludoteca_user WITH PASSWORD 'ludoteca2024';
+
 GRANT ALL PRIVILEGES ON DATABASE ludoteca_pos TO ludoteca_user;
+
+# 4. Conéctate a la nueva base de datos
+\c ludoteca_pos
+
+# 5. Da permisos adicionales (ejecuta estos comandos)
+GRANT ALL ON SCHEMA public TO ludoteca_user;
+
+GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO ludoteca_user;
+
+GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO ludoteca_user;
+
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO ludoteca_user;
+
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO ludoteca_user;
+
+# 6. Sal de psql
+\q
+```
+
+#### Verificar que funcionó:
+
+```powershell
+# Conéctate con el nuevo usuario
+cd "C:\Program Files\PostgreSQL\15\bin"
+.\psql -U ludoteca_user -d ludoteca_pos
+# Contraseña: ludoteca2024
+
+# Si te conecta sin errores, ¡funcionó! Sal con:
 \q
 ```
 
