@@ -50,12 +50,26 @@ export function useCurrency() {
     }
   };
 
-  const formatCurrency = (amount: number): string => {
-    return `${currency.symbol}${amount.toFixed(2)}`;
+  const formatCurrency = (amount: number | string): string => {
+    // Convertir a número si es string (PostgreSQL devuelve DECIMAL como string)
+    const numAmount = typeof amount === "string" ? parseFloat(amount) : amount;
+
+    if (isNaN(numAmount)) {
+      return `${currency.symbol}0.00`;
+    }
+
+    return `${currency.symbol}${numAmount.toFixed(2)}`;
   };
 
-  const formatCurrencyWithCode = (amount: number): string => {
-    return `${currency.symbol}${amount.toFixed(2)} ${currency.code}`;
+  const formatCurrencyWithCode = (amount: number | string): string => {
+    // Convertir a número si es string (PostgreSQL devuelve DECIMAL como string)
+    const numAmount = typeof amount === "string" ? parseFloat(amount) : amount;
+
+    if (isNaN(numAmount)) {
+      return `${currency.symbol}0.00 ${currency.code}`;
+    }
+
+    return `${currency.symbol}${numAmount.toFixed(2)} ${currency.code}`;
   };
 
   const convertFromUSD = (amountUSD: number): number => {
