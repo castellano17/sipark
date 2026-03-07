@@ -1,10 +1,10 @@
 # Script para configurar PostgreSQL en Windows
 # Ejecutar como Administrador
 
-Write-Host "=== Configuración de PostgreSQL para SIPARK ===" -ForegroundColor Cyan
+Write-Host "=== Configuracion de PostgreSQL para SIPARK ===" -ForegroundColor Cyan
 Write-Host ""
 
-# Buscar la instalación de PostgreSQL
+# Buscar la instalacion de PostgreSQL
 $pgPaths = @(
     "C:\Program Files\PostgreSQL\15\bin",
     "C:\Program Files\PostgreSQL\16\bin",
@@ -17,20 +17,20 @@ $psqlPath = $null
 foreach ($path in $pgPaths) {
     if (Test-Path "$path\psql.exe") {
         $psqlPath = "$path\psql.exe"
-        Write-Host "✓ PostgreSQL encontrado en: $path" -ForegroundColor Green
+        Write-Host "OK PostgreSQL encontrado en: $path" -ForegroundColor Green
         break
     }
 }
 
 if (-not $psqlPath) {
-    Write-Host "✗ PostgreSQL no encontrado. Por favor instálalo primero." -ForegroundColor Red
+    Write-Host "ERROR PostgreSQL no encontrado. Por favor instalalo primero." -ForegroundColor Red
     Write-Host "  Ejecuta: .\install-postgresql-windows.ps1" -ForegroundColor Yellow
     exit 1
 }
 
-# Solicitar contraseña del usuario postgres
+# Solicitar contrasena del usuario postgres
 Write-Host ""
-Write-Host "Ingresa la contraseña del usuario 'postgres' que configuraste al instalar PostgreSQL:" -ForegroundColor Yellow
+Write-Host "Ingresa la contrasena del usuario 'postgres' que configuraste al instalar PostgreSQL:" -ForegroundColor Yellow
 $postgresPassword = Read-Host -AsSecureString
 $BSTR = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($postgresPassword)
 $plainPassword = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto($BSTR)
@@ -59,12 +59,12 @@ $env:PGPASSWORD = $plainPassword
 & $psqlPath -U postgres -f $tempSqlFile 2>&1 | ForEach-Object {
     if ($_ -match "ERROR") {
         if ($_ -match "already exists") {
-            Write-Host "⚠ Base de datos o usuario ya existe (esto es normal si ya lo configuraste antes)" -ForegroundColor Yellow
+            Write-Host "AVISO Base de datos o usuario ya existe (esto es normal si ya lo configuraste antes)" -ForegroundColor Yellow
         } else {
-            Write-Host "✗ Error: $_" -ForegroundColor Red
+            Write-Host "ERROR: $_" -ForegroundColor Red
         }
     } elseif ($_ -match "CREATE|GRANT") {
-        Write-Host "✓ $_" -ForegroundColor Green
+        Write-Host "OK $_" -ForegroundColor Green
     }
 }
 
@@ -73,25 +73,25 @@ Remove-Item $tempSqlFile -ErrorAction SilentlyContinue
 $env:PGPASSWORD = $null
 
 Write-Host ""
-Write-Host "Verificando conexión..." -ForegroundColor Cyan
+Write-Host "Verificando conexion..." -ForegroundColor Cyan
 
 # Verificar que la base de datos funcione
 $env:PGPASSWORD = "ludoteca2024"
 $testResult = & $psqlPath -U ludoteca_user -d ludoteca_pos -c "SELECT 1;" 2>&1
 
 if ($testResult -match "1 row") {
-    Write-Host "✓ ¡Base de datos configurada correctamente!" -ForegroundColor Green
+    Write-Host "OK Base de datos configurada correctamente!" -ForegroundColor Green
     Write-Host ""
     Write-Host "Credenciales de la base de datos:" -ForegroundColor Cyan
     Write-Host "  Host: localhost" -ForegroundColor White
     Write-Host "  Puerto: 5432" -ForegroundColor White
     Write-Host "  Base de datos: ludoteca_pos" -ForegroundColor White
     Write-Host "  Usuario: ludoteca_user" -ForegroundColor White
-    Write-Host "  Contraseña: ludoteca2024" -ForegroundColor White
+    Write-Host "  Contrasena: ludoteca2024" -ForegroundColor White
     Write-Host ""
     Write-Host "Siguiente paso: Crear el archivo db-config.json" -ForegroundColor Yellow
 } else {
-    Write-Host "✗ Error al verificar la conexión" -ForegroundColor Red
+    Write-Host "ERROR al verificar la conexion" -ForegroundColor Red
     Write-Host $testResult
 }
 
@@ -99,4 +99,4 @@ $env:PGPASSWORD = $null
 
 Write-Host ""
 Write-Host "Presiona cualquier tecla para continuar..."
-$null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+$host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown") | Out-Null
