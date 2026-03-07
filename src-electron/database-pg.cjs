@@ -21,17 +21,31 @@ function getConfig() {
     }
   }
 
-  // Configuración por defecto o desde variables de entorno
-  return {
+  // Configuración por defecto
+  const defaultConfig = {
     host: process.env.DB_HOST || "localhost",
     port: parseInt(process.env.DB_PORT || "5432"),
     database: process.env.DB_NAME || "ludoteca_pos",
-    user: process.env.DB_USER || "postgres",
-    password: process.env.DB_PASSWORD || "postgres",
-    max: 20, // Máximo de conexiones en el pool
+    user: process.env.DB_USER || "ludoteca_user",
+    password: process.env.DB_PASSWORD || "ludoteca2024",
+    max: 20,
     idleTimeoutMillis: 30000,
     connectionTimeoutMillis: 2000,
   };
+
+  // Crear el archivo de configuración automáticamente si no existe
+  try {
+    fs.writeFileSync(
+      configPath,
+      JSON.stringify(defaultConfig, null, 2),
+      "utf8",
+    );
+    console.log("✅ Archivo db-config.json creado automáticamente");
+  } catch (error) {
+    console.warn("⚠️ No se pudo crear db-config.json:", error.message);
+  }
+
+  return defaultConfig;
 }
 
 async function initializeDatabase() {
