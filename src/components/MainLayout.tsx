@@ -195,7 +195,7 @@ export default function MainLayout({ currentUser, onLogout }: MainLayoutProps) {
         />
 
         {/* Main Content */}
-        <main className="flex-1 overflow-auto">{renderContent()}</main>
+        <main className="">{renderContent()}</main>
       </div>
 
       {/* Status Bar */}

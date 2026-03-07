@@ -362,7 +362,7 @@ export function PackageFeaturesManager({
         {/* Modal Crear/Editar Característica */}
         {showModal && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]">
-            <Card className="w-full max-w-md bg-white">
+            <Card className="w-full max-w-md bg-white max-h-[90vh] overflow-y-auto">
               <form onSubmit={handleSubmit}>
                 <div className="p-6 border-b">
                   <h3 className="text-lg font-semibold">
@@ -599,7 +599,7 @@ export function PackageFeaturesManager({
         {/* Modal Eliminar Característica */}
         {showDeleteConfirm && featureToDelete && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]">
-            <Card className="w-full max-w-md bg-slate-800 border-slate-700">
+            <Card className="w-full max-w-md bg-slate-800 border-slate-700 max-h-[90vh] overflow-y-auto">
               <div className="p-6">
                 <h3 className="text-lg font-semibold text-white mb-4">
                   ¿Eliminar característica?
@@ -642,7 +642,7 @@ export function PackageFeaturesManager({
         {/* Modal Eliminar Categoría */}
         {showCategoryDeleteConfirm && categoryToDelete && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[70]">
-            <Card className="w-full max-w-md bg-slate-800 border-slate-700">
+            <Card className="w-full max-w-md bg-slate-800 border-slate-700 max-h-[90vh] overflow-y-auto">
               <div className="p-6">
                 <h3 className="text-lg font-semibold text-white mb-4">
                   ¿Eliminar categoría?

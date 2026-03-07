@@ -134,7 +134,7 @@ export function SalesHistory() {
         </div>
 
         {/* Tabla de Ventas */}
-        <Card className="flex-1 overflow-auto">
+        <Card className="">
           <table className="w-full">
             <thead className="bg-gray-50 sticky top-0">
               <tr>

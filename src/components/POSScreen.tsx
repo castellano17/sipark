@@ -500,7 +500,7 @@ export function POSScreen({
       {/* Contenido Principal */}
       <div className="flex-1 flex gap-4 overflow-hidden">
         {/* Grid de Productos */}
-        <div className="flex-1 overflow-auto">
+        <div className="">
           {!cashBoxOpen ? (
             <div className="flex items-center justify-center h-full">
               <div className="text-center text-gray-400">
@@ -546,7 +546,7 @@ export function POSScreen({
           <h2 className="text-lg font-bold mb-4">Ticket Actual</h2>
 
           {/* Items */}
-          <div className="flex-1 overflow-auto space-y-2 mb-4">
+          <div className=" space-y-2 mb-4">
             {currentSale.items.length === 0 ? (
               <div className="text-center text-gray-400 py-8">
                 No hay productos agregados

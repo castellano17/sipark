@@ -428,7 +428,7 @@ export function Inventory() {
       </div>
 
       {/* Products Table */}
-      <div className="flex-1 overflow-auto p-6">
+      <div className=" p-6">
         <Card>
           <div className="overflow-x-auto">
             <table className="w-full">
@@ -582,7 +582,7 @@ export function Inventory() {
       {showAdjustmentModal && selectedProduct && (
         <Dialog open={showAdjustmentModal} onOpenChange={closeAdjustmentModal}>
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <Card className="w-full max-w-2xl bg-white max-h-[90vh] overflow-hidden flex flex-col border-0">
+            <Card className="w-full max-w-2xl bg-white max-h-[90vh] overflow-y-auto flex flex-col border-0">
               {/* Header */}
               <div className="flex items-center justify-between p-6 border-b bg-gradient-to-r from-orange-600 to-orange-700">
                 <div className="flex items-center gap-3">
@@ -602,7 +602,7 @@ export function Inventory() {
               </div>
 
               {/* Content */}
-              <div className="flex-1 overflow-auto p-6 space-y-4">
+              <div className=" p-6 space-y-4">
                 <div>
                   <label className="block text-sm font-medium mb-2">
                     Tipo de Ajuste *
@@ -654,7 +654,7 @@ export function Inventory() {
                     placeholder="Ingrese la cantidad"
                   />
                   {adjustmentData.quantity && (
-                    <Card className="mt-2 p-3 bg-orange-50 border-orange-200">
+                    <Card className="mt-2 p-3 bg-orange-50 border-orange-200 max-h-[90vh] overflow-y-auto">
                       <p className="text-sm font-medium text-orange-900">
                         Nuevo stock:{" "}
                         <span className="text-lg font-bold">
@@ -740,7 +740,7 @@ export function Inventory() {
       {showAuditModal && (
         <Dialog open={showAuditModal} onOpenChange={setShowAuditModal}>
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <Card className="w-full max-w-6xl max-h-[90vh] overflow-hidden flex flex-col bg-white border-0">
+            <Card className="w-full max-w-6xl max-h-[90vh] overflow-y-auto flex flex-col bg-white border-0">
               {/* Header */}
               <div className="flex items-center justify-between p-6 border-b bg-gradient-to-r from-slate-700 to-slate-800">
                 <div className="flex items-center gap-3">
@@ -812,7 +812,7 @@ export function Inventory() {
               </div>
 
               {/* Content */}
-              <div className="flex-1 overflow-auto p-6">
+              <div className=" p-6">
                 <Card>
                   <table className="w-full">
                     <thead className="bg-gray-50 border-b">

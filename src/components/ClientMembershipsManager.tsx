@@ -251,7 +251,7 @@ export function ClientMembershipsManager() {
       </Card>
 
       {/* Tabla de Membresías */}
-      <Card className="flex-1 overflow-hidden">
+      <Card className="flex-1 overflow-y-auto">
         <div className="overflow-x-auto h-full">
           <table className="w-full">
             <thead className="bg-gray-50 sticky top-0">

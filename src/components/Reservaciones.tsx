@@ -964,7 +964,7 @@ export const Reservaciones: React.FC = () => {
       {/* Modal Confirmación Cancelar */}
       {showCancelConfirm && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <Card className="w-full max-w-md">
+          <Card className="w-full max-w-md max-h-[90vh] overflow-y-auto">
             <CardContent className="p-6">
               <div className="text-center">
                 <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 mb-4">
@@ -1003,7 +1003,7 @@ export const Reservaciones: React.FC = () => {
       {/* Modal Registrar Pago */}
       {showPaymentModal && selectedReservation && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <Card className="w-full max-w-md">
+          <Card className="w-full max-w-md max-h-[90vh] overflow-y-auto">
             <CardHeader className="bg-green-600 text-white">
               <CardTitle>Registrar Pago</CardTitle>
             </CardHeader>
@@ -1087,7 +1087,7 @@ export const Reservaciones: React.FC = () => {
       {/* Modal Completar Evento */}
       {showCompleteModal && selectedReservation && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <Card className="w-full max-w-md">
+          <Card className="w-full max-w-md max-h-[90vh] overflow-y-auto">
             <CardHeader className="bg-purple-600 text-white">
               <CardTitle>Completar Evento</CardTitle>
             </CardHeader>

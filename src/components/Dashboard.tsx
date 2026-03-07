@@ -274,7 +274,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
         {/* Columna Izquierda - 2/3 */}
         <div className="lg:col-span-2 space-y-6">
           {/* Welcome Card */}
-          <Card className="shadow-lg border-none bg-gradient-to-r from-blue-500 to-purple-600 text-white overflow-hidden">
+          <Card className="shadow-lg border-none bg-gradient-to-r from-blue-500 to-purple-600 text-white overflow-y-auto">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div className="flex-1">

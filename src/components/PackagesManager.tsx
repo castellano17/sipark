@@ -279,7 +279,7 @@ export const PackagesManager: React.FC = () => {
       </div>
 
       {/* Grid de Paquetes */}
-      <div className="flex-1 overflow-auto">
+      <div className="">
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {packages.length > 0 ? (
             packages.map((pkg) => (

@@ -430,7 +430,7 @@ export const Settings: React.FC = () => {
         </TabsList>
 
         {/* Tab: Empresa */}
-        <TabsContent value="empresa" className="flex-1 overflow-auto">
+        <TabsContent value="empresa" className="">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Datos de Empresa */}
             <Card className="shadow-md border-none">
@@ -519,7 +519,7 @@ export const Settings: React.FC = () => {
         </TabsContent>
 
         {/* Tab: Operaciones */}
-        <TabsContent value="operaciones" className="flex-1 overflow-auto">
+        <TabsContent value="operaciones" className="">
           <div className="space-y-6">
             {/* Configuración de Moneda */}
             <Card className="shadow-md border-none">
@@ -576,7 +576,7 @@ export const Settings: React.FC = () => {
         </TabsContent>
 
         {/* Tab: Contabilidad */}
-        <TabsContent value="contabilidad" className="flex-1 overflow-auto">
+        <TabsContent value="contabilidad" className="">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Configuración Fiscal */}
             <Card className="shadow-md border-none">
@@ -680,7 +680,7 @@ export const Settings: React.FC = () => {
         </TabsContent>
 
         {/* Tab: Hardware */}
-        <TabsContent value="hardware" className="flex-1 overflow-auto">
+        <TabsContent value="hardware" className="">
           <div className="space-y-6">
             {/* Base de Datos */}
             <Card className="shadow-md border-none">

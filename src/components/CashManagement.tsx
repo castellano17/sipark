@@ -496,7 +496,7 @@ export function CashManagement() {
       {/* Modal de Cierre */}
       {showCloseModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <Card className="w-[500px] p-6 border-0">
+          <Card className="w-[500px] p-6 border-0 max-h-[90vh] overflow-y-auto">
             <h2 className="text-2xl font-bold mb-4">Cerrar Caja</h2>
 
             <div className="bg-blue-50 p-4 rounded-lg mb-4">

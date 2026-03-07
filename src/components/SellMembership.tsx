@@ -551,7 +551,7 @@ export function SellMembership() {
       {showPrintModal && (
         <Dialog open={showPrintModal} onOpenChange={setShowPrintModal}>
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-            <Card className="p-8 max-w-md w-full mx-4">
+            <Card className="p-8 max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto">
               <div className="text-center mb-6">
                 <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
                   <CheckCircle className="w-10 h-10 text-green-600" />

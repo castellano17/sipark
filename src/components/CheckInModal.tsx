@@ -251,7 +251,7 @@ export const CheckInModal: React.FC<CheckInModalProps> = ({
           onSubmit={handleSubmit}
           className="flex flex-col flex-1 overflow-hidden"
         >
-          <div className="flex-1 overflow-auto p-6 space-y-6">
+          <div className=" p-6 space-y-6">
             {/* Tipo de Cliente - Radio Buttons */}
             <div className="space-y-3">
               <label className="block text-sm font-semibold text-slate-900">

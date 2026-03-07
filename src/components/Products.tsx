@@ -237,7 +237,7 @@ export function Products() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto p-6">
+      <div className=" p-6">
         <Card>
           <table className="w-full">
             <thead className="bg-gray-50 border-b">
@@ -345,7 +345,7 @@ export function Products() {
       {showModal && (
         <Dialog open={showModal} onOpenChange={handleCloseModal}>
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <Card className="w-full max-w-2xl bg-white max-h-[90vh] overflow-hidden flex flex-col border-0">
+            <Card className="w-full max-w-2xl bg-white max-h-[90vh] overflow-y-auto flex flex-col border-0">
               <form onSubmit={handleSubmit} className="flex flex-col h-full">
                 {/* Header */}
                 <div className="flex items-center justify-between p-6 border-b bg-gradient-to-r from-slate-700 to-slate-800">
@@ -359,7 +359,7 @@ export function Products() {
                   </div>
                 </div>
 
-                <div className="flex-1 overflow-auto p-6 space-y-4">
+                <div className=" p-6 space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div className="col-span-2">
                       <label className="block text-sm font-medium mb-2">
@@ -538,7 +538,7 @@ export function Products() {
       {showCategoryModal && (
         <Dialog open={showCategoryModal} onOpenChange={setShowCategoryModal}>
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4">
-            <Card className="w-full max-w-md bg-white border-0">
+            <Card className="w-full max-w-md bg-white border-0 max-h-[90vh] overflow-y-auto">
               <div className="p-6 border-b">
                 <h2 className="text-xl font-bold">Nueva Categoría</h2>
               </div>
@@ -585,7 +585,7 @@ export function Products() {
       {showDeleteConfirm && productToDelete && (
         <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-            <Card className="w-full max-w-md bg-slate-800 border-slate-700">
+            <Card className="w-full max-w-md bg-slate-800 border-slate-700 max-h-[90vh] overflow-y-auto">
               <div className="p-6">
                 <h3 className="text-lg font-semibold text-white mb-4">
                   ¿Eliminar producto?
