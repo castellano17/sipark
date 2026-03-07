@@ -402,7 +402,7 @@ export function Users() {
       </div>
 
       {/* Users Table */}
-      <div className=" p-6">
+      <div className="flex-1 overflow-auto p-6">
         <Card>
           <table className="w-full">
             <thead className="bg-gray-50 border-b">
@@ -538,7 +538,7 @@ export function Users() {
       {showModal && (
         <Dialog open={showModal} onOpenChange={setShowModal}>
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <Card className="w-full max-w-2xl bg-white border-0 max-h-[90vh] overflow-y-auto">
+            <Card className="w-full max-w-2xl bg-white border-0">
               <form onSubmit={handleSubmit}>
                 {/* Header */}
                 <div className="flex items-center justify-between p-6 border-b bg-gradient-to-r from-blue-600 to-blue-700">
@@ -747,7 +747,7 @@ export function Users() {
           onOpenChange={setShowPermissionsModal}
         >
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <Card className="w-full max-w-4xl max-h-[90vh] overflow-y-auto flex flex-col bg-white border-0">
+            <Card className="w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col bg-white border-0">
               <div className="flex items-center justify-between p-6 border-b bg-gradient-to-r from-purple-600 to-purple-700">
                 <div className="flex items-center gap-3">
                   <div className="p-2 bg-white/20 rounded-lg">
@@ -759,7 +759,7 @@ export function Users() {
                 </div>
               </div>
 
-              <div className=" p-6">
+              <div className="flex-1 overflow-auto p-6">
                 <table className="w-full">
                   <thead className="bg-gray-50 border-b">
                     <tr>
@@ -861,7 +861,7 @@ export function Users() {
       {showPasswordModal && (
         <Dialog open={showPasswordModal} onOpenChange={setShowPasswordModal}>
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <Card className="w-full max-w-md bg-white border-0 max-h-[90vh] overflow-y-auto">
+            <Card className="w-full max-w-md bg-white border-0">
               <div className="flex items-center justify-between p-6 border-b bg-gradient-to-r from-orange-600 to-orange-700">
                 <div className="flex items-center gap-3">
                   <div className="p-2 bg-white/20 rounded-lg">
@@ -932,7 +932,7 @@ export function Users() {
       {showAuditModal && (
         <Dialog open={showAuditModal} onOpenChange={setShowAuditModal}>
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <Card className="w-full max-w-6xl max-h-[90vh] overflow-y-auto flex flex-col bg-white border-0">
+            <Card className="w-full max-w-6xl max-h-[90vh] overflow-hidden flex flex-col bg-white border-0">
               <div className="flex items-center justify-between p-6 border-b bg-gradient-to-r from-slate-700 to-slate-800">
                 <div className="flex items-center gap-3">
                   <div className="p-2 bg-white/20 rounded-lg">
@@ -944,7 +944,7 @@ export function Users() {
                 </div>
               </div>
 
-              <div className=" p-6">
+              <div className="flex-1 overflow-auto p-6">
                 <table className="w-full">
                   <thead className="bg-gray-50 border-b">
                     <tr>
@@ -1025,7 +1025,7 @@ export function Users() {
       {showDeleteConfirm && userToDelete && (
         <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-            <Card className="w-full max-w-md bg-slate-800 border-slate-700 max-h-[90vh] overflow-y-auto">
+            <Card className="w-full max-w-md bg-slate-800 border-slate-700">
               <div className="p-6">
                 <h3 className="text-lg font-semibold text-white mb-4">
                   ¿Desactivar usuario?

@@ -276,7 +276,7 @@ export function Purchases() {
         </div>
       </div>
 
-      <div className=" p-6">
+      <div className="flex-1 overflow-auto p-6">
         <Card>
           <table className="w-full">
             <thead className="bg-gray-50 border-b">
@@ -358,7 +358,7 @@ export function Purchases() {
       {showModal && (
         <Dialog open={showModal} onOpenChange={handleCloseModal}>
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <Card className="w-full max-w-4xl max-h-[90vh] overflow-y-auto bg-white border-0">
+            <Card className="w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col bg-white border-0">
               <form onSubmit={handleSubmit} className="flex flex-col h-full">
                 {/* Header */}
                 <div className="flex items-center justify-between p-6 border-b bg-gradient-to-r from-blue-600 to-blue-700">
@@ -372,7 +372,7 @@ export function Purchases() {
                   </div>
                 </div>
 
-                <div className=" p-6 space-y-6">
+                <div className="flex-1 overflow-auto p-6 space-y-6">
                   {/* Datos de la factura */}
                   <div className="grid grid-cols-3 gap-4">
                     <div className="relative supplier-search-container">

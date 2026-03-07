@@ -144,7 +144,7 @@ export function Suppliers() {
         </div>
       </div>
 
-      <div className=" p-6">
+      <div className="flex-1 overflow-auto p-6">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {suppliers.map((supplier) => (
             <Card
@@ -226,7 +226,7 @@ export function Suppliers() {
       {showModal && (
         <Dialog open={showModal} onOpenChange={handleCloseModal}>
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <Card className="w-full max-w-2xl bg-white border-0 max-h-[90vh] overflow-y-auto">
+            <Card className="w-full max-w-2xl bg-white border-0">
               <form onSubmit={handleSubmit}>
                 {/* Header */}
                 <div className="flex items-center justify-between p-6 border-b bg-gradient-to-r from-slate-700 to-slate-800">

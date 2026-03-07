@@ -67,7 +67,7 @@ export function PaymentModal({ sale, onClose, onConfirm }: PaymentModalProps) {
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <Card className="w-[500px] p-6 border-0 max-h-[90vh] overflow-y-auto">
+      <Card className="w-[500px] p-6 border-0">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-2xl font-bold">Procesar Pago</h2>

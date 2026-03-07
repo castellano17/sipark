@@ -48,7 +48,7 @@ export function ClientSelectorModal({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <Card className="w-[600px] max-h-[80vh] flex flex-col p-6 border-0 max-h-[90vh] overflow-y-auto">
+      <Card className="w-[600px] max-h-[80vh] flex flex-col p-6 border-0">
         {/* Header */}
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-2xl font-bold">Seleccionar Cliente</h2>
@@ -86,7 +86,7 @@ export function ClientSelectorModal({
         </Button>
 
         {/* Lista de Clientes */}
-        <div className=" space-y-2">
+        <div className="flex-1 overflow-auto space-y-2">
           {filteredClients.length === 0 ? (
             <div className="text-center text-gray-400 py-8">
               No se encontraron clientes
