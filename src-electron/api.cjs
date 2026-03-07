@@ -1718,7 +1718,7 @@ async function createMembership(membershipData) {
       max_sessions_per_day = null,
       discount_percentage = 0,
       priority_level = 0,
-      auto_renew = 0,
+      auto_renew = false,
       grace_period_days = 0,
     } = membershipData;
 
@@ -1728,7 +1728,8 @@ async function createMembership(membershipData) {
         membership_type, max_sessions_per_day, discount_percentage,
         priority_level, auto_renew, grace_period_days, is_active
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+      RETURNING id
     `;
     const result = await runAsync(sql, [
       name,
@@ -1740,10 +1741,11 @@ async function createMembership(membershipData) {
       max_sessions_per_day,
       discount_percentage,
       priority_level,
-      auto_renew ? 1 : 0,
+      auto_renew,
       grace_period_days,
+      true,
     ]);
-    return result.lastID;
+    return result.rows[0].id;
   } catch (error) {
     console.error("Error creando membresía:", error);
     throw error;
