@@ -101,6 +101,7 @@ async function createTables() {
       stock INTEGER DEFAULT 0,
       min_stock INTEGER DEFAULT 0,
       duration_minutes INTEGER,
+      last_sale_date TIMESTAMP,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )`,
 
@@ -140,8 +141,10 @@ async function createTables() {
       timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       payment_method VARCHAR(50),
       cash_box_id INTEGER,
+      user_id INTEGER,
       FOREIGN KEY (client_id) REFERENCES clients(id),
-      FOREIGN KEY (cash_box_id) REFERENCES cash_boxes(id)
+      FOREIGN KEY (cash_box_id) REFERENCES cash_boxes(id),
+      FOREIGN KEY (user_id) REFERENCES users(id)
     )`,
 
     `CREATE TABLE IF NOT EXISTS sale_items (
