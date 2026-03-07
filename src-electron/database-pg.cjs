@@ -541,6 +541,18 @@ function convertSqliteToPostgres(sql) {
   // Convertir date('now') a CURRENT_DATE
   pgSql = pgSql.replace(/date\('now'\)/gi, "CURRENT_DATE");
 
+  // Convertir DATE('now', '-X days') a (CURRENT_DATE - INTERVAL 'X days')
+  pgSql = pgSql.replace(
+    /DATE\('now',\s*'-(\d+)\s+days?'\)/gi,
+    "(CURRENT_DATE - INTERVAL '$1 days')",
+  );
+
+  // Convertir DATE('now', '+X days') a (CURRENT_DATE + INTERVAL 'X days')
+  pgSql = pgSql.replace(
+    /DATE\('now',\s*'\+(\d+)\s+days?'\)/gi,
+    "(CURRENT_DATE + INTERVAL '$1 days')",
+  );
+
   // Convertir strftime('%H', column) a EXTRACT(HOUR FROM column)
   pgSql = pgSql.replace(/strftime\('%H',\s*(\w+)\)/gi, "EXTRACT(HOUR FROM $1)");
 
