@@ -36,26 +36,17 @@ $BSTR = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($postgresPa
 $plainPassword = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto($BSTR)
 
 # Crear archivo temporal con los comandos SQL
-$sqlCommands = @"
--- Crear base de datos
+$sqlCommands = @'
 CREATE DATABASE ludoteca_pos;
-
--- Crear usuario
 CREATE USER ludoteca_user WITH PASSWORD 'ludoteca2024';
-
--- Dar permisos
 GRANT ALL PRIVILEGES ON DATABASE ludoteca_pos TO ludoteca_user;
-
--- Conectar a la base de datos
 \c ludoteca_pos
-
--- Dar permisos en el schema public
 GRANT ALL ON SCHEMA public TO ludoteca_user;
 GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO ludoteca_user;
 GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO ludoteca_user;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO ludoteca_user;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO ludoteca_user;
-"@
+'@
 
 $tempSqlFile = "$env:TEMP\setup_sipark_db.sql"
 $sqlCommands | Out-File -FilePath $tempSqlFile -Encoding UTF8
