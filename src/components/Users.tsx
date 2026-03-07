@@ -425,7 +425,7 @@ export function Users() {
                 <th className="px-6 py-3 text-left text-xs font-semibold">
                   Último Acceso
                 </th>
-                <th className="px-6 py-3 text-center text-xs font-semibold">
+                <th className="px-6 py-3 text-center text-xs font-semibold w-40">
                   Acciones
                 </th>
               </tr>
@@ -483,12 +483,13 @@ export function Users() {
                       : "Nunca"}
                   </td>
                   <td className="px-6 py-4">
-                    <div className="flex items-center justify-center gap-1">
+                    <div className="flex items-center justify-center gap-0.5">
                       <Button
                         size="sm"
                         variant="ghost"
                         onClick={() => handleOpenModal(user)}
                         title="Editar"
+                        className="h-8 w-8 p-0"
                       >
                         <Edit className="w-4 h-4" />
                       </Button>
@@ -497,6 +498,7 @@ export function Users() {
                         variant="ghost"
                         onClick={() => handleOpenPermissions(user.id)}
                         title="Permisos"
+                        className="h-8 w-8 p-0"
                       >
                         <Shield className="w-4 h-4 text-purple-600" />
                       </Button>
@@ -505,6 +507,7 @@ export function Users() {
                         variant="ghost"
                         onClick={() => handleOpenPasswordModal(user.id)}
                         title="Cambiar contraseña"
+                        className="h-8 w-8 p-0"
                       >
                         <Key className="w-4 h-4 text-orange-600" />
                       </Button>
@@ -514,6 +517,7 @@ export function Users() {
                           variant="ghost"
                           onClick={() => handleDelete(user.id)}
                           title="Desactivar"
+                          className="h-8 w-8 p-0"
                         >
                           <Trash2 className="w-4 h-4 text-red-600" />
                         </Button>
