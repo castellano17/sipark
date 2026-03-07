@@ -34,7 +34,7 @@ async function uploadToGoogleDrive(credentials, folderId = null) {
     const fileName = backup.path.split("/").pop();
     const fileMetadata = {
       name: fileName,
-      mimeType: "application/x-sqlite3",
+      mimeType: "application/sql",
       description: `Respaldo automático de SIPARK - ${new Date().toLocaleString()}`,
     };
 
@@ -45,7 +45,7 @@ async function uploadToGoogleDrive(credentials, folderId = null) {
 
     // Preparar media
     const media = {
-      mimeType: "application/x-sqlite3",
+      mimeType: "application/sql",
       body: fs.createReadStream(backup.path),
     };
 
