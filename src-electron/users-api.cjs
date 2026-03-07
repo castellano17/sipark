@@ -33,22 +33,25 @@ async function createFirstAdmin() {
 
     const result = await runAsync(
       `INSERT INTO users (username, password, first_name, last_name, role, is_active)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      ["admin", hashedPassword, "Administrador", "Sistema", "admin", 1],
+       VALUES ($1, $2, $3, $4, $5, $6)
+       RETURNING id`,
+      ["admin", hashedPassword, "Administrador", "Sistema", "admin", true],
     );
+
+    const userId = result.rows[0].id;
 
     // Dar permisos completos al admin
     for (const module of AVAILABLE_MODULES) {
       await runAsync(
         `INSERT INTO user_permissions (user_id, module, can_view, can_create, can_edit, can_delete)
-         VALUES (?, ?, ?, ?, ?, ?)`,
-        [result.lastID, module, 1, 1, 1, 1],
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [userId, module, true, true, true, true],
       );
     }
 
     return {
       success: true,
-      userId: result.lastID,
+      userId: userId,
       message: "Usuario admin creado. Usuario: admin, Contraseña: admin123",
     };
   } catch (error) {
