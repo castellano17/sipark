@@ -128,17 +128,25 @@
       "allowElevation": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "Ludoteca POS",
+      "shortcutName": "SIPARK",
       "perMachine": true,
       "deleteAppDataOnUninstall": false,
-      "runAfterFinish": false
+      "runAfterFinish": true,
+      "include": "installer-scripts/installer-custom.nsh"
     },
     "extraResources": [
       {
-        "from": "pos.db",
-        "to": "pos.db",
+        "from": "postgresql-portable",
+        "to": "postgresql",
         "filter": [
           "**/*"
+        ]
+      },
+      {
+        "from": "installer-scripts",
+        "to": "installer-scripts",
+        "filter": [
+          "*.ps1"
         ]
       }
     ]

@@ -2,6 +2,7 @@ const { app, BrowserWindow, ipcMain, shell } = require("electron");
 const path = require("path");
 // Detectar si estamos en desarrollo sin dependencias externas
 const isDev = !app.isPackaged;
+const postgresManager = require("./src-electron/postgres-manager.cjs");
 const { initializeDatabase } = require("./src-electron/database-pg.cjs");
 // const { migrateDatabase } = require("./src-electron/migrate.cjs"); // No necesario con PostgreSQL
 const { seedDatabase } = require("./src-electron/seed.cjs");
@@ -26,6 +27,23 @@ if (isDev) {
 }
 
 let mainWindow;
+
+async function initializeApp() {
+  try {
+    // Detectar y iniciar PostgreSQL embebido si existe
+    postgresManager.detectEmbeddedPostgres();
+    await postgresManager.start();
+
+    // Inicializar base de datos
+    await initializeDatabase();
+    await seedDatabase();
+
+    console.log("✅ Aplicación inicializada correctamente");
+  } catch (error) {
+    console.error("❌ Error inicializando aplicación:", error);
+    throw error;
+  }
+}
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -60,9 +78,8 @@ function createWindow() {
 // Inicializar BD antes de crear ventana
 app.on("ready", async () => {
   try {
-    await initializeDatabase();
-    // await migrateDatabase(); // No necesario con PostgreSQL
-    seedDatabase();
+    // Inicializar PostgreSQL embebido y base de datos
+    await initializeApp();
 
     // Crear primer admin si no existen usuarios
     try {
@@ -86,10 +103,18 @@ app.on("ready", async () => {
   }
 });
 
-app.on("window-all-closed", () => {
+app.on("window-all-closed", async () => {
+  // Detener PostgreSQL embebido al cerrar
+  await postgresManager.stop();
+
   if (process.platform !== "darwin") {
     app.quit();
   }
+});
+
+app.on("quit", async () => {
+  // Asegurar que PostgreSQL se detenga al salir
+  await postgresManager.stop();
 });
 
 app.on("activate", () => {
