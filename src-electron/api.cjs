@@ -169,8 +169,7 @@ async function startSession(clientId, packageId, durationMinutes = 60) {
   try {
     const startTime = getLocalTimestamp();
     const sql =
-      "INSERT INTO active_sessions (client_id, start_time, package_id, status) VALUES (?, ?, ?, ?)
-      RETURNING id";
+      "INSERT INTO active_sessions (client_id, start_time, package_id, status) VALUES (?, ?, ?, ?) RETURNING id";
     const result = await runAsync(sql, [
       clientId,
       startTime,
@@ -282,8 +281,7 @@ async function createProductService(
 ) {
   try {
     const sql =
-      "INSERT INTO products_services (name, price, type, category, barcode, stock, duration_minutes) VALUES (?, ?, ?, ?, ?, ?, ?)
-      RETURNING id";
+      "INSERT INTO products_services (name, price, type, category, barcode, stock, duration_minutes) VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id";
     const result = await runAsync(sql, [
       name,
       price,
@@ -980,8 +978,7 @@ async function createSession(
         clientId = generalClient.id;
       } else {
         const result = await runAsync(
-          "INSERT INTO clients (name, parent_name, phone) VALUES (?, ?, ?)
-      RETURNING id",
+          "INSERT INTO clients (name, parent_name, phone) VALUES (?, ?, ?) RETURNING id",
           ["Cliente General", "Sin Registro", "0000000000"],
         );
         clientId = result.lastID;
@@ -997,8 +994,7 @@ async function createSession(
         clientId = existingClient.id;
       } else {
         const result = await runAsync(
-          "INSERT INTO clients (name, parent_name, phone) VALUES (?, ?, ?)
-      RETURNING id",
+          "INSERT INTO clients (name, parent_name, phone) VALUES (?, ?, ?) RETURNING id",
           [clientName, parentName, phone],
         );
         clientId = result.lastID;
@@ -1008,8 +1004,7 @@ async function createSession(
     // Crear sesión
     const startTime = getLocalTimestamp();
     const sessionResult = await runAsync(
-      "INSERT INTO active_sessions (client_id, start_time, package_id, duration_minutes, status) VALUES (?, ?, ?, ?, ?)
-      RETURNING id",
+      "INSERT INTO active_sessions (client_id, start_time, package_id, duration_minutes, status) VALUES (?, ?, ?, ?, ?) RETURNING id",
       [clientId, startTime, packageId, durationMinutes, "active"],
     );
 
