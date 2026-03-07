@@ -212,7 +212,7 @@ export const CheckInModal: React.FC<CheckInModalProps> = ({
       onClick={() => onOpenChange(false)}
     >
       <div
-        className="w-full max-w-[500px] bg-white rounded-lg shadow-lg max-h-[90vh] overflow-hidden flex flex-col border-0"
+        className="w-full max-w-[500px] bg-white rounded-lg shadow-lg max-h-[90vh] overflow-y-auto flex flex-col border-0"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}

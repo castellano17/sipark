@@ -345,7 +345,7 @@ export function Products() {
       {showModal && (
         <Dialog open={showModal} onOpenChange={handleCloseModal}>
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <Card className="w-full max-w-2xl bg-white max-h-[90vh] overflow-hidden flex flex-col border-0">
+            <Card className="w-full max-w-2xl bg-white max-h-[90vh] overflow-y-auto flex flex-col border-0">
               <form onSubmit={handleSubmit} className="flex flex-col h-full">
                 {/* Header */}
                 <div className="flex items-center justify-between p-6 border-b bg-gradient-to-r from-slate-700 to-slate-800">

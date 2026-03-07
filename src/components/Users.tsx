@@ -747,7 +747,7 @@ export function Users() {
           onOpenChange={setShowPermissionsModal}
         >
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <Card className="w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col bg-white border-0">
+            <Card className="w-full max-w-4xl max-h-[90vh] overflow-y-auto flex flex-col bg-white border-0">
               <div className="flex items-center justify-between p-6 border-b bg-gradient-to-r from-purple-600 to-purple-700">
                 <div className="flex items-center gap-3">
                   <div className="p-2 bg-white/20 rounded-lg">
@@ -932,7 +932,7 @@ export function Users() {
       {showAuditModal && (
         <Dialog open={showAuditModal} onOpenChange={setShowAuditModal}>
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <Card className="w-full max-w-6xl max-h-[90vh] overflow-hidden flex flex-col bg-white border-0">
+            <Card className="w-full max-w-6xl max-h-[90vh] overflow-y-auto flex flex-col bg-white border-0">
               <div className="flex items-center justify-between p-6 border-b bg-gradient-to-r from-slate-700 to-slate-800">
                 <div className="flex items-center gap-3">
                   <div className="p-2 bg-white/20 rounded-lg">

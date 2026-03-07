@@ -582,7 +582,7 @@ export function Inventory() {
       {showAdjustmentModal && selectedProduct && (
         <Dialog open={showAdjustmentModal} onOpenChange={closeAdjustmentModal}>
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <Card className="w-full max-w-2xl bg-white max-h-[90vh] overflow-hidden flex flex-col border-0">
+            <Card className="w-full max-w-2xl bg-white max-h-[90vh] overflow-y-auto flex flex-col border-0">
               {/* Header */}
               <div className="flex items-center justify-between p-6 border-b bg-gradient-to-r from-orange-600 to-orange-700">
                 <div className="flex items-center gap-3">
@@ -740,7 +740,7 @@ export function Inventory() {
       {showAuditModal && (
         <Dialog open={showAuditModal} onOpenChange={setShowAuditModal}>
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <Card className="w-full max-w-6xl max-h-[90vh] overflow-hidden flex flex-col bg-white border-0">
+            <Card className="w-full max-w-6xl max-h-[90vh] overflow-y-auto flex flex-col bg-white border-0">
               {/* Header */}
               <div className="flex items-center justify-between p-6 border-b bg-gradient-to-r from-slate-700 to-slate-800">
                 <div className="flex items-center gap-3">
