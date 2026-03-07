@@ -40,10 +40,10 @@ function createWindow() {
     },
   });
 
-  // En producción, los archivos de dist están en app.asar.unpacked
+  // En producción, cargar desde dist
   const startUrl = isDev
     ? "http://localhost:5173"
-    : `file://${path.join(__dirname, "..", "app.asar.unpacked", "dist", "index.html")}`;
+    : `file://${path.join(__dirname, "dist", "index.html")}`;
 
   console.log("🔗 Cargando URL:", startUrl);
   mainWindow.loadURL(startUrl);
