@@ -264,6 +264,12 @@ async function createTables() {
       price DECIMAL(10,2) NOT NULL,
       duration_days INTEGER NOT NULL,
       benefits TEXT,
+      membership_type VARCHAR(50) DEFAULT 'standard',
+      max_sessions_per_day INTEGER,
+      discount_percentage DECIMAL(5,2) DEFAULT 0,
+      priority_level INTEGER DEFAULT 0,
+      auto_renew BOOLEAN DEFAULT FALSE,
+      grace_period_days INTEGER DEFAULT 0,
       is_active BOOLEAN DEFAULT TRUE,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )`,
@@ -442,7 +448,7 @@ function convertSqliteToPostgres(sql) {
     /CAST\(\(julianday\(([^)]+)\)\s*-\s*julianday\('now'\)\)\s+AS\s+INTEGER\)/gi,
     "CAST(($1 - CURRENT_DATE) AS INTEGER)",
   );
-  
+
   // julianday(column) - julianday('now') -> (column - CURRENT_DATE)
   pgSql = pgSql.replace(
     /julianday\(([^)]+)\)\s*-\s*julianday\('now'\)/gi,
