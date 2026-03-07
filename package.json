@@ -74,6 +74,7 @@
       "main.cjs",
       "preload.cjs",
       "src-electron/**/*",
+      "!src-electron/database.cjs",
       "package.json"
     ],
     "asarUnpack": [
