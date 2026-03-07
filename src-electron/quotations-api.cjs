@@ -1,4 +1,4 @@
-const { runAsync, getAsync, allAsync } = require("./database.cjs");
+const { runAsync, getAsync, allAsync } = require("./database-pg.cjs");
 
 // Generar número de cotización
 function generateQuotationNumber() {
