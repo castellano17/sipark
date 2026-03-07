@@ -565,7 +565,7 @@ export function POSScreen({
                       {formatCurrency(item.unit_price)} c/u
                     </div>
                   </div>
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-0.5">
                     <Button
                       size="sm"
                       variant="outline"

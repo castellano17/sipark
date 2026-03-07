@@ -260,7 +260,7 @@ export function Products() {
                 <th className="px-4 py-3 text-center text-xs font-semibold">
                   Stock
                 </th>
-                <th className="px-4 py-3 text-center text-xs font-semibold">
+                <th className="w-40 px-4 py-3 text-center text-xs font-semibold">
                   Acciones
                 </th>
               </tr>
@@ -308,7 +308,7 @@ export function Products() {
                     )}
                   </td>
                   <td className="px-4 py-3">
-                    <div className="flex items-center justify-center gap-2">
+                    <div className="flex items-center justify-center gap-0.5">
                       <Button
                         size="sm"
                         variant="ghost"

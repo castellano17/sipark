@@ -452,7 +452,7 @@ export function Inventory() {
                   <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">
                     Estado
                   </th>
-                  <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">
+                  <th className="w-40 px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">
                     Acciones
                   </th>
                 </tr>
@@ -505,7 +505,7 @@ export function Inventory() {
                             </Button>
                           </div>
                         ) : (
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-0.5">
                             <span className="text-sm text-gray-600 capitalize">
                               {product.category || product.type || "-"}
                             </span>

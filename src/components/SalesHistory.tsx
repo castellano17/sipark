@@ -153,7 +153,7 @@ export function SalesHistory() {
                 <th className="px-4 py-3 text-right text-sm font-semibold">
                   Total
                 </th>
-                <th className="px-4 py-3 text-center text-sm font-semibold">
+                <th className="w-40 px-4 py-3 text-center text-sm font-semibold">
                   Acciones
                 </th>
               </tr>
@@ -184,7 +184,7 @@ export function SalesHistory() {
                       {formatCurrency(sale.total)}
                     </td>
                     <td className="px-4 py-3">
-                      <div className="flex items-center justify-center gap-2">
+                      <div className="flex items-center justify-center gap-0.5">
                         <Button
                           size="sm"
                           variant="outline"

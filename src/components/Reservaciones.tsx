@@ -458,7 +458,7 @@ export const Reservaciones: React.FC = () => {
                   <th className="text-left p-3">Hora</th>
                   <th className="text-left p-3">Paquete</th>
                   <th className="text-right p-3">Total</th>
-                  <th className="text-center p-3">Estado</th>
+                  <th className="w-40 text-center p-3">Estado</th>
                   <th className="text-center p-3">Acciones</th>
                 </tr>
               </thead>
@@ -495,7 +495,7 @@ export const Reservaciones: React.FC = () => {
                       </span>
                     </td>
                     <td className="p-3">
-                      <div className="flex items-center justify-center gap-2">
+                      <div className="flex items-center justify-center gap-0.5">
                         <Button
                           size="sm"
                           variant="outline"

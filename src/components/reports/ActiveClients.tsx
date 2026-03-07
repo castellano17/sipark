@@ -87,11 +87,13 @@ export default function ActiveClients({ onBack }: ActiveClientsProps) {
           </div>
         </div>
         <div className="flex gap-2">
-          <Button onClick={handleExportExcel} variant="outline" size="sm">
+          <Button
+                        className="h-8 w-8 p-0" onClick={handleExportExcel} variant="outline" size="sm">
             <FileSpreadsheet className="w-4 h-4 mr-2" />
             Excel
           </Button>
-          <Button onClick={handleExportPDF} variant="outline" size="sm">
+          <Button
+                        className="h-8 w-8 p-0" onClick={handleExportPDF} variant="outline" size="sm">
             <Download className="w-4 h-4 mr-2" />
             PDF
           </Button>

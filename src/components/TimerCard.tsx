@@ -136,7 +136,7 @@ export const TimerCard: React.FC<TimerCardProps> = ({
           <Button
             onClick={() => onPause?.(id)}
             variant="outline"
-            className="w-full h-10 text-sm font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 flex items-center justify-center gap-2"
+            className="w-full h-10 text-sm font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 flex items-center justify-center gap-0.5"
           >
             <Pause className="w-4 h-4" />
             <span>{isPaused ? "Reanudar" : "Pausar"}</span>
@@ -145,7 +145,7 @@ export const TimerCard: React.FC<TimerCardProps> = ({
           <Button
             onClick={() => onViewDetails?.(id)}
             variant="outline"
-            className="w-full h-10 text-sm font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 flex items-center justify-center gap-2"
+            className="w-full h-10 text-sm font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 flex items-center justify-center gap-0.5"
           >
             <Eye className="w-4 h-4" />
             <span>Detalles</span>

@@ -610,7 +610,7 @@ export function PackageFeaturesManager({
                 <p className="text-white font-semibold text-base mb-6">
                   {featureToDelete.name}
                 </p>
-                <div className="flex items-center gap-2 p-3 bg-amber-900/30 border border-amber-700 rounded-lg mb-4">
+                <div className="flex items-center gap-0.5 p-3 bg-amber-900/30 border border-amber-700 rounded-lg mb-4">
                   <AlertCircle className="w-4 h-4 text-amber-400" />
                   <span className="text-sm text-amber-200">
                     Los paquetes que la incluyen no se verán afectados

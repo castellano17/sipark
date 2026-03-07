@@ -274,7 +274,7 @@ export function ClientMembershipsManager() {
                 <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
                   Monto
                 </th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">
+                <th className="w-40 px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">
                   Acciones
                 </th>
               </tr>
@@ -321,7 +321,7 @@ export function ClientMembershipsManager() {
                     </div>
                   </td>
                   <td className="px-4 py-3">
-                    <div className="flex items-center justify-center gap-1">
+                    <div className="flex items-center justify-center gap-0.5">
                       <Button
                         size="sm"
                         variant="outline"

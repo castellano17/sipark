@@ -1212,7 +1212,7 @@ export const Settings: React.FC = () => {
               />
             </div>
 
-            <div className="flex items-center gap-2 p-3 bg-amber-50 rounded-lg border border-amber-200">
+            <div className="flex items-center gap-0.5 p-3 bg-amber-50 rounded-lg border border-amber-200">
               <p className="text-xs text-amber-800">
                 ⚠️ Para Gmail: Habilita la verificación en 2 pasos y genera una
                 App Password en tu cuenta de Google
@@ -1345,7 +1345,7 @@ export const Settings: React.FC = () => {
 
             {gdriveConfig.refresh_token && (
               <div className="p-3 bg-green-50 rounded-lg border border-green-200">
-                <p className="text-xs text-green-800 flex items-center gap-2">
+                <p className="text-xs text-green-800 flex items-center gap-0.5">
                   <CheckCircle className="w-4 h-4" />
                   Refresh Token configurado correctamente
                 </p>

@@ -52,7 +52,8 @@ export function ClientSelectorModal({
         {/* Header */}
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-2xl font-bold">Seleccionar Cliente</h2>
-          <Button variant="ghost" size="sm" onClick={onClose}>
+          <Button
+                        className="h-8 w-8 p-0" variant="ghost" size="sm" onClick={onClose}>
             <X className="w-5 h-5" />
           </Button>
         </div>

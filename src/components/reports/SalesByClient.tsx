@@ -242,7 +242,8 @@ export default function SalesByClient({ onBack }: SalesByClientProps) {
           <Card className="p-6 mb-6">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-semibold text-lg">Detalle de Clientes</h3>
-              <Button variant="outline" size="sm" onClick={handleExportExcel}>
+              <Button
+                        className="h-8 w-8 p-0" variant="outline" size="sm" onClick={handleExportExcel}>
                 <FileSpreadsheet className="w-4 h-4 mr-2" />
                 Excel
               </Button>

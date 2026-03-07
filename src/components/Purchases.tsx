@@ -296,7 +296,7 @@ export function Purchases() {
                 <th className="px-4 py-3 text-right text-xs font-semibold">
                   Total
                 </th>
-                <th className="px-4 py-3 text-center text-xs font-semibold">
+                <th className="w-40 px-4 py-3 text-center text-xs font-semibold">
                   Acciones
                 </th>
               </tr>

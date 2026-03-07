@@ -546,7 +546,7 @@ export const PackagesManager: React.FC = () => {
 
             {/* Error */}
             {error && (
-              <div className="flex items-center gap-2 p-3 bg-rose-50 border border-rose-200 rounded-lg">
+              <div className="flex items-center gap-0.5 p-3 bg-rose-50 border border-rose-200 rounded-lg">
                 <AlertCircle className="w-4 h-4 text-rose-600" />
                 <span className="text-sm text-rose-600">{error}</span>
               </div>
@@ -601,7 +601,7 @@ export const PackagesManager: React.FC = () => {
             </div>
           )}
 
-          <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+          <div className="flex items-center gap-0.5 p-3 bg-amber-50 border border-amber-200 rounded-lg">
             <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0" />
             <span className="text-sm text-amber-600">
               Esta acción no se puede deshacer

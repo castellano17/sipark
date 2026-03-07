@@ -181,7 +181,8 @@ export function MembershipTypes() {
             <h2 className="text-lg font-semibold">
               {editingId ? "Editar Membresía" : "Nueva Membresía"}
             </h2>
-            <Button variant="outline" size="sm" onClick={resetForm}>
+            <Button
+                        className="h-8 w-8 p-0" variant="outline" size="sm" onClick={resetForm}>
               <X className="w-4 h-4" />
             </Button>
           </div>

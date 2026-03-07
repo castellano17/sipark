@@ -71,7 +71,8 @@ export function PaymentModal({ sale, onClose, onConfirm }: PaymentModalProps) {
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-2xl font-bold">Procesar Pago</h2>
-          <Button variant="ghost" size="sm" onClick={onClose}>
+          <Button
+                        className="h-8 w-8 p-0" variant="ghost" size="sm" onClick={onClose}>
             <X className="w-5 h-5" />
           </Button>
         </div>

@@ -331,7 +331,8 @@ export function CashBoxReport({ onBack }: CashBoxReportProps) {
                         </span>
                       </td>
                       <td className="px-4 py-3 text-center">
-                        <Button size="sm" onClick={() => loadReport(box.id)}>
+                        <Button
+                        className="h-8 w-8 p-0" size="sm" onClick={() => loadReport(box.id)}>
                           Ver Reporte
                         </Button>
                       </td>
@@ -540,15 +541,18 @@ export function CashBoxReport({ onBack }: CashBoxReportProps) {
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-semibold text-lg">Detalle de Ventas</h3>
               <div className="flex gap-2">
-                <Button variant="outline" size="sm" onClick={handleExportExcel}>
+                <Button
+                        className="h-8 w-8 p-0" variant="outline" size="sm" onClick={handleExportExcel}>
                   <FileDown className="w-4 h-4 mr-2" />
                   Excel
                 </Button>
-                <Button variant="outline" size="sm" onClick={handleExportPDF}>
+                <Button
+                        className="h-8 w-8 p-0" variant="outline" size="sm" onClick={handleExportPDF}>
                   <FileDown className="w-4 h-4 mr-2" />
                   PDF
                 </Button>
-                <Button variant="outline" size="sm" onClick={handlePrint}>
+                <Button
+                        className="h-8 w-8 p-0" variant="outline" size="sm" onClick={handlePrint}>
                   <Printer className="w-4 h-4 mr-2" />
                   Imprimir
                 </Button>
