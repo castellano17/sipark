@@ -436,24 +436,8 @@ function convertSqliteToPostgres(sql) {
   let paramIndex = 1;
   pgSql = pgSql.replace(/\?/g, () => `$${paramIndex++}`);
 
-  // Convertir julianday() - DEBE IR ANTES de DATE()
-  // CAST((julianday(cm.end_date) - julianday('now')) AS INTEGER) -> CAST((cm.end_date - CURRENT_DATE) AS INTEGER)
-  pgSql = pgSql.replace(
-    /CAST\(\(julianday\(([^)]+)\)\s*-\s*julianday\('now'\)\)\s+AS\s+INTEGER\)/gi,
-    "CAST(($1 - CURRENT_DATE) AS INTEGER)",
-  );
-  
-  // julianday(column) - julianday('now') -> (column - CURRENT_DATE)
-  pgSql = pgSql.replace(
-    /julianday\(([^)]+)\)\s*-\s*julianday\('now'\)/gi,
-    "($1 - CURRENT_DATE)",
-  );
-
   // Convertir DATE(column) a column::DATE
   pgSql = pgSql.replace(/DATE\((\w+)\)/gi, "$1::DATE");
-
-  // Convertir date('now') a CURRENT_DATE
-  pgSql = pgSql.replace(/date\('now'\)/gi, "CURRENT_DATE");
 
   // Convertir strftime('%H', column) a EXTRACT(HOUR FROM column)
   pgSql = pgSql.replace(/strftime\('%H',\s*(\w+)\)/gi, "EXTRACT(HOUR FROM $1)");
