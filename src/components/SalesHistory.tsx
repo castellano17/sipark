@@ -41,7 +41,13 @@ export function SalesHistory() {
     }
 
     if (dateFilter) {
-      filtered = filtered.filter((s) => s.timestamp.startsWith(dateFilter));
+      filtered = filtered.filter((s) => {
+        const timestamp =
+          typeof s.timestamp === "string"
+            ? s.timestamp
+            : new Date(s.timestamp).toISOString().split("T")[0];
+        return timestamp.startsWith(dateFilter);
+      });
     }
 
     setFilteredSales(filtered);

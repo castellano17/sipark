@@ -374,11 +374,16 @@ export const Reservaciones: React.FC = () => {
     }
   };
 
-  const filteredReservations = reservations.filter(
-    (r) =>
+  const filteredReservations = reservations.filter((r) => {
+    const eventDate =
+      typeof r.event_date === "string"
+        ? r.event_date
+        : new Date(r.event_date).toISOString().split("T")[0];
+    return (
       r.client_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      r.event_date.includes(searchTerm),
-  );
+      eventDate.includes(searchTerm)
+    );
+  });
 
   const getStatusColor = (status: string) => {
     switch (status) {
