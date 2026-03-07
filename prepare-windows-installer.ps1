@@ -33,9 +33,14 @@ Write-Host "Esto se incluira en el instalador para que el cliente NO tenga que d
 Write-Host "URL: $PostgresUrl" -ForegroundColor Gray
 
 try {
-    $ProgressPreference = 'SilentlyContinue'
-    Invoke-WebRequest -Uri $PostgresUrl -OutFile $PostgresZip -UseBasicParsing
-    Write-Host "PostgreSQL descargado (~50 MB)" -ForegroundColor Green
+    if (Test-Path $PostgresZip) {
+        Write-Host "Archivo ya existe, saltando descarga..." -ForegroundColor Yellow
+    }
+    else {
+        $ProgressPreference = 'SilentlyContinue'
+        Invoke-WebRequest -Uri $PostgresUrl -OutFile $PostgresZip -UseBasicParsing
+        Write-Host "PostgreSQL descargado (~50 MB)" -ForegroundColor Green
+    }
 }
 catch {
     Write-Host "Error descargando PostgreSQL" -ForegroundColor Red
@@ -47,37 +52,85 @@ catch {
 
 # Extraer PostgreSQL
 Write-Host ""
-Write-Host "Extrayendo PostgreSQL..." -ForegroundColor Cyan
+Write-Host "Extrayendo PostgreSQL (esto puede tardar 1-2 minutos)..." -ForegroundColor Cyan
+Write-Host "Por favor espera..." -ForegroundColor Yellow
+
 try {
-    Expand-Archive -Path $PostgresZip -DestinationPath ".\temp-postgres" -Force
+    # Limpiar directorio temporal si existe
+    if (Test-Path ".\temp-postgres") {
+        Remove-Item -Path ".\temp-postgres" -Recurse -Force
+    }
     
-    # Copiar solo los archivos necesarios
-    $pgsqlDir = Get-ChildItem -Path ".\temp-postgres" -Directory -Filter "pgsql" -Recurse | Select-Object -First 1
+    # Extraer con Add-Type (más rápido que Expand-Archive)
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    [System.IO.Compression.ZipFile]::ExtractToDirectory($PostgresZip, ".\temp-postgres")
+    
+    Write-Host "Archivo extraido, buscando directorio pgsql..." -ForegroundColor Cyan
+    
+    # Buscar directorio pgsql
+    $pgsqlDir = Get-ChildItem -Path ".\temp-postgres" -Directory -Filter "pgsql" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+    
+    if (-not $pgsqlDir) {
+        # Intentar buscar sin filtro
+        Write-Host "Buscando estructura alternativa..." -ForegroundColor Yellow
+        $pgsqlDir = Get-ChildItem -Path ".\temp-postgres" -Directory -Recurse | Where-Object { $_.Name -eq "pgsql" } | Select-Object -First 1
+    }
     
     if ($pgsqlDir) {
+        Write-Host "Directorio encontrado: $($pgsqlDir.FullName)" -ForegroundColor Green
+        
         # Copiar binarios esenciales
         Write-Host "Copiando binarios..." -ForegroundColor Cyan
-        Copy-Item -Path "$($pgsqlDir.FullName)\bin" -Destination "$OutputDir\bin" -Recurse -Force
+        $binSource = Join-Path $pgsqlDir.FullName "bin"
+        if (Test-Path $binSource) {
+            Copy-Item -Path $binSource -Destination "$OutputDir\bin" -Recurse -Force
+            Write-Host "  Binarios copiados" -ForegroundColor Green
+        }
+        else {
+            Write-Host "  Advertencia: No se encontro carpeta bin" -ForegroundColor Yellow
+        }
         
+        # Copiar librerias
         Write-Host "Copiando librerias..." -ForegroundColor Cyan
-        Copy-Item -Path "$($pgsqlDir.FullName)\lib" -Destination "$OutputDir\lib" -Recurse -Force
+        $libSource = Join-Path $pgsqlDir.FullName "lib"
+        if (Test-Path $libSource) {
+            Copy-Item -Path $libSource -Destination "$OutputDir\lib" -Recurse -Force
+            Write-Host "  Librerias copiadas" -ForegroundColor Green
+        }
+        else {
+            Write-Host "  Advertencia: No se encontro carpeta lib" -ForegroundColor Yellow
+        }
         
+        # Copiar archivos compartidos
         Write-Host "Copiando archivos compartidos..." -ForegroundColor Cyan
-        Copy-Item -Path "$($pgsqlDir.FullName)\share" -Destination "$OutputDir\share" -Recurse -Force
+        $shareSource = Join-Path $pgsqlDir.FullName "share"
+        if (Test-Path $shareSource) {
+            Copy-Item -Path $shareSource -Destination "$OutputDir\share" -Recurse -Force
+            Write-Host "  Archivos compartidos copiados" -ForegroundColor Green
+        }
+        else {
+            Write-Host "  Advertencia: No se encontro carpeta share" -ForegroundColor Yellow
+        }
         
         Write-Host "PostgreSQL extraido correctamente" -ForegroundColor Green
     }
     else {
         Write-Host "No se encontro el directorio pgsql" -ForegroundColor Red
+        Write-Host "Contenido de temp-postgres:" -ForegroundColor Yellow
+        Get-ChildItem -Path ".\temp-postgres" -Recurse -Depth 2 | Select-Object FullName | Format-Table
         exit 1
     }
     
     # Limpiar
+    Write-Host "Limpiando archivos temporales..." -ForegroundColor Cyan
     Remove-Item -Path ".\temp-postgres" -Recurse -Force
-    Remove-Item -Path $PostgresZip -Force
+    # Mantener el ZIP por si se necesita de nuevo
+    # Remove-Item -Path $PostgresZip -Force
+    Write-Host "Limpieza completada (ZIP conservado para futuras compilaciones)" -ForegroundColor Green
 }
 catch {
     Write-Host "Error extrayendo PostgreSQL: $_" -ForegroundColor Red
+    Write-Host "Stack trace: $($_.ScriptStackTrace)" -ForegroundColor Red
     exit 1
 }
 
@@ -91,12 +144,34 @@ Write-Host "Estructura creada" -ForegroundColor Green
 # Copiar scripts de instalacion
 Write-Host ""
 Write-Host "Copiando scripts de instalacion..." -ForegroundColor Cyan
-if (Test-Path ".\installer-scripts\*.ps1") {
-    Copy-Item -Path ".\installer-scripts\*.ps1" -Destination "$OutputDir\" -Force
-    Write-Host "Scripts copiados" -ForegroundColor Green
+if (Test-Path ".\installer-scripts") {
+    if (Test-Path ".\installer-scripts\*.ps1") {
+        Copy-Item -Path ".\installer-scripts\*.ps1" -Destination "$OutputDir\" -Force
+        Write-Host "Scripts copiados" -ForegroundColor Green
+    }
+    else {
+        Write-Host "Advertencia: No se encontraron scripts .ps1 en installer-scripts" -ForegroundColor Yellow
+    }
 }
 else {
-    Write-Host "Advertencia: No se encontraron scripts en installer-scripts" -ForegroundColor Yellow
+    Write-Host "Advertencia: No existe el directorio installer-scripts" -ForegroundColor Yellow
+}
+
+# Verificar que se copiaron los archivos esenciales
+Write-Host ""
+Write-Host "Verificando archivos..." -ForegroundColor Cyan
+$postgresExe = Join-Path $OutputDir "bin\postgres.exe"
+$pgCtlExe = Join-Path $OutputDir "bin\pg_ctl.exe"
+$initdbExe = Join-Path $OutputDir "bin\initdb.exe"
+
+if ((Test-Path $postgresExe) -and (Test-Path $pgCtlExe) -and (Test-Path $initdbExe)) {
+    Write-Host "Archivos esenciales verificados correctamente" -ForegroundColor Green
+}
+else {
+    Write-Host "Advertencia: Algunos archivos esenciales no se encontraron" -ForegroundColor Yellow
+    if (-not (Test-Path $postgresExe)) { Write-Host "  Falta: postgres.exe" -ForegroundColor Red }
+    if (-not (Test-Path $pgCtlExe)) { Write-Host "  Falta: pg_ctl.exe" -ForegroundColor Red }
+    if (-not (Test-Path $initdbExe)) { Write-Host "  Falta: initdb.exe" -ForegroundColor Red }
 }
 
 # Calcular tamano
