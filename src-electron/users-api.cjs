@@ -63,7 +63,7 @@ async function createFirstAdmin() {
 async function authenticateUser(username, password) {
   try {
     const user = await getAsync(
-      "SELECT * FROM users WHERE username = ? AND is_active = 1",
+      "SELECT * FROM users WHERE username = $1 AND is_active = TRUE",
       [username],
     );
 
@@ -290,7 +290,7 @@ async function updateUser(userId, userData, updatedBy) {
 
       if (user && user.role === "admin") {
         const activeAdminCount = await getAsync(
-          "SELECT COUNT(*) as count FROM users WHERE role = 'admin' AND is_active = 1",
+          "SELECT COUNT(*) as count FROM users WHERE role = 'admin' AND is_active = TRUE",
         );
 
         if (activeAdminCount.count <= 1) {
@@ -393,7 +393,7 @@ async function deleteUser(userId, deletedBy) {
   try {
     // No permitir eliminar el último admin
     const adminCount = await getAsync(
-      "SELECT COUNT(*) as count FROM users WHERE role = 'admin' AND is_active = 1",
+      "SELECT COUNT(*) as count FROM users WHERE role = 'admin' AND is_active = TRUE",
     );
 
     const user = await getAsync("SELECT role FROM users WHERE id = ?", [
@@ -407,8 +407,8 @@ async function deleteUser(userId, deletedBy) {
     // Desactivar usuario
     await runAsync(
       `UPDATE users 
-       SET is_active = 0, updated_by = ?, updated_at = CURRENT_TIMESTAMP
-       WHERE id = ?`,
+       SET is_active = FALSE, updated_by = $1, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $2`,
       [deletedBy, userId],
     );
 

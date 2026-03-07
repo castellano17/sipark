@@ -1698,7 +1698,7 @@ async function clearAllData() {
 async function getMemberships() {
   try {
     const sql =
-      "SELECT * FROM memberships WHERE is_active = 1 ORDER BY name ASC";
+      "SELECT * FROM memberships WHERE is_active = TRUE ORDER BY name ASC";
     return await allAsync(sql);
   } catch (error) {
     console.error("Error obteniendo membresías:", error);
@@ -1798,7 +1798,9 @@ async function updateMembership(id, membershipData) {
 
 async function deleteMembership(id) {
   try {
-    await runAsync("UPDATE memberships SET is_active = 0 WHERE id = ?", [id]);
+    await runAsync("UPDATE memberships SET is_active = FALSE WHERE id = $1", [
+      id,
+    ]);
     return true;
   } catch (error) {
     console.error("Error eliminando membresía:", error);
@@ -2116,7 +2118,7 @@ async function updateClientVisitCheckout(
 async function getPackageFeatures() {
   try {
     const sql =
-      "SELECT * FROM package_features WHERE is_active = 1 ORDER BY category, name ASC";
+      "SELECT * FROM package_features WHERE is_active = TRUE ORDER BY category, name ASC";
     return await allAsync(sql);
   } catch (error) {
     console.error("Error obteniendo características:", error);
@@ -2155,9 +2157,10 @@ async function updatePackageFeature(id, name, description, category) {
 
 async function deletePackageFeature(id) {
   try {
-    await runAsync("UPDATE package_features SET is_active = 0 WHERE id = ?", [
-      id,
-    ]);
+    await runAsync(
+      "UPDATE package_features SET is_active = FALSE WHERE id = $1",
+      [id],
+    );
     return true;
   } catch (error) {
     console.error("Error eliminando característica:", error);
@@ -2208,7 +2211,7 @@ async function setPackageFeatures(packageId, featureIds) {
 async function getPackageFeatureCategories() {
   try {
     const sql =
-      "SELECT * FROM package_feature_categories WHERE is_active = 1 ORDER BY name ASC";
+      "SELECT * FROM package_feature_categories WHERE is_active = TRUE ORDER BY name ASC";
     return await allAsync(sql);
   } catch (error) {
     console.error("Error obteniendo categorías de características:", error);
@@ -2248,7 +2251,7 @@ async function updatePackageFeatureCategory(id, name, description) {
 async function deletePackageFeatureCategory(id) {
   try {
     await runAsync(
-      "UPDATE package_feature_categories SET is_active = 0 WHERE id = ?",
+      "UPDATE package_feature_categories SET is_active = FALSE WHERE id = $1",
       [id],
     );
     return true;
