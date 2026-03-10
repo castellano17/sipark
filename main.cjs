@@ -2,9 +2,7 @@ const { app, BrowserWindow, ipcMain, shell } = require("electron");
 const path = require("path");
 // Detectar si estamos en desarrollo sin dependencias externas
 const isDev = !app.isPackaged;
-const postgresManager = require("./src-electron/postgres-manager.cjs");
 const { initializeDatabase } = require("./src-electron/database-pg.cjs");
-// const { migrateDatabase } = require("./src-electron/migrate.cjs"); // No necesario con PostgreSQL
 const { seedDatabase } = require("./src-electron/seed.cjs");
 const api = require("./src-electron/api.cjs");
 const printerModule = require("./src-electron/printer.cjs");
@@ -30,9 +28,12 @@ let mainWindow;
 
 async function initializeApp() {
   try {
-    // Detectar y iniciar PostgreSQL embebido si existe
-    postgresManager.detectEmbeddedPostgres();
-    await postgresManager.start();
+    console.log("🚀 Inicializando aplicación SIPARK...");
+    console.log("📊 Conectando a PostgreSQL del sistema...");
+    console.log("💡 Asegúrate de que PostgreSQL esté instalado y corriendo");
+    console.log("💡 Host: 127.0.0.1:5432");
+    console.log("💡 Base de datos: ludoteca_pos");
+    console.log("💡 Usuario: ludoteca_user");
 
     // Inicializar base de datos
     await initializeDatabase();
@@ -41,6 +42,16 @@ async function initializeApp() {
     console.log("✅ Aplicación inicializada correctamente");
   } catch (error) {
     console.error("❌ Error inicializando aplicación:", error);
+    console.error("\n⚠️  POSTGRESQL NO ESTÁ CORRIENDO O NO ESTÁ CONFIGURADO");
+    console.error("📋 Pasos para solucionar:");
+    console.error(
+      "   1. Instala PostgreSQL desde https://www.postgresql.org/download/",
+    );
+    console.error("   2. Asegúrate de que el servicio esté corriendo");
+    console.error(
+      "   3. Crea la base de datos y usuario con el script setup-database.sql",
+    );
+    console.error("   4. Verifica que las credenciales sean correctas\n");
     throw error;
   }
 }
@@ -103,18 +114,14 @@ app.on("ready", async () => {
   }
 });
 
-app.on("window-all-closed", async () => {
-  // Detener PostgreSQL embebido al cerrar
-  await postgresManager.stop();
-
+app.on("window-all-closed", () => {
   if (process.platform !== "darwin") {
     app.quit();
   }
 });
 
-app.on("quit", async () => {
-  // Asegurar que PostgreSQL se detenga al salir
-  await postgresManager.stop();
+app.on("quit", () => {
+  console.log("👋 Aplicación cerrada");
 });
 
 app.on("activate", () => {

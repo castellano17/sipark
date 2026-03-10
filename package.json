@@ -134,21 +134,6 @@
       "runAfterFinish": true,
       "include": "installer-scripts/installer-custom.nsh"
     },
-    "extraResources": [
-      {
-        "from": "postgresql-portable",
-        "to": "postgresql",
-        "filter": [
-          "**/*"
-        ]
-      },
-      {
-        "from": "installer-scripts",
-        "to": "installer-scripts",
-        "filter": [
-          "*.ps1"
-        ]
-      }
-    ]
+    "extraResources": []
   }
 }

@@ -21,16 +21,16 @@ function getConfig() {
     }
   }
 
-  // Configuración por defecto
+  // Configuración por defecto para PostgreSQL del sistema
   const defaultConfig = {
-    host: process.env.DB_HOST || "localhost",
+    host: process.env.DB_HOST || "127.0.0.1", // Usar IPv4 explícitamente
     port: parseInt(process.env.DB_PORT || "5432"),
     database: process.env.DB_NAME || "ludoteca_pos",
     user: process.env.DB_USER || "ludoteca_user",
     password: process.env.DB_PASSWORD || "ludoteca2024",
     max: 20,
     idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 2000,
+    connectionTimeoutMillis: 10000, // 10 segundos para dar más tiempo
   };
 
   // Crear el archivo de configuración automáticamente si no existe
@@ -76,6 +76,27 @@ async function initializeDatabase() {
 
 async function createTables() {
   const tables = [
+    // Crear users PRIMERO porque otras tablas la referencian
+    `CREATE TABLE IF NOT EXISTS users (
+      id SERIAL PRIMARY KEY,
+      username VARCHAR(50) NOT NULL UNIQUE,
+      password VARCHAR(255) NOT NULL,
+      first_name VARCHAR(100) NOT NULL,
+      last_name VARCHAR(100) NOT NULL,
+      email VARCHAR(100),
+      phone VARCHAR(50),
+      photo_path TEXT,
+      role VARCHAR(50) NOT NULL,
+      is_active BOOLEAN DEFAULT TRUE,
+      last_login TIMESTAMP,
+      created_by INTEGER,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_by INTEGER,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (created_by) REFERENCES users(id),
+      FOREIGN KEY (updated_by) REFERENCES users(id)
+    )`,
+
     `CREATE TABLE IF NOT EXISTS clients (
       id SERIAL PRIMARY KEY,
       name VARCHAR(255) NOT NULL,
@@ -174,26 +195,6 @@ async function createTables() {
       value TEXT NOT NULL,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )`,
-
-    `CREATE TABLE IF NOT EXISTS users (
-      id SERIAL PRIMARY KEY,
-      username VARCHAR(50) NOT NULL UNIQUE,
-      password VARCHAR(255) NOT NULL,
-      first_name VARCHAR(100) NOT NULL,
-      last_name VARCHAR(100) NOT NULL,
-      email VARCHAR(100),
-      phone VARCHAR(50),
-      photo_path TEXT,
-      role VARCHAR(50) NOT NULL,
-      is_active BOOLEAN DEFAULT TRUE,
-      last_login TIMESTAMP,
-      created_by INTEGER,
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      updated_by INTEGER,
-      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (created_by) REFERENCES users(id),
-      FOREIGN KEY (updated_by) REFERENCES users(id)
     )`,
 
     `CREATE TABLE IF NOT EXISTS suppliers (
