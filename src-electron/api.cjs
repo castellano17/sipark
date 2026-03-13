@@ -1082,7 +1082,7 @@ async function closeCashBox(
     );
 
     const expectedAmount =
-      cashBox.opening_amount + salesTotal.total - expensesTotal.total;
+      parseFloat(cashBox.opening_amount) + parseFloat(salesTotal.total) - parseFloat(expensesTotal.total);
     const difference = closingAmount - expectedAmount;
 
     // Cerrar caja

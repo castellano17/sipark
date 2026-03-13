@@ -297,12 +297,12 @@ export function CashManagement() {
     });
   };
 
-  const totalSales = sales.reduce((sum, sale) => sum + sale.total, 0);
+  const totalSales = sales.reduce((sum, sale) => sum + parseFloat(sale.total), 0);
   const totalExpenses = movements
     .filter((m) => m.type === "expense")
-    .reduce((sum, m) => sum + Math.abs(m.amount), 0);
+    .reduce((sum, m) => sum + Math.abs(parseFloat(String(m.amount))), 0);
   const currentBalance = activeCashBox
-    ? activeCashBox.opening_amount + totalSales - totalExpenses
+    ? parseFloat(String(activeCashBox.opening_amount)) + totalSales - totalExpenses
     : 0;
 
   return (

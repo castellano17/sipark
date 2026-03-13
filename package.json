@@ -2,6 +2,7 @@
   "name": "ludoteca-pos",
   "version": "1.0.4",
   "main": "main.cjs",
+  "type": "module",
   "homepage": "./",
   "scripts": {
     "dev": "vite",
