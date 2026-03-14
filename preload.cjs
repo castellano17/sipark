@@ -327,10 +327,13 @@ contextBridge.exposeInMainWorld("api", {
     ipcRenderer.invoke("api:getCashBoxSales", cashBoxId),
 
   // PDF Generation
+  exportPDF: (options) => ipcRenderer.invoke("api:exportPDF", options),
   generateOpeningPDF: (cashBoxData) =>
     ipcRenderer.invoke("api:generateOpeningPDF", cashBoxData),
   generateClosingPDF: (closeData) =>
     ipcRenderer.invoke("api:generateClosingPDF", closeData),
+  generateDailyCashSummaryPDF: (data) =>
+    ipcRenderer.invoke("api:generateDailyCashSummaryPDF", data),
 
   // Sales with Items
   createSaleWithItems: (saleData) =>

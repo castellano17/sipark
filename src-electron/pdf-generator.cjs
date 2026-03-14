@@ -972,10 +972,326 @@ async function generateQuotationPDF(quotationData) {
   }
 }
 
+/**
+ * Genera un reporte PDF genérico (tablas y resúmenes)
+ */
+async function generateGenericReport(options) {
+  try {
+    const userDataPath = app.getPath("userData");
+    const pdfDir = path.join(userDataPath, "pdfs");
+
+    if (!fs.existsSync(pdfDir)) {
+      fs.mkdirSync(pdfDir, { recursive: true });
+    }
+
+    const companySettings = await getCompanySettings();
+    const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+    const filename = `${options.filename || "reporte"}_${timestamp}.pdf`;
+    const filepath = path.join(pdfDir, filename);
+
+    return new Promise((resolve, reject) => {
+      const doc = new PDFDocument({ margin: 40, size: "A4" });
+      const stream = fs.createWriteStream(filepath);
+
+      stream.on("finish", () => resolve(filepath));
+      stream.on("error", reject);
+
+      doc.pipe(stream);
+
+      // Encabezado
+      doc.fontSize(10).font("Helvetica").fillColor("#666666");
+      doc.text(companySettings.businessName, { align: "center" });
+      if (companySettings.businessAddress) {
+        doc.text(companySettings.businessAddress, { align: "center" });
+      }
+      if (companySettings.businessPhone) {
+        doc.text(companySettings.businessPhone, { align: "center" });
+      }
+      doc.moveDown();
+
+      // Título
+      doc.fontSize(18).font("Helvetica-Bold").fillColor("black")
+         .text(options.title || "REPORTE", { align: "center" });
+      
+      if (options.subtitle) {
+        doc.fontSize(12).font("Helvetica").text(options.subtitle, { align: "center" });
+      }
+      doc.moveDown(2);
+
+      // Resumen
+      if (options.summary && options.summary.length > 0) {
+        doc.fontSize(12).font("Helvetica-Bold").fillColor("black").text("RESUMEN");
+        doc.moveDown(0.5);
+        
+        doc.fontSize(10).font("Helvetica").fillColor("#333333");
+        options.summary.forEach(item => {
+          doc.text(`${item.label}: `, { continued: true }).font("Helvetica-Bold").text(`${item.value}`);
+          doc.font("Helvetica");
+        });
+        doc.moveDown(2);
+      }
+
+      // Tabla
+      if (options.columns && options.data) {
+        const tableTop = doc.y;
+        doc.font("Helvetica-Bold").fontSize(10).fillColor("white");
+
+        // Dibujar barra de encabezados de la tabla
+        doc.rect(40, tableTop, 515, 20).fill("#3b82f6");
+        doc.fillColor("white");
+
+        let currentY = tableTop + 6;
+        let columnX = 45;
+        
+        // Calcular anchos dinámicos básicos
+        const columnsCount = options.columns.length;
+        const colWidth = 510 / columnsCount;
+
+        // Escribir cabeceras
+        options.columns.forEach((col, i) => {
+            const isRight = col.format === "currency" || col.format === "number";
+            doc.text(col.header, columnX, currentY, { width: colWidth - 5, align: isRight ? "right" : "left" });
+            columnX += colWidth;
+        });
+
+        currentY += 20;
+
+        // Filas de datos
+        doc.font("Helvetica").fontSize(9);
+        options.data.forEach((row, rowIndex) => {
+            // Fondo alterno
+            if (rowIndex % 2 !== 0) {
+                doc.rect(40, currentY - 6, 515, 20).fill("#f9fafb");
+            }
+            doc.fillColor("#333333");
+
+            columnX = 45;
+            options.columns.forEach(col => {
+                let cellValue = row[col.key];
+                
+                // Formateadores simples
+                if (cellValue !== null && cellValue !== undefined) {
+                  if (col.format === 'currency') {
+                    cellValue = formatCurrency(cellValue);
+                  } else if (col.format === 'date') {
+                    cellValue = new Date(cellValue).toLocaleDateString("es-ES");
+                  } else if (col.format === 'datetime') {
+                    cellValue = new Date(cellValue).toLocaleString("es-ES");
+                  } else if (col.format === 'number') {
+                    cellValue = cellValue.toLocaleString("es-ES");
+                  }
+                } else {
+                  cellValue = "-";
+                }
+
+                const isRight = col.format === "currency" || col.format === "number";
+                doc.text(String(cellValue), columnX, currentY, { width: colWidth - 5, align: isRight ? "right" : "left" });
+                columnX += colWidth;
+            });
+
+            currentY += 20;
+            
+            // Paginación si sobrepasamos el borde inferior
+            if (currentY > 750) {
+                doc.addPage();
+                currentY = 50;
+            }
+        });
+      }
+
+      // Pie de página
+      doc.fontSize(9).font("Helvetica").fillColor("#666666");
+      doc.text(`Generado: ${new Date().toLocaleString("es-ES")}`, 40, doc.page.height - 50, { align: "center" });
+
+      doc.end();
+    });
+  } catch (error) {
+    console.error("Error generando reporte genérico:", error);
+    throw error;
+  }
+}
+
+/**
+ * Genera el PDF del Resumen Diario de Caja
+ */
+async function generateDailyCashSummaryPDF(data, selectedDate) {
+  try {
+    const userDataPath = app.getPath("userData");
+    const pdfDir = path.join(userDataPath, "pdfs");
+
+    if (!fs.existsSync(pdfDir)) {
+      fs.mkdirSync(pdfDir, { recursive: true });
+    }
+
+    const companySettings = await getCompanySettings();
+    const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+    const filename = `resumen-caja-${selectedDate}_${timestamp}.pdf`;
+    const filepath = path.join(pdfDir, filename);
+
+    return new Promise((resolve, reject) => {
+      const doc = new PDFDocument({ margin: 50 });
+      const stream = fs.createWriteStream(filepath);
+
+      stream.on("finish", () => {
+        resolve(filepath);
+      });
+
+      stream.on("error", reject);
+
+      doc.pipe(stream);
+
+      // Encabezado
+      doc.fontSize(10).font("Helvetica").fillColor("#666666");
+      doc.text(companySettings.businessName, { align: "center" });
+      if (companySettings.businessAddress) {
+        doc.text(companySettings.businessAddress, { align: "center" });
+      }
+      if (companySettings.businessPhone) {
+        doc.text(companySettings.businessPhone, { align: "center" });
+      }
+      doc.moveDown();
+
+      // Título
+      doc.fontSize(18).font("Helvetica-Bold").fillColor("black")
+         .text("RESUMEN DIARIO DE CAJA", { align: "center" });
+         
+      // Fecha
+      const [year, month, day] = selectedDate.split('-');
+      const formattedDate = new Date(year, month - 1, day).toLocaleDateString("es-ES", {
+        weekday: "long", year: "numeric", month: "long", day: "numeric"
+      });
+      doc.fontSize(12).font("Helvetica").text(formattedDate, { align: "center" });
+      doc.moveDown(1.5);
+
+      // Información de caja
+      if (data.cashBox) {
+        doc.fontSize(10).font("Helvetica").text(`Caja #${data.cashBox.id} - Abierta por: ${data.cashBox.opened_by}`);
+        
+        doc.fontSize(11).font("Helvetica-Bold").text("Monto de Apertura: ", { continued: true });
+        doc.font("Helvetica").text(formatCurrency(data.summary.openingAmount), { align: "right" });
+        doc.moveDown(0.5);
+      }
+
+      // Línea separadora
+      doc.moveTo(50, doc.y).lineTo(550, doc.y).strokeColor("#cccccc").stroke();
+      doc.moveDown(1);
+      doc.fillColor("black");
+
+      // VENTAS DEL DÍA
+      doc.fontSize(14).font("Helvetica-Bold").text("VENTAS DEL DÍA");
+      doc.moveDown(0.5);
+      
+      doc.fontSize(11).font("Helvetica").text(`Total de Ventas (${data.sales.count}):`, { continued: true });
+      doc.font("Helvetica-Bold").text(formatCurrency(data.sales.total), { align: "right" });
+      
+      if (data.sales.discount > 0) {
+        doc.fontSize(10).font("Helvetica").fillColor("#666666");
+        doc.text("Subtotal:", { indent: 20, continued: true });
+        doc.text(formatCurrency(data.sales.subtotal), { align: "right" });
+        
+        doc.text("Descuentos:", { indent: 20, continued: true });
+        doc.text(`-${formatCurrency(data.sales.discount)}`, { align: "right" });
+      }
+      doc.moveDown(1);
+      doc.fillColor("black");
+
+      // Por método de pago
+      doc.fontSize(11).font("Helvetica-Bold").text("Por Método de Pago:");
+      doc.fontSize(10).font("Helvetica");
+      data.sales.byMethod.forEach((method) => {
+        const methodName = method.payment_method === "cash" ? "Efectivo"
+            : method.payment_method === "card" ? "Tarjeta"
+            : method.payment_method === "transfer" ? "Transferencia"
+            : method.payment_method;
+        doc.text(`${methodName} (${method.count}):`, { indent: 15, continued: true });
+        doc.text(formatCurrency(method.total), { align: "right" });
+      });
+      doc.moveDown(1);
+
+      // Línea separadora
+      doc.moveTo(50, doc.y).lineTo(550, doc.y).strokeColor("#cccccc").stroke();
+      doc.moveDown(1);
+
+      // INGRESOS ADICIONALES
+      if (data.additionalIncome.total > 0) {
+        doc.fontSize(14).font("Helvetica-Bold").text("INGRESOS ADICIONALES");
+        doc.moveDown(0.5);
+        
+        doc.fontSize(10).font("Helvetica");
+        data.additionalIncome.items.forEach((item) => {
+          doc.text(item.description, { continued: true });
+          doc.text(formatCurrency(item.amount), { align: "right" });
+        });
+        
+        doc.moveDown(0.5);
+        doc.fontSize(11).font("Helvetica-Bold").text("Total Ingresos:", { continued: true });
+        doc.text(formatCurrency(data.additionalIncome.total), { align: "right" });
+        doc.moveDown(1);
+        
+        doc.moveTo(50, doc.y).lineTo(550, doc.y).strokeColor("#cccccc").stroke();
+        doc.moveDown(1);
+      }
+
+      // GASTOS
+      if (data.expenses.total > 0) {
+        doc.fontSize(14).font("Helvetica-Bold").text("GASTOS");
+        doc.moveDown(0.5);
+        
+        doc.fontSize(10).font("Helvetica");
+        data.expenses.items.forEach((item) => {
+          doc.text(item.description, { continued: true });
+          doc.fillColor("#dc2626").text(`-${formatCurrency(item.amount)}`, { align: "right" });
+          doc.fillColor("black");
+        });
+        
+        doc.moveDown(0.5);
+        doc.fontSize(11).font("Helvetica-Bold").text("Total Gastos:", { continued: true });
+        doc.fillColor("#dc2626").text(`-${formatCurrency(data.expenses.total)}`, { align: "right" });
+        doc.fillColor("black");
+        doc.moveDown(1);
+        
+        doc.moveTo(50, doc.y).lineTo(550, doc.y).strokeColor("#cccccc").stroke();
+        doc.moveDown(1);
+      }
+
+      // RESUMEN
+      const yResumen = doc.y;
+      doc.rect(40, yResumen, 515, 60).fill("#f3f4f6");
+      doc.fillColor("black");
+      
+      doc.y = yResumen + 10;
+      doc.fontSize(14).font("Helvetica-Bold").text("RESUMEN", { indent: 10 });
+      doc.moveDown(0.5);
+      
+      doc.fontSize(11).font("Helvetica").text("Efectivo Esperado:", { indent: 10, continued: true });
+      doc.font("Helvetica-Bold").text(formatCurrency(data.summary.expectedCash), { align: "right", right: 50 });
+      doc.moveDown(0.5);
+      
+      doc.fontSize(12).font("Helvetica-Bold").text("Ingreso Neto del Día:", { indent: 10, continued: true });
+      doc.fillColor(data.summary.netIncome >= 0 ? "#16a34a" : "#dc2626")
+         .text(formatCurrency(data.summary.netIncome), { align: "right", right: 50 });
+      doc.fillColor("black");
+      
+      doc.moveDown(3);
+
+      // Footer
+      doc.fontSize(9).font("Helvetica").fillColor("#666666");
+      doc.text(`Generado el ${new Date().toLocaleString("es-ES")}`, { align: "center" });
+
+      doc.end();
+    });
+  } catch (error) {
+    console.error("Error generando PDF de Resumen de Caja:", error);
+    throw error;
+  }
+}
+
 module.exports = {
   generateOpeningPDF,
   generateClosingPDF,
   generateMembershipPDF,
   generateReservationPDF,
   generateQuotationPDF,
+  generateGenericReport,
+  generateDailyCashSummaryPDF,
 };

@@ -1,7 +1,5 @@
 import { useNotification } from "./useNotification";
 import { useCurrency } from "./useCurrency";
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
 
 interface ExportColumn {
@@ -22,7 +20,7 @@ interface ExportOptions {
 
 export function useReportExport() {
   const { success, error } = useNotification();
-  const { formatCurrency, symbol } = useCurrency();
+  const { formatCurrency } = useCurrency();
 
   const formatValue = (value: any, format?: string): string => {
     if (value === null || value === undefined) return "-";
@@ -85,77 +83,10 @@ export function useReportExport() {
     }
   };
 
-  const exportToPDF = (options: ExportOptions) => {
+  const exportToPDF = async (options: ExportOptions) => {
     try {
-      const doc = new jsPDF();
-      const pageWidth = doc.internal.pageSize.getWidth();
-
-      // Título
-      doc.setFontSize(18);
-      doc.setFont("helvetica", "bold");
-      doc.text(options.title, pageWidth / 2, 20, { align: "center" });
-
-      // Subtítulo
-      if (options.subtitle) {
-        doc.setFontSize(12);
-        doc.setFont("helvetica", "normal");
-        doc.text(options.subtitle, pageWidth / 2, 28, { align: "center" });
-      }
-
-      // Fecha de generación
-      doc.setFontSize(10);
-      doc.setFont("helvetica", "normal");
-      const generatedDate = new Date().toLocaleString("es-ES");
-      doc.text(`Generado: ${generatedDate}`, 14, 35);
-
-      // Resumen (si existe)
-      let startY = 45;
-      if (options.summary && options.summary.length > 0) {
-        doc.setFontSize(12);
-        doc.setFont("helvetica", "bold");
-        doc.text("Resumen", 14, startY);
-        startY += 7;
-
-        doc.setFontSize(10);
-        doc.setFont("helvetica", "normal");
-        options.summary.forEach((item) => {
-          const valueText =
-            typeof item.value === "number"
-              ? formatCurrency(item.value)
-              : String(item.value);
-          doc.text(`${item.label}: ${valueText}`, 14, startY);
-          startY += 6;
-        });
-        startY += 5;
-      }
-
-      // Tabla
-      const tableColumns = options.columns.map((col) => col.header);
-      const tableRows = options.data.map((row) =>
-        options.columns.map((col) => formatValue(row[col.key], col.format)),
-      );
-
-      autoTable(doc, {
-        head: [tableColumns],
-        body: tableRows,
-        startY: startY,
-        styles: {
-          fontSize: 9,
-          cellPadding: 3,
-        },
-        headStyles: {
-          fillColor: [59, 130, 246], // blue-600
-          textColor: 255,
-          fontStyle: "bold",
-        },
-        alternateRowStyles: {
-          fillColor: [249, 250, 251], // gray-50
-        },
-        margin: { top: 10, left: 14, right: 14 },
-      });
-
-      // Descargar PDF
-      doc.save(`${options.filename}.pdf`);
+      // Delegar la generación del PDF al main context (Electron)
+      await (window as any).api.exportPDF(options);
       success("Reporte exportado a PDF");
     } catch (err) {
       console.error("Error exportando a PDF:", err);

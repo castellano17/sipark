@@ -457,6 +457,16 @@ function setupIpcHandlers() {
     shell.openPath(filepath); // Abrir el PDF automáticamente
     return filepath;
   });
+  ipcMain.handle("api:generateDailyCashSummaryPDF", async (event, data) => {
+    const filepath = await pdfGenerator.generateDailyCashSummaryPDF(data.data, data.selectedDate);
+    shell.openPath(filepath);
+    return filepath;
+  });
+  ipcMain.handle("api:exportPDF", async (event, options) => {
+    const filepath = await pdfGenerator.generateGenericReport(options);
+    shell.openPath(filepath);
+    return filepath;
+  });
 
   // Sales with Items
   ipcMain.handle("api:createSaleWithItems", (event, saleData) =>
