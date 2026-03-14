@@ -7,10 +7,11 @@ export default defineConfig({
   base: "./",
   resolve: {
     alias: {
-      "@": path.resolve(__dirname, "./src"),
-      "html2canvas": path.resolve(__dirname, "./src/dummy-html2canvas.ts"),
-      "dompurify": path.resolve(__dirname, "./src/dummy-html2canvas.ts")
+      "@": path.resolve(__dirname, "./src")
     },
+  },
+  optimizeDeps: {
+    exclude: ['html2canvas', 'jspdf']
   },
   server: {
     port: 5173,
