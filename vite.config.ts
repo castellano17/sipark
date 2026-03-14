@@ -20,7 +20,17 @@ export default defineConfig({
     outDir: "dist",
     emptyOutDir: true,
     rollupOptions: {
-      external: ["html2canvas"]
+      plugins: [
+        {
+          name: 'ignore-jspdf-deps',
+          resolveId(source) {
+            if (source === 'html2canvas' || source === 'dompurify') {
+              return { id: source, external: true };
+            }
+            return null;
+          }
+        }
+      ]
     }
   },
 });
