@@ -13,7 +13,6 @@ const { createLocalBackup } = require("./backup.cjs");
 async function uploadToGoogleDrive(credentials, folderId = null) {
   try {
     // Crear respaldo temporal
-    console.log("📦 Creando respaldo temporal...");
     const backup = await createLocalBackup();
 
     // Configurar OAuth2
@@ -50,14 +49,12 @@ async function uploadToGoogleDrive(credentials, folderId = null) {
     };
 
     // Subir archivo
-    console.log("☁️  Subiendo a Google Drive...");
     const response = await drive.files.create({
       requestBody: fileMetadata,
       media: media,
       fields: "id, name, size, createdTime, webViewLink",
     });
 
-    console.log("✅ Archivo subido a Google Drive:", response.data.id);
 
     return {
       success: true,
@@ -146,7 +143,6 @@ async function downloadFromGoogleDrive(credentials, fileId, destinationPath) {
     return new Promise((resolve, reject) => {
       response.data
         .on("end", () => {
-          console.log("✅ Archivo descargado desde Google Drive");
           resolve({ success: true, path: destinationPath });
         })
         .on("error", (err) => {

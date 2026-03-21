@@ -86,6 +86,10 @@ interface POSScreenProps {
     packageId: number;
     packageName: string;
     packagePrice: number;
+    isCheckIn?: boolean;
+    isPaid?: boolean;
+    startTime?: string;
+    durationMinutes?: number;
   } | null;
   onCheckoutComplete?: () => void;
 }
@@ -95,9 +99,9 @@ export function POSScreen({
   onCheckoutComplete,
 }: POSScreenProps = {}) {
   const { getProductsServices } = useDatabase();
-  const { printTicket } = usePrinter();
+  const { printTicket, openDrawer } = usePrinter();
   const { warning, error, success } = useNotification();
-  const { formatCurrency, symbol } = useCurrency();
+  const { formatCurrency } = useCurrency();
   const { createSaleWithItems, getActiveCashBox } = useCashBox();
   const [products, setProducts] = useState<ProductService[]>([]);
   const [filteredProducts, setFilteredProducts] = useState<ProductService[]>(
@@ -116,6 +120,7 @@ export function POSScreen({
     discount: 0,
     total: 0,
   });
+  const [isCheckIn, setIsCheckIn] = useState(false);
 
   const barcodeInputRef = useRef<HTMLInputElement>(null);
 
@@ -123,6 +128,13 @@ export function POSScreen({
   useEffect(() => {
     loadProducts();
     checkCashBoxStatus();
+
+    // Enfocar automáticamente el input de código de barras al cargar
+    setTimeout(() => {
+      if (barcodeInputRef.current) {
+        barcodeInputRef.current.focus();
+      }
+    }, 300);
 
     // Verificar estado de caja cada 5 segundos
     const interval = setInterval(checkCashBoxStatus, 5000);
@@ -133,14 +145,15 @@ export function POSScreen({
   useEffect(() => {
     if (checkoutData && products.length > 0 && cashBoxOpen) {
       const product = products.find((p) => p.id === checkoutData.packageId);
-      if (product) {
-        // Guardar el sessionId para marcarlo como completado después del pago
-        setActiveSessionId(checkoutData.sessionId);
+      
+      setActiveSessionId(checkoutData.sessionId);
+      setIsCheckIn(!!checkoutData.isCheckIn);
 
-        // Establecer el cliente en la venta Y agregar el producto en una sola operación
-        setCurrentSale((prev) => {
-          // Crear el nuevo item
-          const newItem: SaleItem = {
+      setCurrentSale((prev) => {
+        let updatedItems: SaleItem[] = [];
+        
+        if (product && !checkoutData.isPaid) {
+          updatedItems.push({
             id: crypto.randomUUID(),
             product_id: product.id,
             product_name: product.name,
@@ -149,32 +162,46 @@ export function POSScreen({
             unit_price: product.price,
             subtotal: product.price,
             duration_minutes: product.duration_minutes,
-          };
-
-          const updatedItems = [...prev.items, newItem];
-          const subtotal = updatedItems.reduce(
-            (sum, item) => sum + item.subtotal,
-            0,
-          );
-          const total = subtotal - prev.discount;
-
-          return {
-            ...prev,
-            client_id: checkoutData.clientId,
-            client_name: checkoutData.clientName,
-            items: updatedItems,
-            subtotal,
-            total: Math.max(0, total),
-          };
-        });
-
-        // Limpiar checkout data después de agregarlo
-        if (onCheckoutComplete) {
-          onCheckoutComplete();
+          });
         }
-      }
+
+        if (checkoutData.startTime && checkoutData.durationMinutes) {
+          const start = new Date(checkoutData.startTime);
+          const duration = checkoutData.durationMinutes;
+          const end = new Date(start.getTime() + duration * 60000);
+          const now = new Date();
+          
+          if (now > end) {
+            const extraMins = Math.floor((now.getTime() - end.getTime()) / 60000);
+            if (extraMins > 0) {
+              updatedItems.push({
+                id: crypto.randomUUID(),
+                product_id: -1, 
+                product_name: `Tiempo Extra (${extraMins} min)`,
+                product_type: "time",
+                quantity: 1,
+                unit_price: 0,
+                subtotal: 0,
+              });
+              warning(`Se han detectado ${extraMins} minutos de tiempo extra.`);
+            }
+          }
+        }
+
+        const subtotal = updatedItems.reduce((sum, item) => sum + item.subtotal, 0);
+        return {
+          ...prev,
+          client_id: checkoutData.clientId,
+          client_name: checkoutData.clientName,
+          items: updatedItems,
+          subtotal,
+          total: Math.max(0, subtotal - prev.discount),
+        };
+      });
+
+      if (onCheckoutComplete) onCheckoutComplete();
     }
-  }, [checkoutData, products, cashBoxOpen]);
+  }, [checkoutData, products, cashBoxOpen, onCheckoutComplete, warning]);
 
   const loadProducts = async () => {
     const rows = await getProductsServices();
@@ -316,11 +343,10 @@ export function POSScreen({
     setActiveSessionId(null); // Limpiar sessionId también
   };
 
-  // Seleccionar cliente
   const handleSelectClient = (client: Client) => {
     setCurrentSale({
       ...currentSale,
-      client_id: client.id === -1 ? null : client.id,
+      client_id: client.id === -1 ? undefined : client.id,
       client_name: client.name,
     });
     setShowClientSelector(false);
@@ -329,12 +355,7 @@ export function POSScreen({
   // Procesar pago
   const handlePayment = async (payment: PaymentDetails) => {
     try {
-      console.log("💰 Procesando pago. currentSale:", {
-        client_id: currentSale.client_id,
-        client_name: currentSale.client_name,
-        items: currentSale.items.length,
-        total: currentSale.total,
-      });
+      // Registrar venta...
 
       // Obtener caja activa
       const activeCashBox = await getActiveCashBox();
@@ -360,17 +381,22 @@ export function POSScreen({
         return;
       }
 
-      // Si hay una sesión activa (checkout desde timing), marcarla como completada
+      // Si hay una sesión activa vinculada
       if (activeSessionId) {
         try {
-          await (window as any).api.endSession(
-            activeSessionId,
-            currentSale.total,
-          );
-          setActiveSessionId(null); // Limpiar el sessionId
+          if (isCheckIn) {
+            // Si es check-in, solo marcamos como pagada
+            await (window as any).api.updateSessionPaidStatus(activeSessionId, true);
+          } else {
+            // Si es check-out, finalizamos la sesión completamente
+            await (window as any).api.endSession(
+              activeSessionId,
+              currentSale.total,
+            );
+          }
+          setActiveSessionId(null);
         } catch (err) {
-          console.error("Error finalizando sesión:", err);
-          // No bloqueamos la venta si falla esto
+          console.error("Error actualizando sesión:", err);
         }
       }
 
@@ -427,15 +453,26 @@ export function POSScreen({
             </span>
           )}
         </div>
-        <Button
-          variant="outline"
-          className="gap-2"
-          onClick={() => setShowClientSelector(true)}
-          disabled={!cashBoxOpen}
-        >
-          <User className="w-4 h-4" />
-          {currentSale.client_name || "Seleccionar Cliente"}
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            className="gap-2 bg-slate-100 font-semibold text-slate-700 hover:bg-slate-200"
+            onClick={() => openDrawer()}
+            disabled={!cashBoxOpen}
+            title="Abrir cajón de dinero manualmente"
+          >
+            💰 Abrir Cajón
+          </Button>
+          <Button
+            variant="outline"
+            className="gap-2"
+            onClick={() => setShowClientSelector(true)}
+            disabled={!cashBoxOpen}
+          >
+            <User className="w-4 h-4" />
+            {currentSale.client_name || "Seleccionar Cliente"}
+          </Button>
+        </div>
       </div>
 
       {/* Búsqueda */}

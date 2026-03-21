@@ -3,12 +3,17 @@ const { runAsync, getAsync, allAsync } = require("./database-pg.cjs");
 // Crear reservación
 async function createReservation(data) {
   try {
+    if (!data.client_name || !data.client_name.trim()) return { success: false, error: "El campo 'Nombre' es obligatorio" };
+    if (!data.event_date) return { success: false, error: "El campo 'Fecha del Evento' es obligatorio" };
+    if (!data.event_time) return { success: false, error: "El campo 'Hora del Evento' es obligatorio" };
+    if (!data.package_id) return { success: false, error: "El campo 'Paquete' es obligatorio" };
+
     const result = await runAsync(
       `INSERT INTO reservations (
         client_id, client_name, client_phone, client_email,
         event_date, event_time, package_id, package_name,
-        total_amount, deposit_amount, status, notes, created_by
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        num_children, total_amount, deposit_amount, status, notes, created_by
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         data.client_id,
         data.client_name,
@@ -18,6 +23,7 @@ async function createReservation(data) {
         data.event_time,
         data.package_id,
         data.package_name,
+        data.num_children || 0,
         data.total_amount,
         data.deposit_amount || 0,
         data.status || "pending",

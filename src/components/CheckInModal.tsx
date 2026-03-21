@@ -16,7 +16,14 @@ interface Client {
 interface CheckInModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSuccess: () => void;
+  onSuccess: (data: {
+    sessionId?: number;
+    clientId?: number;
+    clientName: string;
+    packageId: number;
+    packageName: string;
+    packagePrice: number;
+  }) => void;
 }
 
 export const CheckInModal: React.FC<CheckInModalProps> = ({
@@ -121,7 +128,7 @@ export const CheckInModal: React.FC<CheckInModalProps> = ({
     const timePackages = data.filter(
       (p: ProductService) =>
         p.type === "package" ||
-        (p.type === "service" && p.duration_minutes && p.duration_minutes > 0),
+        (p.type === "time" && p.duration_minutes && p.duration_minutes > 0),
     );
     setPackages(timePackages);
     if (timePackages.length > 0) {
@@ -153,7 +160,7 @@ export const CheckInModal: React.FC<CheckInModalProps> = ({
           : "Sin Registro";
       const phone = clientType === "registered" ? selectedClient!.phone : "";
 
-      await createSession(
+      const result = await createSession(
         clientName,
         parentName,
         phone,
@@ -163,7 +170,14 @@ export const CheckInModal: React.FC<CheckInModalProps> = ({
 
       success(`Entrada registrada para ${clientName}`);
       onOpenChange(false);
-      onSuccess();
+      onSuccess({
+        sessionId: result?.id,
+        clientId: clientType === "registered" ? selectedClient?.id : undefined,
+        clientName,
+        packageId: formData.packageId,
+        packageName: selectedPackage?.name || "",
+        packagePrice: selectedPackage?.price || 0,
+      });
     } catch (err) {
       console.error("Error en check-in:", err);
       errorNotification("Error al registrar la entrada");
@@ -184,7 +198,7 @@ export const CheckInModal: React.FC<CheckInModalProps> = ({
         newClientData.emergencyPhone,
         newClientData.email,
         newClientData.childName,
-        newClientData.childAge,
+        Number(newClientData.childAge),
         newClientData.allergies,
         newClientData.specialNotes,
       );
@@ -193,7 +207,7 @@ export const CheckInModal: React.FC<CheckInModalProps> = ({
 
       // Recargar clientes y seleccionar el nuevo
       await loadClients();
-      const newClient = clients.find((c) => c.id === result.id);
+      const newClient = clients.find((c) => c.id === (result as any)?.id || result);
       if (newClient) {
         setSelectedClient(newClient);
         setSearchQuery(newClient.name);
@@ -212,7 +226,7 @@ export const CheckInModal: React.FC<CheckInModalProps> = ({
       onClick={() => onOpenChange(false)}
     >
       <div
-        className="w-full max-w-[500px] bg-white rounded-lg shadow-lg max-h-[90vh] overflow-y-auto flex flex-col border-0"
+        className="w-full max-w-2xl bg-white rounded-lg shadow-lg max-h-[90vh] overflow-y-auto flex flex-col border-0"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -406,8 +420,8 @@ export const CheckInModal: React.FC<CheckInModalProps> = ({
                         </Button>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="col-span-2">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="md:col-span-1">
                           <label className="block text-sm font-medium text-slate-700 mb-1">
                             Nombre del Tutor *
                           </label>
@@ -426,7 +440,7 @@ export const CheckInModal: React.FC<CheckInModalProps> = ({
                           />
                         </div>
 
-                        <div className="col-span-2">
+                        <div className="md:col-span-1">
                           <label className="block text-sm font-medium text-slate-700 mb-1">
                             Nombre del Padre/Madre
                           </label>
@@ -444,7 +458,7 @@ export const CheckInModal: React.FC<CheckInModalProps> = ({
                           />
                         </div>
 
-                        <div>
+                        <div className="md:col-span-1">
                           <label className="block text-sm font-medium text-slate-700 mb-1">
                             Teléfono Principal *
                           </label>
@@ -463,7 +477,7 @@ export const CheckInModal: React.FC<CheckInModalProps> = ({
                           />
                         </div>
 
-                        <div>
+                        <div className="md:col-span-1">
                           <label className="block text-sm font-medium text-slate-700 mb-1">
                             Tel. Emergencia
                           </label>
@@ -481,7 +495,7 @@ export const CheckInModal: React.FC<CheckInModalProps> = ({
                           />
                         </div>
 
-                        <div className="col-span-2">
+                        <div className="col-span-1 md:col-span-2">
                           <label className="block text-sm font-medium text-slate-700 mb-1">
                             Email
                           </label>
@@ -499,7 +513,7 @@ export const CheckInModal: React.FC<CheckInModalProps> = ({
                           />
                         </div>
 
-                        <div>
+                        <div className="md:col-span-1">
                           <label className="block text-sm font-medium text-slate-700 mb-1">
                             Nombre del Niño
                           </label>
@@ -517,7 +531,7 @@ export const CheckInModal: React.FC<CheckInModalProps> = ({
                           />
                         </div>
 
-                        <div>
+                        <div className="md:col-span-1">
                           <label className="block text-sm font-medium text-slate-700 mb-1">
                             Edad del Niño
                           </label>
@@ -537,7 +551,7 @@ export const CheckInModal: React.FC<CheckInModalProps> = ({
                           />
                         </div>
 
-                        <div className="col-span-2">
+                        <div className="col-span-1 md:col-span-2">
                           <label className="block text-sm font-medium text-slate-700 mb-1">
                             Alergias / Condiciones Médicas
                           </label>
@@ -555,7 +569,7 @@ export const CheckInModal: React.FC<CheckInModalProps> = ({
                           />
                         </div>
 
-                        <div className="col-span-2">
+                        <div className="col-span-1 md:col-span-2">
                           <label className="block text-sm font-medium text-slate-700 mb-1">
                             Notas Especiales
                           </label>
@@ -593,7 +607,7 @@ export const CheckInModal: React.FC<CheckInModalProps> = ({
               <label className="block text-sm font-semibold text-slate-900">
                 Selecciona un Paquete
               </label>
-              <div className="grid grid-cols-1 gap-3 max-h-[300px] overflow-y-auto pr-2">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[300px] overflow-y-auto pr-2">
                 {packages.map((pkg) => (
                   <div
                     key={pkg.id}

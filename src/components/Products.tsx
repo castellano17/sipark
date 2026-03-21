@@ -360,8 +360,8 @@ export function Products() {
                 </div>
 
                 <div className="flex-1 overflow-auto p-6 space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="col-span-2">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="col-span-1 md:col-span-2">
                       <label className="block text-sm font-medium mb-2">
                         Nombre *
                       </label>
@@ -375,7 +375,7 @@ export function Products() {
                       />
                     </div>
 
-                    <div>
+                    <div className="md:col-span-1">
                       <label className="block text-sm font-medium mb-2">
                         Tipo *
                       </label>
@@ -395,7 +395,7 @@ export function Products() {
                       </select>
                     </div>
 
-                    <div>
+                    <div className="md:col-span-1">
                       <label className="block text-sm font-medium mb-2">
                         Precio *
                       </label>
@@ -412,7 +412,7 @@ export function Products() {
                       />
                     </div>
 
-                    <div>
+                    <div className="md:col-span-1">
                       <label className="block text-sm font-medium mb-2">
                         Categoría
                       </label>
@@ -446,7 +446,7 @@ export function Products() {
                       </div>
                     </div>
 
-                    <div>
+                    <div className="md:col-span-1">
                       <label className="block text-sm font-medium mb-2">
                         Código de Barras
                       </label>
@@ -460,7 +460,7 @@ export function Products() {
                     </div>
 
                     {isPhysicalProduct(formData.type) && editingProduct && (
-                      <div>
+                      <div className="md:col-span-1">
                         <label className="block text-sm font-medium mb-2">
                           Stock Inicial
                         </label>
@@ -481,7 +481,7 @@ export function Products() {
                     )}
 
                     {isTimeBasedService(formData.type) && (
-                      <div>
+                      <div className="md:col-span-1">
                         <label className="block text-sm font-medium mb-2">
                           Duración (minutos)
                         </label>

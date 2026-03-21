@@ -98,6 +98,9 @@ export default function MainLayout({ currentUser, onLogout }: MainLayoutProps) {
           packageId: session.package_id,
           packageName: session.package_name,
           packagePrice: session.package_price,
+          isPaid: session.is_paid, // Pasar el estado de pago
+          startTime: session.start_time,
+          durationMinutes: session.duration_minutes,
         });
 
         // Navegar al POS
@@ -106,6 +109,28 @@ export default function MainLayout({ currentUser, onLogout }: MainLayoutProps) {
     } catch (error) {
       console.error("Error en checkout:", error);
     }
+  };
+
+  const handleCheckIn = async (data: {
+    sessionId?: number;
+    clientId?: number;
+    clientName: string;
+    packageId: number;
+    packageName: string;
+    packagePrice: number;
+  }) => {
+    // Ir al POS con el paquete pre-cargado
+    // isCheckIn = true: solo cobrar, NO terminar la sesión (aún no ha iniciado el tiempo)
+    setCheckoutData({
+      sessionId: data.sessionId ?? 0,
+      clientId: data.clientId ?? null,
+      clientName: data.clientName,
+      packageId: data.packageId,
+      packageName: data.packageName,
+      packagePrice: data.packagePrice,
+      isCheckIn: true,
+    });
+    setCurrentPath("/pos");
   };
 
   const renderContent = () => {
@@ -118,7 +143,12 @@ export default function MainLayout({ currentUser, onLogout }: MainLayoutProps) {
           />
         );
       case "/operaciones":
-        return <TimingDashboard onCheckout={handleCheckout} />;
+        return (
+          <TimingDashboard
+            onCheckout={handleCheckout}
+            onCheckIn={handleCheckIn}
+          />
+        );
       case "/operaciones/paquetes":
         return <PackagesManager />;
       case "/operaciones/membresias":

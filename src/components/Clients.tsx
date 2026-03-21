@@ -137,8 +137,8 @@ export function Clients() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.name) {
-      error("Complete los campos obligatorios");
+    if (!formData.name.trim()) {
+      error("El campo 'Nombre del Responsable' es obligatorio");
       return;
     }
 
@@ -365,7 +365,7 @@ export function Clients() {
         <Dialog open={showModal} onOpenChange={setShowModal}>
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
             <Card className="w-full max-w-2xl bg-white max-h-[90vh] overflow-y-auto">
-              <form onSubmit={handleSubmit}>
+              <form onSubmit={handleSubmit} noValidate>
                 <div className="p-6 border-b bg-gradient-to-r from-blue-600 to-blue-700">
                   <h2 className="text-xl font-bold text-white">
                     {editingClient ? "Editar Cliente" : "Nuevo Cliente"}
@@ -373,8 +373,8 @@ export function Clients() {
                 </div>
 
                 <div className="p-6 space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="col-span-2">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="md:col-span-1">
                       <label className="block text-sm font-medium mb-2">
                         Nombre del Responsable *
                       </label>
@@ -383,11 +383,10 @@ export function Clients() {
                         onChange={(e) =>
                           setFormData({ ...formData, name: e.target.value })
                         }
-                        required
                       />
                     </div>
 
-                    <div>
+                    <div className="md:col-span-1">
                       <label className="block text-sm font-medium mb-2">
                         Teléfono Principal
                       </label>
@@ -400,7 +399,7 @@ export function Clients() {
                       />
                     </div>
 
-                    <div>
+                    <div className="md:col-span-1">
                       <label className="block text-sm font-medium mb-2">
                         Teléfono de Emergencia
                       </label>
@@ -416,7 +415,7 @@ export function Clients() {
                       />
                     </div>
 
-                    <div className="col-span-2">
+                    <div className="col-span-1 md:col-span-2">
                       <label className="block text-sm font-medium mb-2">
                         Email
                       </label>
@@ -429,7 +428,7 @@ export function Clients() {
                       />
                     </div>
 
-                    <div>
+                    <div className="md:col-span-1">
                       <label className="block text-sm font-medium mb-2">
                         Nombre del Niño
                       </label>
@@ -444,7 +443,7 @@ export function Clients() {
                       />
                     </div>
 
-                    <div>
+                    <div className="md:col-span-1">
                       <label className="block text-sm font-medium mb-2">
                         Edad del Niño
                       </label>
@@ -462,7 +461,7 @@ export function Clients() {
                       />
                     </div>
 
-                    <div className="col-span-2">
+                    <div className="col-span-1 md:col-span-2">
                       <label className="block text-sm font-medium mb-2">
                         Alergias / Condiciones Médicas
                       </label>
@@ -478,7 +477,7 @@ export function Clients() {
                       />
                     </div>
 
-                    <div className="col-span-2">
+                    <div className="col-span-1 md:col-span-2">
                       <label className="block text-sm font-medium mb-2">
                         Notas Especiales
                       </label>

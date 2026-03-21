@@ -230,6 +230,8 @@ contextBridge.exposeInMainWorld("api", {
       packageId,
       durationMinutes,
     }),
+  startTimerSession: (sessionId) =>
+    ipcRenderer.invoke("api:startTimerSession", sessionId),
 
   // Health Check
   checkDatabaseConnection: () =>

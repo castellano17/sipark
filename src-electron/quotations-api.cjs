@@ -28,6 +28,12 @@ async function createQuotation(data) {
       created_by,
     } = data;
 
+    if (!client_name || !client_name.trim()) return { success: false, error: "El campo 'Nombre' es obligatorio" };
+    if (!valid_until) return { success: false, error: "El campo 'Válida Hasta' es obligatorio" };
+    if (!items || items.length === 0 || items.some((item) => !item.description || item.quantity <= 0)) {
+      return { success: false, error: "Debe agregar al menos un item válido" };
+    }
+
     // Calcular totales
     const subtotal = items.reduce((sum, item) => sum + item.subtotal, 0);
     const discountAmount = discount || 0;

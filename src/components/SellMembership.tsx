@@ -33,9 +33,11 @@ interface MembershipType {
   description: string;
   price: number;
   duration_days: number;
-  benefits: string;
+  benefits?: string;
   membership_type: string;
   discount_percentage: number;
+  total_hours?: string;
+  id_card?: string;
 }
 
 export function SellMembership() {
@@ -61,6 +63,24 @@ export function SellMembership() {
   const [paymentAmount, setPaymentAmount] = useState<number>(0);
   const [discount, setDiscount] = useState<number>(0);
   const [notes, setNotes] = useState<string>("");
+
+  // Nuevos campos de membresía
+  const [phone, setPhone] = useState<string>("");
+  const [idCard, setIdCard] = useState<string>("");
+  const [acquisitionDate, setAcquisitionDate] = useState<string>(
+    new Date().toLocaleDateString("sv-SE"), // sv-SE format is YYYY-MM-DD
+  );
+  const [totalHours, setTotalHours] = useState<string>("");
+
+  const formatCedula = (val: string) => {
+    const digits = val.replace(/[^0-9A-ZA-Z]/gi, "").toUpperCase();
+    let formatted = "";
+    if (digits.length > 0) formatted += digits.substring(0, 3);
+    if (digits.length > 3) formatted += "-" + digits.substring(3, 9);
+    if (digits.length > 9) formatted += "-" + digits.substring(9, 13);
+    if (digits.length > 13) formatted += digits.substring(13, 14);
+    return formatted;
+  };
 
   const { formatCurrency } = useCurrency();
   const { success, error } = useNotification();
@@ -101,9 +121,9 @@ export function SellMembership() {
       ]);
       setClients(clientsData);
       setMemberships(membershipsData.filter((m: any) => m.is_active));
-    } catch (err) {
-      console.error("Error cargando datos:", err);
-      error("Error al cargar datos");
+    } catch (err: any) {
+      console.error("Error renovando membresía:", err);
+      error("Error al renovar membresía: " + (err.message || "Error desconocido"));
     } finally {
       setLoading(false);
     }
@@ -112,11 +132,14 @@ export function SellMembership() {
   const handleSelectClient = (client: Client) => {
     setSelectedClient(client);
     setClientSearch(client.name);
+    setPhone(client.phone || "");
     setShowClientDropdown(false);
   };
 
   const handleSelectMembership = (membership: MembershipType) => {
     setSelectedMembership(membership);
+    setPaymentAmount(membership.price);
+    setTotalHours(membership.total_hours?.toString() || "");
   };
 
   const calculateEndDate = () => {
@@ -154,6 +177,11 @@ export function SellMembership() {
 
     if (paymentAmount <= 0) {
       error("El monto de pago debe ser mayor a 0");
+      return;
+    }
+
+    if (!totalHours) {
+      error("El campo N° de Entradas en horas es obligatorio");
       return;
     }
 
@@ -202,6 +230,10 @@ export function SellMembership() {
         paymentAmount,
         notes,
         currentUser.id || null,
+        phone,
+        idCard,
+        acquisitionDate,
+        totalHours
       );
 
       // Guardar datos para impresión
@@ -214,6 +246,10 @@ export function SellMembership() {
         payment_amount: paymentAmount,
         payment_method: paymentMethod,
         notes: notes,
+        phone: phone,
+        id_card: idCard,
+        total_hours: totalHours,
+        acquisition_date: acquisitionDate,
       };
 
       // Mostrar modal de impresión
@@ -221,9 +257,9 @@ export function SellMembership() {
       setShowPrintModal(true);
 
       success("Membresía vendida exitosamente");
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error vendiendo membresía:", err);
-      error("Error al procesar la venta de membresía");
+      error("Error al procesar la venta de membresía: " + (err.message || "Error desconocido"));
     } finally {
       setProcessing(false);
     }
@@ -237,8 +273,13 @@ export function SellMembership() {
       }
 
       if (type === "ticket") {
-        await printMembershipTicket(lastMembershipData);
-        success("Ticket enviado a impresora");
+        try {
+          await printMembershipTicket(lastMembershipData);
+          success("Ticket enviado a impresora");
+        } catch (printErr) {
+          console.warn("No se pudo imprimir automáticamente:", printErr);
+          error("Error al imprimir ticket");
+        }
       } else {
         await printMembershipInvoice(lastMembershipData);
         success("Factura PDF generada");
@@ -263,6 +304,10 @@ export function SellMembership() {
     setPaymentAmount(0);
     setDiscount(0);
     setNotes("");
+    setPhone("");
+    setIdCard("");
+    setAcquisitionDate(new Date().toLocaleDateString("sv-SE"));
+    setTotalHours("");
   };
 
   const getMembershipTypeLabel = (type: string) => {
@@ -493,6 +538,50 @@ export function SellMembership() {
                 </div>
               </div>
 
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Teléfono del Titular (Opcional)
+                  </label>
+                  <Input
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    placeholder="Ej: 8888-8888"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Cédula (Opcional)
+                  </label>
+                  <Input
+                    value={idCard}
+                    onChange={(e) => setIdCard(formatCedula(e.target.value))}
+                    placeholder="###-######-####L"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Fecha de adquisición
+                  </label>
+                  <Input
+                    type="date"
+                    value={acquisitionDate}
+                    onChange={(e) => setAcquisitionDate(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    N° de Entradas en horas
+                  </label>
+                      <Input
+                        value={totalHours}
+                        readOnly
+                        placeholder="Ej: 10 horas"
+                        className="bg-gray-50 cursor-not-allowed"
+                      />
+                </div>
+              </div>
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Notas (opcional)
@@ -501,7 +590,7 @@ export function SellMembership() {
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                  rows={3}
+                  rows={2}
                   placeholder="Observaciones adicionales..."
                 />
               </div>

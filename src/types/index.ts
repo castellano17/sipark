@@ -50,11 +50,12 @@ export interface ActiveSession {
   client_id: number;
   start_time: string;
   package_id?: number;
-  status: "active" | "completed";
+  status: "active" | "completed" | "pending";
   client_name: string;
   photo_path?: string;
   package_name?: string;
   duration_minutes?: number;
+  is_paid?: boolean;
 }
 
 export interface ProductService {

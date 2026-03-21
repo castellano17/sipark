@@ -3,7 +3,6 @@ const fs = require("fs");
 const filePath = "src-electron/api.cjs";
 let content = fs.readFileSync(filePath, "utf8");
 
-console.log("\n🔍 Corrigiendo cláusulas HAVING para PostgreSQL...\n");
 
 const fixes = [
   {
@@ -48,16 +47,12 @@ let fixedCount = 0;
 fixes.forEach((fix) => {
   if (content.includes(fix.old)) {
     content = content.replace(fix.old, fix.new);
-    console.log(`✅ Corregido: ${fix.name}`);
     fixedCount++;
   } else {
-    console.log(`⚠️  No encontrado: ${fix.name}`);
   }
 });
 
 fs.writeFileSync(filePath, content, "utf8");
 
-console.log(`\n${"=".repeat(80)}`);
-console.log(
   `\n✨ Correcciones HAVING completadas: ${fixedCount}/${fixes.length}\n`,
 );

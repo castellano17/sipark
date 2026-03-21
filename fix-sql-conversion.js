@@ -44,4 +44,3 @@ const newOrder = `  // IMPORTANTE: Convertir DATE('now', ...) ANTES de DATE(colu
 content = content.replace(oldOrder, newOrder);
 
 fs.writeFileSync(filePath, content, "utf8");
-console.log("✅ Orden de conversiones SQL corregido en database-pg.cjs");

@@ -23,14 +23,15 @@ interface MembershipType {
   description: string;
   price: number;
   duration_days: number;
-  benefits: string;
+
   membership_type: string;
   max_sessions_per_day: number | null;
   discount_percentage: number;
   priority_level: number;
   auto_renew: boolean;
-  grace_period_days: number;
   is_active: boolean;
+  total_hours: string;
+  benefits?: string;
 }
 
 export function MembershipTypes() {
@@ -49,8 +50,8 @@ export function MembershipTypes() {
     discount_percentage: 0,
     priority_level: 0,
     auto_renew: false,
-    grace_period_days: 0,
     is_active: true,
+    total_hours: "",
   });
 
   const { formatCurrency } = useCurrency();
@@ -123,28 +124,17 @@ export function MembershipTypes() {
       description: "",
       price: 0,
       duration_days: 30,
-      benefits: "",
+      total_hours: "",
       membership_type: "standard",
       max_sessions_per_day: null,
       discount_percentage: 0,
       priority_level: 0,
       auto_renew: false,
-      grace_period_days: 0,
       is_active: true,
+      benefits: "",
     });
     setEditingId(null);
     setShowForm(false);
-  };
-
-  const getMembershipTypeLabel = (type: string) => {
-    const types: Record<string, string> = {
-      standard: "Estándar",
-      premium: "Premium",
-      vip: "VIP",
-      student: "Estudiante",
-      family: "Familiar",
-    };
-    return types[type] || type;
   };
 
   if (loading) {
@@ -205,24 +195,15 @@ export function MembershipTypes() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Tipo
+                  N° de Entradas en horas
                 </label>
-                <select
-                  value={formData.membership_type}
+                <Input
+                  value={formData.total_hours}
                   onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      membership_type: e.target.value,
-                    })
+                    setFormData({ ...formData, total_hours: e.target.value })
                   }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                >
-                  <option value="standard">Estándar</option>
-                  <option value="premium">Premium</option>
-                  <option value="vip">VIP</option>
-                  <option value="student">Estudiante</option>
-                  <option value="family">Familiar</option>
-                </select>
+                  placeholder="Ej: 10 horas"
+                />
               </div>
 
               <div>
@@ -279,61 +260,7 @@ export function MembershipTypes() {
                 />
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Sesiones por día (0 = ilimitado)
-                </label>
-                <Input
-                  type="number"
-                  min="0"
-                  value={formData.max_sessions_per_day || ""}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      max_sessions_per_day: e.target.value
-                        ? parseInt(e.target.value)
-                        : null,
-                    })
-                  }
-                />
-              </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Nivel de Prioridad
-                </label>
-                <select
-                  value={formData.priority_level}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      priority_level: parseInt(e.target.value),
-                    })
-                  }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                >
-                  <option value="0">Normal</option>
-                  <option value="1">Alta</option>
-                  <option value="2">VIP</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Días de Gracia
-                </label>
-                <Input
-                  type="number"
-                  min="0"
-                  value={formData.grace_period_days || ""}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      grace_period_days: parseInt(e.target.value) || 0,
-                    })
-                  }
-                />
-              </div>
             </div>
 
             <div>
@@ -351,20 +278,7 @@ export function MembershipTypes() {
               />
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Beneficios
-              </label>
-              <textarea
-                value={formData.benefits}
-                onChange={(e) =>
-                  setFormData({ ...formData, benefits: e.target.value })
-                }
-                className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                rows={3}
-                placeholder="Lista de beneficios (uno por línea)"
-              />
-            </div>
+
 
             <div className="flex items-center gap-4">
               <label className="flex items-center gap-2">
@@ -418,8 +332,8 @@ export function MembershipTypes() {
                 <Award className="w-6 h-6 text-blue-600" />
                 <div>
                   <h3 className="font-semibold text-lg">{membership.name}</h3>
-                  <span className="text-xs text-gray-500">
-                    {getMembershipTypeLabel(membership.membership_type)}
+                  <span className="text-xs text-blue-600 font-medium">
+                    {membership.total_hours || "Sin horas definidas"}
                   </span>
                 </div>
               </div>

@@ -40,6 +40,10 @@ async function createClient(
   specialNotes,
 ) {
   try {
+    if (!name || typeof name !== 'string' || !name.trim()) {
+      throw new Error("El campo 'Nombre del Responsable' es obligatorio.");
+    }
+
     // Verificar si ya existe un cliente con el mismo nombre y teléfono
     const existingClient = await getAsync(
       "SELECT id FROM clients WHERE name = ? AND phone = ?",
@@ -192,7 +196,6 @@ async function startSession(clientId, packageId, durationMinutes = 60) {
 
 async function getActiveSessions() {
   try {
-    console.log("📋 Obteniendo sesiones activas...");
     const sql = `
       SELECT 
         s.id,
@@ -200,7 +203,8 @@ async function getActiveSessions() {
         s.start_time,
         s.package_id,
         s.status,
-        s.elapsed_minutes,
+        s.duration_minutes,
+        s.is_paid,
         c.name as client_name,
         c.photo_path,
         p.name as package_name,
@@ -208,11 +212,10 @@ async function getActiveSessions() {
       FROM active_sessions s
       JOIN clients c ON s.client_id = c.id
       LEFT JOIN products_services p ON s.package_id = p.id
-      WHERE s.status = 'active'
+      WHERE s.status IN ('active', 'pending')
       ORDER BY s.start_time DESC
     `;
     const result = await allAsync(sql);
-    console.log(`✅ ${result.length} sesiones activas encontradas`);
     return result;
   } catch (error) {
     console.error("❌ Error obteniendo sesiones activas:", error);
@@ -366,7 +369,6 @@ async function getSales(limit = 100) {
       LIMIT ?
     `;
     const sales = await allAsync(sql, [limit]);
-    console.log(`📊 Ventas encontradas: ${sales.length}`);
     return sales;
   } catch (error) {
     console.error("Error obteniendo ventas:", error);
@@ -736,17 +738,10 @@ async function getCashBoxReport(cashBoxId) {
       .reduce((sum, m) => sum + m.amount, 0);
 
     // Debug
-    console.log("🔍 DEBUG Caja #" + cashBoxId);
-    console.log("  opening_amount:", cashBox.opening_amount);
-    console.log("  cashSales:", cashSales);
-    console.log("  incomeMovements:", incomeMovements);
-    console.log("  expenseMovements:", expenseMovements);
-    console.log("  movements:", movements);
 
     const expectedCash =
       cashBox.opening_amount + cashSales + incomeMovements - expenseMovements;
 
-    console.log("  expectedCash calculado:", expectedCash);
 
     const difference = cashBox.closing_amount
       ? cashBox.closing_amount - expectedCash
@@ -935,25 +930,7 @@ async function checkDatabaseConnection() {
   }
 }
 
-module.exports = {
-  getClients,
-  createClient,
-  getClientById,
-  startSession,
-  getActiveSessions,
-  endSession,
-  getProductsServices,
-  createProductService,
-  updateProductService,
-  deleteProductService,
-  getSales,
-  getDailyStats,
-  getSetting,
-  setSetting,
-  getAllSettings,
-  createSession,
-  checkDatabaseConnection,
-};
+
 
 // ============ CREATE SESSION (Check-in) ============
 
@@ -963,40 +940,33 @@ async function createSession(
   phone,
   packageId,
   durationMinutes = 60,
+  isPaid = false,
 ) {
   try {
     let clientId;
 
     // Si no hay teléfono, buscar o crear cliente "Cliente General"
     if (!phone || phone.trim() === "") {
-      const generalClient = await getAsync(
-        "SELECT id FROM clients WHERE name = ? AND phone = ?",
-        ["Cliente General", "0000000000"],
-      );
+      const sqlClient = "SELECT id FROM clients WHERE name = ? AND phone = ?";
+      const generalClient = await getAsync(sqlClient, ["Cliente General", "0000000000"]);
 
       if (generalClient) {
         clientId = generalClient.id;
       } else {
-        const result = await runAsync(
-          "INSERT INTO clients (name, parent_name, phone) VALUES (?, ?, ?) RETURNING id",
-          ["Cliente General", "Sin Registro", "0000000000"],
-        );
+        const sqlInsert = "INSERT INTO clients (name, parent_name, phone) VALUES (?, ?, ?) RETURNING id";
+        const result = await runAsync(sqlInsert, ["Cliente General", "Sin Registro", "0000000000"]);
         clientId = result.lastID;
       }
     } else {
       // Cliente con teléfono - buscar o crear
-      const existingClient = await getAsync(
-        "SELECT id FROM clients WHERE name = ? AND phone = ?",
-        [clientName, phone],
-      );
+      const sqlClient = "SELECT id FROM clients WHERE name = ? AND phone = ?";
+      const existingClient = await getAsync(sqlClient, [clientName, phone]);
 
       if (existingClient) {
         clientId = existingClient.id;
       } else {
-        const result = await runAsync(
-          "INSERT INTO clients (name, parent_name, phone) VALUES (?, ?, ?) RETURNING id",
-          [clientName, parentName, phone],
-        );
+        const sqlInsert = "INSERT INTO clients (name, parent_name, phone) VALUES (?, ?, ?) RETURNING id";
+        const result = await runAsync(sqlInsert, [clientName, parentName, phone]);
         clientId = result.lastID;
       }
     }
@@ -1004,8 +974,8 @@ async function createSession(
     // Crear sesión
     const startTime = getLocalTimestamp();
     const sessionResult = await runAsync(
-      "INSERT INTO active_sessions (client_id, start_time, package_id, duration_minutes, status) VALUES (?, ?, ?, ?, ?) RETURNING id",
-      [clientId, startTime, packageId, durationMinutes, "active"],
+      "INSERT INTO active_sessions (client_id, start_time, package_id, duration_minutes, status, is_paid) VALUES (?, ?, ?, ?, ?, ?) RETURNING id",
+      [clientId, startTime, packageId, durationMinutes, "pending", isPaid],
     );
 
     return {
@@ -1014,8 +984,9 @@ async function createSession(
       client_name: clientName,
       start_time: startTime,
       package_id: packageId,
-      status: "active",
+      status: "pending",
       duration_minutes: durationMinutes,
+      is_paid: isPaid,
     };
   } catch (error) {
     console.error("Error creando sesión:", error);
@@ -1023,7 +994,32 @@ async function createSession(
   }
 }
 
-// ============ CASH BOX ============
+async function startTimerSession(sessionId) {
+  try {
+    const startTime = getLocalTimestamp();
+    await runAsync(
+      "UPDATE active_sessions SET status = 'active', start_time = ? WHERE id = ?",
+      [startTime, sessionId]
+    );
+    return true;
+  } catch (error) {
+    console.error("Error iniciando temporizador manual de sesión:", error);
+    throw error;
+  }
+}
+
+async function updateSessionPaidStatus(sessionId, isPaid) {
+  try {
+    await runAsync(
+      "UPDATE active_sessions SET is_paid = ? WHERE id = ?",
+      [isPaid, sessionId]
+    );
+    return true;
+  } catch (error) {
+    console.error("Error actualizando estado de pago de sesión:", error);
+    throw error;
+  }
+}
 
 async function openCashBox(openingAmount, openedBy = "Admin") {
   try {
@@ -1181,7 +1177,6 @@ async function createSaleWithItems(saleData) {
       cash_box_id,
     } = saleData;
 
-    console.log("📝 Creando venta con client_id:", client_id);
 
     // Crear venta
     const saleSql = `
@@ -1200,7 +1195,6 @@ async function createSaleWithItems(saleData) {
     ]);
 
     const saleId = saleResult.lastID;
-    console.log("✅ Venta creada con ID:", saleId, "client_id:", client_id);
 
     // Crear items de venta
     for (const item of items) {
@@ -1478,14 +1472,10 @@ async function getCategories() {
 }
 
 async function createCategory(name, description) {
-  console.log("🔧 API: createCategory llamado con:", { name, description });
   try {
     const sql =
       "INSERT INTO categories (name, description) VALUES (?, ?) RETURNING id";
-    console.log("🔧 API: Ejecutando SQL:", sql);
     const result = await runAsync(sql, [name, description]);
-    console.log("🔧 API: Resultado de runAsync:", result);
-    console.log("✅ API: Categoría creada con ID:", result.lastID);
     return result.lastID;
   } catch (error) {
     console.error("❌ API: Error creando categoría:", error);
@@ -1566,14 +1556,7 @@ async function createPurchaseOrder(purchaseData) {
         "UPDATE products_services SET stock = stock + ? WHERE id = ?",
         [item.quantity, item.product_id],
       );
-      console.log(
-        `✅ Stock actualizado para producto ${item.product_id}: +${item.quantity} unidades`,
-      );
     }
-
-    console.log(
-      `✅ Orden de compra #${purchaseOrderId} creada con ${items.length} items`,
-    );
     return purchaseOrderId;
   } catch (error) {
     console.error("Error creando orden de compra:", error);
@@ -1627,7 +1610,6 @@ async function getPurchaseOrderWithItems(purchaseOrderId) {
 
 async function clearAllData() {
   try {
-    console.log("🗑️  Limpiando base de datos...");
 
     // Deshabilitar temporalmente las claves foráneas
     await runAsync("PRAGMA foreign_keys = OFF");
@@ -1672,7 +1654,6 @@ async function clearAllData() {
     for (const table of tables) {
       try {
         await runAsync(`DELETE FROM ${table}`);
-        console.log(`  ✓ Tabla ${table} limpiada`);
       } catch (err) {
         // Si la tabla no existe, continuar
         if (!err.message.includes("no such table")) {
@@ -1683,13 +1664,10 @@ async function clearAllData() {
 
     // Reiniciar los autoincrement
     await runAsync("DELETE FROM sqlite_sequence");
-    console.log("  ✓ Secuencias reiniciadas");
 
     // Reactivar las claves foráneas
     await runAsync("PRAGMA foreign_keys = ON");
 
-    console.log("✅ Base de datos limpiada completamente");
-    console.log("ℹ️  Configuración del sistema mantenida");
 
     return { success: true, message: "Base de datos limpiada exitosamente" };
   } catch (error) {
@@ -1717,29 +1695,34 @@ async function getMemberships() {
   }
 }
 
-async function createMembership(membershipData) {
+async function createMembership(
+  name,
+  description,
+  price,
+  duration_days,
+  auto_renew = false,
+  is_active = true,
+  total_hours = null,
+  membership_type = "standard",
+) {
   try {
-    const {
-      name,
-      description,
-      price,
-      duration_days,
-      benefits,
-      membership_type = "standard",
-      max_sessions_per_day = null,
-      discount_percentage = 0,
-      priority_level = 0,
-      auto_renew = false,
-      grace_period_days = 0,
-    } = membershipData;
+    const benefits = ""; // No se usa por ahora, pero lo mantenemos para compatibilidad
+    const max_sessions_per_day = null;
+    const discount_percentage = 0;
+    const priority_level = 0;
+    const grace_period_days = 0;
+    const phone = null;
+    const id_card = null;
+    const acquisition_date = null;
 
     const sql = `
       INSERT INTO memberships (
         name, description, price, duration_days, benefits,
         membership_type, max_sessions_per_day, discount_percentage,
-        priority_level, auto_renew, grace_period_days, is_active
+        priority_level, auto_renew, grace_period_days, is_active,
+        phone, id_card, acquisition_date, total_hours
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
       RETURNING id
     `;
     const result = await runAsync(sql, [
@@ -1755,6 +1738,10 @@ async function createMembership(membershipData) {
       auto_renew,
       grace_period_days,
       true,
+      phone,
+      id_card,
+      acquisition_date,
+      total_hours,
     ]);
     return result.rows[0].id;
   } catch (error) {
@@ -1763,28 +1750,33 @@ async function createMembership(membershipData) {
   }
 }
 
-async function updateMembership(id, membershipData) {
+async function updateMembership(
+  id,
+  name,
+  description,
+  price,
+  duration_days,
+  auto_renew,
+  is_active,
+  total_hours,
+) {
   try {
-    const {
-      name,
-      description,
-      price,
-      duration_days,
-      benefits,
-      membership_type = "standard",
-      max_sessions_per_day = null,
-      discount_percentage = 0,
-      priority_level = 0,
-      auto_renew = 0,
-      grace_period_days = 0,
-      is_active = 1,
-    } = membershipData;
+    const benefits = "";
+    const membership_type = "standard";
+    const max_sessions_per_day = null;
+    const discount_percentage = 0;
+    const priority_level = 0;
+    const grace_period_days = 0;
+    const phone = null;
+    const id_card = null;
+    const acquisition_date = null;
 
     const sql = `
       UPDATE memberships 
       SET name = ?, description = ?, price = ?, duration_days = ?, benefits = ?,
           membership_type = ?, max_sessions_per_day = ?, discount_percentage = ?,
-          priority_level = ?, auto_renew = ?, grace_period_days = ?, is_active = ?
+          priority_level = ?, auto_renew = ?, grace_period_days = ?, is_active = ?,
+          phone = ?, id_card = ?, acquisition_date = ?, total_hours = ?
       WHERE id = ?
     `;
     await runAsync(sql, [
@@ -1800,6 +1792,10 @@ async function updateMembership(id, membershipData) {
       auto_renew ? 1 : 0,
       grace_period_days,
       is_active ? 1 : 0,
+      phone,
+      id_card,
+      acquisition_date,
+      total_hours,
       id,
     ]);
     return true;
@@ -1845,6 +1841,10 @@ async function assignMembership(
   paymentAmount,
   notes,
   createdBy,
+  phone = null,
+  id_card = null,
+  acquisition_date = null,
+  total_hours = null,
 ) {
   try {
     // Obtener duración de la membresía
@@ -1854,12 +1854,17 @@ async function assignMembership(
     );
     if (!membership) throw new Error("Membresía no encontrada");
 
-    const startDate = getLocalTimestamp().split(" ")[0]; // Solo fecha
+    const startDate = getLocalTimestamp().split(" ")[0]; // YYYY-MM-DD
     const endDate = new Date();
+    // Usar la fecha actual del sistema local para calcular el fin
     endDate.setDate(endDate.getDate() + membership.duration_days);
-    const endDateStr = endDate.toISOString().split("T")[0];
+    
+    // Formatear endDate a YYYY-MM-DD local
+    const year = endDate.getFullYear();
+    const month = String(endDate.getMonth() + 1).padStart(2, '0');
+    const day = String(endDate.getDate()).padStart(2, '0');
+    const endDateStr = `${year}-${month}-${day}`;
 
-    // Buscar el ID del usuario si se pasó username
     let userId = null;
     if (createdBy) {
       if (typeof createdBy === "number") {
@@ -1873,8 +1878,12 @@ async function assignMembership(
     }
 
     const sql = `
-      INSERT INTO client_memberships (client_id, membership_id, start_date, end_date, status, payment_amount, payment_method, notes, created_by, created_at)
-      VALUES (?, ?, ?, ?, 'active', ?, ?, ?, ?, ?)
+      INSERT INTO client_memberships (
+        client_id, membership_id, start_date, end_date, status, 
+        payment_amount, notes, phone, id_card, acquisition_date, 
+        total_hours, created_by, created_at
+      )
+      VALUES (?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?, ?, ?)
       RETURNING id
     `;
     const result = await runAsync(sql, [
@@ -1883,12 +1892,15 @@ async function assignMembership(
       startDate,
       endDateStr,
       paymentAmount,
-      "cash", // payment_method por defecto
       notes,
+      phone,
+      id_card,
+      acquisition_date || startDate,
+      total_hours,
       userId,
       getLocalTimestamp(),
     ]);
-    return result.lastID;
+    return result.rows[0].id;
   } catch (error) {
     console.error("Error asignando membresía:", error);
     throw error;
@@ -3637,6 +3649,10 @@ async function getActiveMemberships(statusFilter = "all") {
         cm.status,
         cm.payment_amount,
         cm.notes,
+        cm.phone,
+        cm.id_card,
+        cm.acquisition_date,
+        cm.total_hours,
         CAST((julianday(cm.end_date) - julianday('now')) AS INTEGER) as days_remaining
       FROM client_memberships cm
       INNER JOIN clients c ON cm.client_id = c.id
@@ -4531,15 +4547,10 @@ async function getSalesAuditReport(
 // Función temporal para corregir montos negativos en cash_movements
 async function fixNegativeCashMovements() {
   try {
-    console.log(
-      "🔍 Corrigiendo movimientos de efectivo con montos negativos...",
-    );
-
     const result = await runAsync(
       `UPDATE cash_movements SET amount = ABS(amount) WHERE amount < 0`,
     );
 
-    console.log(`✅ Corregidos ${result.changes} movimientos`);
     return { success: true, changes: result.changes };
   } catch (error) {
     console.error("Error corrigiendo movimientos:", error);
@@ -4609,6 +4620,8 @@ module.exports = {
   setSetting,
   getAllSettings,
   createSession,
+  startTimerSession,
+  updateSessionPaidStatus,
   checkDatabaseConnection,
   openCashBox,
   getActiveCashBox,
@@ -4660,8 +4673,12 @@ module.exports = {
   fixNegativeCashMovements,
 };
 
-// Importar funciones de usuarios
+// Importar funciones adicionales
 const usersApi = require("./users-api.cjs");
+const quotationsApi = require("./quotations-api.cjs");
+const reservationsApi = require("./reservations-api.cjs");
 
-// Agregar funciones de usuarios al módulo
+// Agregar funciones al módulo
 Object.assign(module.exports, usersApi);
+Object.assign(module.exports, quotationsApi);
+Object.assign(module.exports, reservationsApi);

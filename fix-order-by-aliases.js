@@ -3,7 +3,6 @@ const fs = require("fs");
 const filePath = "src-electron/api.cjs";
 let content = fs.readFileSync(filePath, "utf8");
 
-console.log("\n🔍 Verificando ORDER BY con aliases en PostgreSQL...\n");
 
 // ProductsWithoutMovement - the subquery alias should work, but let's make it explicit
 const fix1 = {
@@ -19,12 +18,8 @@ const fix1 = {
 
 if (content.includes(fix1.old)) {
   content = content.replace(fix1.old, fix1.new);
-  console.log(`✅ Corregido: ${fix1.name}`);
 } else {
-  console.log(`⚠️  No encontrado: ${fix1.name}`);
 }
 
 fs.writeFileSync(filePath, content, "utf8");
 
-console.log(`\n${"=".repeat(80)}`);
-console.log(`\n✨ Correcciones ORDER BY completadas\n`);

@@ -40,7 +40,6 @@ function getConfig() {
       JSON.stringify(defaultConfig, null, 2),
       "utf8",
     );
-    console.log("✅ Archivo db-config.json creado automáticamente");
   } catch (error) {
     console.warn("⚠️ No se pudo crear db-config.json:", error.message);
   }
@@ -52,20 +51,14 @@ async function initializeDatabase() {
   try {
     const config = getConfig();
 
-    console.log(
-      `🔌 Conectando a PostgreSQL en ${config.host}:${config.port}...`,
-    );
-
     pool = new Pool(config);
 
     // Probar la conexión
     const client = await pool.connect();
-    console.log("✅ Conexión a PostgreSQL establecida");
     client.release();
 
     // Crear tablas
     await createTables();
-    console.log("✅ Base de datos PostgreSQL inicializada");
 
     return pool;
   } catch (error) {
@@ -149,6 +142,7 @@ async function createTables() {
       duration_minutes INTEGER,
       package_id INTEGER,
       status VARCHAR(50) DEFAULT 'active',
+      is_paid BOOLEAN DEFAULT FALSE,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (client_id) REFERENCES clients(id)
     )`,
@@ -291,6 +285,10 @@ async function createTables() {
       auto_renew BOOLEAN DEFAULT FALSE,
       grace_period_days INTEGER DEFAULT 0,
       is_active BOOLEAN DEFAULT TRUE,
+      phone VARCHAR(50),
+      id_card VARCHAR(50),
+      acquisition_date DATE,
+      total_hours VARCHAR(50),
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )`,
 
@@ -304,6 +302,10 @@ async function createTables() {
       payment_amount DECIMAL(10,2) NOT NULL,
       payment_method VARCHAR(50),
       notes TEXT,
+      phone VARCHAR(50),
+      id_card VARCHAR(50),
+      acquisition_date DATE,
+      total_hours VARCHAR(50),
       created_by INTEGER,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (client_id) REFERENCES clients(id),
@@ -415,22 +417,19 @@ async function createTables() {
     `CREATE TABLE IF NOT EXISTS quotations (
       id SERIAL PRIMARY KEY,
       quotation_number VARCHAR(50) NOT NULL UNIQUE,
-      client_id INTEGER NOT NULL,
       client_name VARCHAR(255) NOT NULL,
       client_phone VARCHAR(50),
       client_email VARCHAR(255),
-      event_date DATE,
-      event_time TIME,
-      num_children INTEGER,
-      total_amount DECIMAL(10,2) NOT NULL,
+      client_address VARCHAR(255),
+      subtotal DECIMAL(10,2) NOT NULL,
       discount DECIMAL(10,2) DEFAULT 0,
-      final_amount DECIMAL(10,2) NOT NULL,
+      tax DECIMAL(10,2) DEFAULT 0,
+      total DECIMAL(10,2) NOT NULL,
       status VARCHAR(20) DEFAULT 'pending',
       notes TEXT,
       valid_until DATE,
       created_by INTEGER,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (client_id) REFERENCES clients(id),
       FOREIGN KEY (created_by) REFERENCES users(id)
     )`,
 
@@ -438,7 +437,7 @@ async function createTables() {
       id SERIAL PRIMARY KEY,
       quotation_id INTEGER NOT NULL,
       product_id INTEGER,
-      product_name VARCHAR(255) NOT NULL,
+      description VARCHAR(255) NOT NULL,
       quantity INTEGER NOT NULL,
       unit_price DECIMAL(10,2) NOT NULL,
       subtotal DECIMAL(10,2) NOT NULL,
@@ -486,6 +485,7 @@ async function createTables() {
     `CREATE INDEX IF NOT EXISTS idx_products_barcode ON products_services(barcode)`,
     `CREATE INDEX IF NOT EXISTS idx_products_type ON products_services(type)`,
     `CREATE INDEX IF NOT EXISTS idx_active_sessions_status ON active_sessions(status)`,
+    `CREATE INDEX IF NOT EXISTS idx_active_sessions_paid ON active_sessions(is_paid)`,
     `CREATE INDEX IF NOT EXISTS idx_cash_boxes_status ON cash_boxes(status)`,
     `CREATE INDEX IF NOT EXISTS idx_users_username ON users(username)`,
     `CREATE INDEX IF NOT EXISTS idx_users_role ON users(role)`,
@@ -502,9 +502,39 @@ async function createTables() {
     try {
       await pool.query(sql);
     } catch (error) {
-      // Los índices pueden ya existir, no es crítico
       console.warn("Advertencia creando índice:", error.message);
     }
+  }
+
+  // Migraciones / Actualizaciones de esquema
+  try {
+    // Verificar si la columna is_paid existe en active_sessions, si no, crearla
+    await pool.query(`
+      DO $$ 
+      BEGIN 
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='active_sessions' AND column_name='is_paid') THEN
+          ALTER TABLE active_sessions ADD COLUMN is_paid BOOLEAN DEFAULT FALSE;
+        END IF;
+
+        -- Migración para nuevas columnas de membresías
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='memberships' AND column_name='id_card') THEN
+          ALTER TABLE memberships ADD COLUMN id_card VARCHAR(50);
+          ALTER TABLE memberships ADD COLUMN phone VARCHAR(50);
+          ALTER TABLE memberships ADD COLUMN acquisition_date DATE;
+          ALTER TABLE memberships ADD COLUMN total_hours VARCHAR(50);
+        END IF;
+
+        -- Migración para nuevas columnas de membresías compradas
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='client_memberships' AND column_name='id_card') THEN
+          ALTER TABLE client_memberships ADD COLUMN id_card VARCHAR(50);
+          ALTER TABLE client_memberships ADD COLUMN phone VARCHAR(50);
+          ALTER TABLE client_memberships ADD COLUMN acquisition_date DATE;
+          ALTER TABLE client_memberships ADD COLUMN total_hours VARCHAR(50);
+        END IF;
+      END $$;
+    `);
+  } catch (error) {
+    console.warn("⚠️ Advertencia al aplicar migraciones:", error.message);
   }
 }
 
@@ -564,6 +594,15 @@ function convertSqliteToPostgres(sql) {
     "EXTRACT(HOUR FROM $1)::INTEGER",
   );
 
+  // Agregar RETURNING id para los INSERTs (excepto settings) para emular result.lastID de SQLite
+  const isInsert = pgSql.trim().toUpperCase().startsWith('INSERT INTO');
+  const isSettings = pgSql.toUpperCase().includes('INTO SETTINGS');
+  const hasReturning = pgSql.toUpperCase().includes('RETURNING');
+  
+  if (isInsert && !isSettings && !hasReturning) {
+    pgSql += ' RETURNING id';
+  }
+
   return pgSql;
 }
 
@@ -571,15 +610,8 @@ async function runAsync(sql, params = []) {
   try {
     // Convertir sintaxis SQLite a PostgreSQL
     const pgSql = convertSqliteToPostgres(sql);
-    console.log("🔧 DB: SQL original:", sql);
-    console.log("🔧 DB: SQL convertido:", pgSql);
-    console.log("🔧 DB: Parámetros:", params);
 
     const result = await pool.query(pgSql, params);
-    console.log("🔧 DB: Resultado query:", {
-      rowCount: result.rowCount,
-      rows: result.rows,
-    });
 
     return {
       lastID: result.rows[0]?.id || null,
@@ -622,7 +654,6 @@ async function allAsync(sql, params = []) {
 async function closeDatabase() {
   if (pool) {
     await pool.end();
-    console.log("✅ Conexión a PostgreSQL cerrada");
   }
 }
 

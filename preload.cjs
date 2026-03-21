@@ -67,6 +67,8 @@ contextBridge.exposeInMainWorld("api", {
   getActiveSessions: () => ipcRenderer.invoke("api:getActiveSessions"),
   endSession: (sessionId, finalPrice) =>
     ipcRenderer.invoke("api:endSession", { sessionId, finalPrice }),
+  updateSessionPaidStatus: (sessionId, isPaid) =>
+    ipcRenderer.invoke("api:updateSessionPaidStatus", { sessionId, isPaid }),
 
   // Products/Services
   getProductsServices: () => ipcRenderer.invoke("api:getProductsServices"),
@@ -284,14 +286,17 @@ contextBridge.exposeInMainWorld("api", {
   getAllSettings: () => ipcRenderer.invoke("api:getAllSettings"),
 
   // Sessions - Check-in
-  createSession: (clientName, parentName, phone, packageId, durationMinutes) =>
+  createSession: (clientName, parentName, phone, packageId, durationMinutes, isPaid) =>
     ipcRenderer.invoke("api:createSession", {
       clientName,
       parentName,
       phone,
       packageId,
       durationMinutes,
+      isPaid,
     }),
+  startTimerSession: (sessionId) =>
+    ipcRenderer.invoke("api:startTimerSession", sessionId),
 
   // Health Check
   checkDatabaseConnection: () =>
@@ -302,6 +307,8 @@ contextBridge.exposeInMainWorld("api", {
   getDefaultPrinter: () => ipcRenderer.invoke("api:getDefaultPrinter"),
   printTestTicket: (printerName) =>
     ipcRenderer.invoke("api:printTestTicket", printerName),
+  openCashDrawer: (printerName) =>
+    ipcRenderer.invoke("api:openCashDrawer", printerName),
 
   // Cash Box
   openCashBox: (openingAmount, openedBy) =>
@@ -404,35 +411,43 @@ contextBridge.exposeInMainWorld("api", {
 
   // Memberships
   getMemberships: () => ipcRenderer.invoke("api:getMemberships"),
-  createMembership: (name, description, price, durationDays, benefits) =>
+  createMembership: (name, description, price, durationDays, autoRenew, isActive, totalHours) =>
     ipcRenderer.invoke("api:createMembership", {
       name,
       description,
       price,
       durationDays,
-      benefits,
+      autoRenew,
+      isActive,
+      totalHours
     }),
-  updateMembership: (id, name, description, price, durationDays, benefits) =>
+  updateMembership: (id, name, description, price, durationDays, autoRenew, isActive, totalHours) =>
     ipcRenderer.invoke("api:updateMembership", {
       id,
       name,
       description,
       price,
       durationDays,
-      benefits,
+      autoRenew,
+      isActive,
+      totalHours
     }),
   deleteMembership: (id) => ipcRenderer.invoke("api:deleteMembership", { id }),
 
   // Client Memberships
   getClientMemberships: (clientId) =>
     ipcRenderer.invoke("api:getClientMemberships", clientId),
-  assignMembership: (clientId, membershipId, paymentAmount, notes, createdBy) =>
+  assignMembership: (clientId, membershipId, paymentAmount, notes, createdBy, phone, id_card, acquisition_date, total_hours) =>
     ipcRenderer.invoke("api:assignMembership", {
       clientId,
       membershipId,
       paymentAmount,
       notes,
       createdBy,
+      phone,
+      id_card,
+      acquisition_date,
+      total_hours
     }),
   cancelClientMembership: (id, canceledBy) =>
     ipcRenderer.invoke("api:cancelClientMembership", { id, canceledBy }),

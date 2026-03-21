@@ -8,13 +8,31 @@ import { useNotification } from "@/hooks/useNotification";
 import { CheckInModal } from "./CheckInModal";
 import { TimerCard } from "./TimerCard";
 import { SessionDetailsModal } from "./SessionDetailsModal";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "./ui/dialog";
+import { LogOut, Receipt, X, CheckCircle, AlertTriangle } from "lucide-react";
 
 interface TimingDashboardProps {
   onCheckout: (sessionId: number) => void;
+  onCheckIn?: (data: {
+    sessionId?: number;
+    clientId?: number;
+    clientName: string;
+    packageId: number;
+    packageName: string;
+    packagePrice: number;
+  }) => void;
 }
 
 export const TimingDashboard: React.FC<TimingDashboardProps> = ({
   onCheckout,
+  onCheckIn,
 }) => {
   const [sessions, setSessions] = useState<ActiveSession[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
@@ -23,8 +41,10 @@ export const TimingDashboard: React.FC<TimingDashboardProps> = ({
   const [selectedSession, setSelectedSession] = useState<ActiveSession | null>(
     null,
   );
+  const [checkoutConfirmOpen, setCheckoutConfirmOpen] = useState(false);
+  const [sessionToCheckout, setSessionToCheckout] = useState<ActiveSession | null>(null);
   const [pausedSessions, setPausedSessions] = useState<Set<number>>(new Set());
-  const { getActiveSessions, endSession } = useDatabase();
+  const { getActiveSessions, endSession, startTimerSession } = useDatabase();
   const { success, error: errorNotification, warning } = useNotification();
 
   useEffect(() => {
@@ -52,20 +72,61 @@ export const TimingDashboard: React.FC<TimingDashboardProps> = ({
     setSessions(data || []);
   };
 
-  const handleCheckout = async (session: ActiveSession) => {
+  const handleCheckout = (session: ActiveSession) => {
+    setSessionToCheckout(session);
+    setCheckoutConfirmOpen(true);
+  };
+
+  const confirmEndSession = async () => {
+    if (!sessionToCheckout) return;
     try {
-      // NO llamar a endSession aquí, solo navegar a POS
-      // La sesión se completará cuando se procese el pago
-      success(`Procesando check-out para ${session.client_name}`);
-      onCheckout(session.id);
+      // Precio 0 porque el usuario indica que ya fue cobrado al inicio
+      const res = await endSession(sessionToCheckout.id, 0);
+      if (res) {
+        success(`Sesión de ${sessionToCheckout.client_name} finalizada correttamente`);
+        loadSessions();
+        setCheckoutConfirmOpen(false);
+      } else {
+        errorNotification("Error al finalizar la sesión");
+      }
     } catch (err) {
-      console.error("Error en checkout:", err);
-      errorNotification("Error al registrar el check-out");
+      console.error("Error finalizando sesión:", err);
+      errorNotification("Error al finalizar la sesión");
     }
   };
 
-  const handleCheckInSuccess = () => {
+  const handlePOSRedirect = () => {
+    if (!sessionToCheckout) return;
+    onCheckout(sessionToCheckout.id);
+    setCheckoutConfirmOpen(false);
+  };
+
+  const handleStartTimer = async (sessionId: number) => {
+    try {
+      const res = await startTimerSession(sessionId);
+      if (res) {
+        success("Tiempo iniciado");
+        loadSessions();
+      } else {
+        errorNotification("Error al iniciar el tiempo");
+      }
+    } catch (err) {
+      errorNotification("Error al iniciar el tiempo");
+    }
+  };
+
+  const handleCheckInSuccess = (data: {
+    sessionId?: number;
+    clientId?: number;
+    clientName: string;
+    packageId: number;
+    packageName: string;
+    packagePrice: number;
+  }) => {
     loadSessions();
+    if (onCheckIn) {
+      onCheckIn(data);
+    }
   };
 
   const handlePause = (sessionId: number) => {
@@ -150,6 +211,8 @@ export const TimingDashboard: React.FC<TimingDashboardProps> = ({
                 onPause={handlePause}
                 onViewDetails={handleViewDetails}
                 isPaused={pausedSessions.has(session.id)}
+                isPending={session.status === "pending"}
+                onStartTimer={handleStartTimer}
               />
             ))}
           </div>
@@ -181,6 +244,118 @@ export const TimingDashboard: React.FC<TimingDashboardProps> = ({
         onOpenChange={setModalOpen}
         onSuccess={handleCheckInSuccess}
       />
+
+      {/* Modal de Confirmación de Check-out */}
+      <Dialog open={checkoutConfirmOpen} onOpenChange={setCheckoutConfirmOpen}>
+        <DialogContent className="sm:max-w-[450px]">
+          <DialogHeader>
+            <DialogTitle className="text-2xl flex items-center gap-2">
+              <LogOut className="w-6 h-6 text-blue-600" />
+              Finalizar Sesión
+            </DialogTitle>
+            <DialogDescription className="text-base py-4 text-slate-600">
+              El cliente <strong className="text-slate-900">{sessionToCheckout?.client_name}</strong> del ticket <strong className="text-slate-900">#{sessionToCheckout?.id.toString().padStart(4, '0')}</strong> ya se retira.
+              <span className="mt-2 flex items-center gap-2">
+                <span className="text-sm">Estado de pago:</span>
+                {sessionToCheckout?.is_paid ? (
+                  <span className="bg-emerald-100 text-emerald-800 text-xs px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
+                    <CheckCircle className="w-3 h-3" /> PAGADO
+                  </span>
+                ) : (
+                  <span className="bg-amber-100 text-amber-800 text-xs px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
+                    <AlertTriangle className="w-3 h-3" /> PENDIENTE
+                  </span>
+                )}
+              </span>
+            </DialogDescription>
+          </DialogHeader>
+
+          {sessionToCheckout && sessionToCheckout.start_time && (
+            (() => {
+              const start = new Date(sessionToCheckout.start_time);
+              const duration = sessionToCheckout.duration_minutes || 60;
+              const end = new Date(start.getTime() + duration * 60000);
+              const now = new Date();
+              const isEarly = now < end;
+              const diffMs = now.getTime() - end.getTime();
+              const extraMinutes = Math.floor(diffMs / 60000);
+              const hasExtraTime = extraMinutes > 0;
+
+              return (
+                <div className="space-y-4 mb-4">
+                  {isEarly ? (
+                    <div className="bg-amber-50 border border-amber-200 p-4 rounded-lg flex items-start gap-3">
+                      <AlertTriangle className="w-6 h-6 text-amber-600 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-sm font-bold text-amber-800">
+                          ¡Atención! Salida Anticipada
+                        </p>
+                        <p className="text-xs text-amber-700 mt-1">
+                          Aún tiene tiempo restante en su paquete. ¿Deseas finalizar el ticket #{sessionToCheckout.id.toString().padStart(4, "0")} antes de tiempo?
+                        </p>
+                      </div>
+                    </div>
+                  ) : hasExtraTime ? (
+                    <div className="bg-rose-50 border border-rose-200 p-4 rounded-lg flex items-start gap-3">
+                      <AlertTriangle className="w-6 h-6 text-rose-600 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-sm font-bold text-rose-800">
+                          ¡Tiempo Excedido! ({extraMinutes} min extra)
+                        </p>
+                        <p className="text-xs text-rose-700 mt-1">
+                          Superó el tiempo del paquete. Se recomienda usar "Ir a Caja" para cobrar el excedente.
+                        </p>
+                      </div>
+                    </div>
+                  ) : null}
+
+                  <div className="bg-blue-50 border border-blue-100 p-4 rounded-lg">
+                    <p className="text-sm text-blue-800">
+                      {sessionToCheckout.is_paid ? (
+                        <>
+                          <strong>Nota:</strong> El paquete base <strong>YA ESTÁ PAGADO</strong>. Elige "Finalizar Ahora" si no hay cargos extras o tiempo adicional.
+                        </>
+                      ) : (
+                        <>
+                          <strong>Nota:</strong> El paquete está <strong>PENDIENTE DE PAGO</strong>. Usa "Ir a Caja" para procesar el cobro total.
+                        </>
+                      )}
+                    </p>
+                  </div>
+                </div>
+              );
+            })()
+          )}
+
+          <DialogFooter className="flex flex-col sm:flex-row gap-3">
+            <Button
+              variant="outline"
+              onClick={() => setCheckoutConfirmOpen(false)}
+              className="flex-1 order-3 sm:order-1"
+            >
+              <X className="w-4 h-4 mr-2" />
+              Cancelar
+            </Button>
+
+            <Button
+              variant="outline"
+              onClick={handlePOSRedirect}
+              className="flex-1 border-blue-600 text-blue-600 hover:bg-blue-50 order-2 sm:order-2"
+            >
+              <Receipt className="w-4 h-4 mr-2" />
+              Ir a Caja
+            </Button>
+
+            <Button
+              onClick={confirmEndSession}
+              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white order-1 sm:order-3"
+            >
+              <CheckCircle className="w-4 h-4 mr-2" />
+              Finalizar Ahora
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Session Details Modal */}
       <SessionDetailsModal

@@ -4,7 +4,6 @@ const path = require("path");
 const reportsDir = "src/components/reports";
 const reports = fs.readdirSync(reportsDir).filter((f) => f.endsWith(".tsx"));
 
-console.log(`🔍 Analizando ${reports.length} reportes...\n`);
 
 let totalFixed = 0;
 const issues = [];
@@ -56,17 +55,12 @@ reports.forEach((file) => {
 
   if (modified) {
     fs.writeFileSync(filePath, content, "utf8");
-    console.log(`✅ ${file}`);
     totalFixed++;
   }
 });
 
-console.log(`\n📊 RESUMEN:\n`);
-console.log(`Total de reportes analizados: ${reports.length}`);
-console.log(`Reportes corregidos: ${totalFixed}`);
 
 if (issues.length > 0) {
-  console.log(`\n⚠️  Problemas encontrados: ${issues.length}\n`);
 
   const byType = {};
   issues.forEach((issue) => {
@@ -75,10 +69,7 @@ if (issues.length > 0) {
   });
 
   Object.keys(byType).forEach((type) => {
-    console.log(`\n${type}:`);
     const files = [...new Set(byType[type].map((i) => i.file))];
-    files.forEach((f) => console.log(`  - ${f}`));
   });
 }
 
-console.log("\n✨ Proceso completado");

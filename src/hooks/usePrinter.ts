@@ -9,7 +9,8 @@ interface Printer {
 export function usePrinter() {
   const [printers, setPrinters] = useState<Printer[]>([]);
   const [defaultPrinter, setDefaultPrinter] = useState<Printer | null>(null);
-  const [selectedPrinter, setSelectedPrinter] = useState<string>("");
+  const [ticketPrinter, setTicketPrinter] = useState<string>("");
+  const [normalPrinter, setNormalPrinter] = useState<string>("");
   const [isLoading, setIsLoading] = useState(true);
   const [printerStatus, setPrinterStatus] = useState<
     "connected" | "disconnected"
@@ -31,11 +32,18 @@ export function usePrinter() {
       const defaultPrinterData = await window.api.getDefaultPrinter();
       setDefaultPrinter(defaultPrinterData);
 
-      if (defaultPrinterData) {
-        setSelectedPrinter(defaultPrinterData.name);
-        setPrinterStatus("connected");
-      } else if (printersList.length > 0) {
-        setSelectedPrinter(printersList[0].name);
+      const tp = await window.api.getSetting("ticket_printer");
+      const np = await window.api.getSetting("normal_printer");
+
+      if (tp) setTicketPrinter(tp);
+      else if (defaultPrinterData) setTicketPrinter(defaultPrinterData.name);
+      else if (printersList.length > 0) setTicketPrinter(printersList[0].name);
+
+      if (np) setNormalPrinter(np);
+      else if (defaultPrinterData) setNormalPrinter(defaultPrinterData.name);
+      else if (printersList.length > 0) setNormalPrinter(printersList[0].name);
+
+      if (printersList.length > 0) {
         setPrinterStatus("connected");
       } else {
         setPrinterStatus("disconnected");
@@ -58,9 +66,20 @@ export function usePrinter() {
     }
   };
 
+  const openDrawer = async () => {
+    try {
+      if (!ticketPrinter) return false;
+      return await window.api.openCashDrawer(ticketPrinter);
+    } catch (error) {
+      console.error("Error al abrir cajón de dinero:", error);
+      return false;
+    }
+  };
+
   const printTicket = async (ticketData: {
     saleId: number;
     clientName?: string;
+    cashierName?: string;
     items: Array<{
       product_name: string;
       quantity: number;
@@ -75,50 +94,105 @@ export function usePrinter() {
     change?: number;
   }) => {
     try {
-      if (!selectedPrinter) {
-        console.warn("No hay impresora seleccionada");
+      if (!ticketPrinter) {
+        console.warn("No hay impresora de tickets seleccionada");
         return false;
       }
 
-      // Formatear ticket
-      let ticketText = "\n";
-      ticketText += "================================\n";
-      ticketText += "         SIPARK LUDOTECA        \n";
-      ticketText += "================================\n";
-      ticketText += `Ticket #${ticketData.saleId}\n`;
-      ticketText += `Fecha: ${new Date().toLocaleString("es-ES")}\n`;
-      if (ticketData.clientName) {
-        ticketText += `Cliente: ${ticketData.clientName}\n`;
-      }
-      ticketText += "--------------------------------\n";
+      // Cargar configuración del ticket guardada por el usuario
+      let config: any = null;
+      try {
+        const saved = await window.api.getSetting("ticket_config");
+        if (saved) config = JSON.parse(saved);
+      } catch { /* usa defaults si no hay config */ }
+
+      const businessName  = config?.businessName  || "MI LUDOTECA";
+      const businessAddress = config?.businessAddress || "";
+      const businessPhone  = config?.businessPhone  || "";
+      const width          = config?.paperWidth    || 40;
+      const headerMessage  = config?.headerMessage  || "";
+      const footerMessage  = config?.footerMessage  || "¡Vuelve pronto!";
+      const thankYouMsg    = config?.thankYouMessage || "¡Gracias por su compra!";
+
+      const showBusinessName = config?.showBusinessName ?? true;
+      const showAddress      = config?.showAddress      ?? true;
+      const showPhone        = config?.showPhone        ?? true;
+      const showTicketNumber = config?.showTicketNumber ?? true;
+      const showDateTime     = config?.showDateTime     ?? true;
+      const showCashier      = config?.showCashier      ?? true;
+      const showThankYou     = config?.showThankYouMessage ?? true;
+
+      const line = "=".repeat(width);
+      const dash = "-".repeat(width);
+      const center = (text: string) => {
+        const pad = Math.max(0, Math.floor((width - text.length) / 2));
+        return " ".repeat(pad) + text;
+      };
+
+      const paymentMethodMap: Record<string, string> = {
+        cash: "EFECTIVO",
+        card: "TARJETA",
+        transfer: "TRANSFERENCIA",
+      };
+      const methodLabel = paymentMethodMap[ticketData.paymentMethod] || ticketData.paymentMethod.toUpperCase();
+
+      let text = "\n";
+      text += line + "\n";
+      if (showBusinessName) text += center(businessName.toUpperCase()) + "\n";
+      if (showAddress && businessAddress) text += center(businessAddress) + "\n";
+      if (showPhone && businessPhone) text += center(`Tel: ${businessPhone}`) + "\n";
+      if (headerMessage) text += center(headerMessage) + "\n";
+      text += line + "\n";
+      if (showTicketNumber) text += `Ticket #${ticketData.saleId}\n`;
+      if (showDateTime) text += `Fecha: ${new Date().toLocaleString("es-ES")}\n`;
+      if (showCashier && ticketData.cashierName) text += `Cajero: ${ticketData.cashierName}\n`;
+      if (ticketData.clientName) text += `Cliente: ${ticketData.clientName}\n`;
+      text += dash + "\n";
 
       // Items
       ticketData.items.forEach((item) => {
-        ticketText += `${item.product_name}\n`;
-        ticketText += `  ${item.quantity} x $${item.unit_price.toFixed(2)} = $${item.subtotal.toFixed(2)}\n`;
+        text += `${item.product_name}\n`;
+        text += `  ${item.quantity} x $${Number(item.unit_price).toFixed(2)} = $${Number(item.subtotal).toFixed(2)}\n`;
       });
 
-      ticketText += "--------------------------------\n";
-      ticketText += `Subtotal:        $${ticketData.subtotal.toFixed(2)}\n`;
+      text += dash + "\n";
+      text += `Subtotal:        $${Number(ticketData.subtotal).toFixed(2)}\n`;
       if (ticketData.discount > 0) {
-        ticketText += `Descuento:      -$${ticketData.discount.toFixed(2)}\n`;
+        text += `Descuento:      -$${Number(ticketData.discount).toFixed(2)}\n`;
       }
-      ticketText += `TOTAL:           $${ticketData.total.toFixed(2)}\n`;
-      ticketText += "--------------------------------\n";
-      ticketText += `Método: ${ticketData.paymentMethod.toUpperCase()}\n`;
+      text += `TOTAL:           $${Number(ticketData.total).toFixed(2)}\n`;
+      text += dash + "\n";
+      text += `Método: ${methodLabel}\n`;
       if (ticketData.amountReceived) {
-        ticketText += `Recibido:        $${ticketData.amountReceived.toFixed(2)}\n`;
-        ticketText += `Cambio:          $${(ticketData.change || 0).toFixed(2)}\n`;
+        text += `Recibido:        $${Number(ticketData.amountReceived).toFixed(2)}\n`;
+        text += `Cambio:          $${Number(ticketData.change || 0).toFixed(2)}\n`;
       }
-      ticketText += "================================\n";
-      ticketText += "    ¡Gracias por su compra!    \n";
-      ticketText += "================================\n\n\n";
+      text += line + "\n";
+      if (showThankYou) text += center(thankYouMsg) + "\n";
+      if (footerMessage) text += center(footerMessage) + "\n";
+      text += line + "\n\n\n";
 
-      // Imprimir (por ahora solo log, luego integrar con API de impresora)
-      console.log("Imprimiendo ticket:", ticketText);
+      // Verificar modo impresión
+      let printerMode = "test";
+      try {
+        printerMode = (await window.api.getSetting("printer_mode")) || "test";
+      } catch { /* default test */ }
 
-      // TODO: Integrar con window.api.printTicket cuando esté disponible
-      // const result = await window.api.printTicket(selectedPrinter, ticketText);
+      if (printerMode === "real") {
+        // Modo real: enviar a impresora física
+        try {
+          await window.api.printTicket(ticketPrinter, text);
+        } catch (err) {
+          console.warn("Error al enviar a impresora, mostrando en consola:", err);
+        }
+      } else {
+        // Modo prueba: solo consola
+      }
+
+      // Abrir cajón si está en modo real
+      if (printerMode === "real") {
+        await openDrawer();
+      }
 
       return true;
     } catch (error) {
@@ -129,8 +203,8 @@ export function usePrinter() {
 
   const printMembershipTicket = async (membership: any) => {
     try {
-      if (!selectedPrinter) {
-        console.warn("No hay impresora seleccionada");
+      if (!ticketPrinter) {
+        console.warn("No hay impresora de tickets seleccionada");
         return false;
       }
 
@@ -143,8 +217,11 @@ export function usePrinter() {
       ticketText += `Fecha: ${new Date().toLocaleString("es-ES")}\n`;
       ticketText += "--------------------------------\n";
       ticketText += `Cliente: ${membership.client_name}\n`;
+      if (membership.phone) ticketText += `Tel: ${membership.phone}\n`;
+      if (membership.id_card) ticketText += `Ced: ${membership.id_card}\n`;
       ticketText += "--------------------------------\n";
       ticketText += `Membresía: ${membership.membership_name}\n`;
+      if (membership.total_hours) ticketText += `Horas: ${membership.total_hours}\n`;
       ticketText += `Inicio: ${new Date(membership.start_date).toLocaleDateString("es-ES")}\n`;
       ticketText += `Vence: ${new Date(membership.end_date).toLocaleDateString("es-ES")}\n`;
       ticketText += "--------------------------------\n";
@@ -158,10 +235,15 @@ export function usePrinter() {
       ticketText += "================================\n\n\n";
 
       // Imprimir en impresora térmica
-      console.log("Imprimiendo ticket en impresora térmica:", ticketText);
 
-      // TODO: Integrar con window.api.printTicket cuando esté disponible
-      // await window.api.printTicket(selectedPrinter, ticketText);
+      try {
+        await window.api.printTicket(ticketPrinter, ticketText);
+      } catch (err) {
+        console.warn("Error al enviar a impresora, mostrando en consola:", err);
+      }
+
+      // Abrir el cajón al finalizar la membresía
+      await openDrawer();
 
       return true;
     } catch (error) {
@@ -184,24 +266,31 @@ export function usePrinter() {
           payment_amount: membership.payment_amount,
           payment_method: membership.payment_method,
           notes: membership.notes,
+          phone: membership.phone,
+          id_card: membership.id_card,
+          total_hours: membership.total_hours,
+          acquisition_date: membership.acquisition_date,
         },
       };
 
-      await window.api.generateMembershipPDF(pdfData);
+      await (window as any).api.generateMembershipPDF(pdfData);
       return true;
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error al generar PDF de la factura:", error);
-      return false;
+      throw error; // Re-lanzar para que el modal/botón maneje el error
     }
   };
 
   return {
     printers,
     defaultPrinter,
-    selectedPrinter,
-    setSelectedPrinter,
+    ticketPrinter,
+    normalPrinter,
+    setTicketPrinter,
+    setNormalPrinter,
     isLoading,
     printerStatus,
+    openDrawer,
     printTestTicket,
     printTicket,
     printMembershipTicket,

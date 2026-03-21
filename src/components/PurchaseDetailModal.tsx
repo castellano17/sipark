@@ -124,7 +124,7 @@ export function PurchaseDetailModal({
             ) : purchase ? (
               <div className="space-y-6">
                 {/* Info de la compra */}
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <Card className="p-4 bg-gray-50">
                     <div className="flex items-center gap-3">
                       <div className="p-2 bg-purple-100 rounded-lg">

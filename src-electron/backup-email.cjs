@@ -15,7 +15,6 @@ const fs = require("fs");
 async function sendBackupByEmail(config) {
   try {
     // Crear respaldo temporal
-    console.log("📦 Creando respaldo temporal...");
     const backup = await createLocalBackup();
 
     // Configurar transporte de email
@@ -31,7 +30,6 @@ async function sendBackupByEmail(config) {
 
     // Verificar conexión
     await transporter.verify();
-    console.log("✅ Conexión SMTP verificada");
 
     // Preparar email
     const mailOptions = {
@@ -70,10 +68,8 @@ async function sendBackupByEmail(config) {
     };
 
     // Enviar email
-    console.log("📧 Enviando email...");
     const info = await transporter.sendMail(mailOptions);
 
-    console.log("✅ Email enviado:", info.messageId);
 
     // Limpiar archivo temporal (opcional)
     // fs.unlinkSync(backup.path);

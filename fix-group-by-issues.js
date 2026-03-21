@@ -3,7 +3,6 @@ const fs = require("fs");
 const filePath = "src-electron/api.cjs";
 let content = fs.readFileSync(filePath, "utf8");
 
-console.log("\n🔍 Buscando problemas de GROUP BY en PostgreSQL...\n");
 
 // Pattern: Find queries with GROUP BY that might be missing columns
 // This is a complex issue - we need to check each query manually
@@ -195,14 +194,10 @@ let fixedCount = 0;
 issues.forEach((issue) => {
   if (content.includes(issue.old)) {
     content = content.replace(issue.old, issue.new);
-    console.log(`✅ Corregido: ${issue.name}`);
     fixedCount++;
   } else {
-    console.log(`⚠️  No encontrado: ${issue.name}`);
   }
 });
 
 fs.writeFileSync(filePath, content, "utf8");
 
-console.log(`\n${"=".repeat(80)}`);
-console.log(`\n✨ Correcciones completadas: ${fixedCount}/${issues.length}\n`);

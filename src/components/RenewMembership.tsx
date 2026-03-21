@@ -13,6 +13,7 @@ import { Input } from "./ui/input";
 import { useCurrency } from "../hooks/useCurrency";
 import { useNotification } from "../hooks/useNotification";
 import { useCashBox } from "../hooks/useCashBox";
+import { usePrinter } from "../hooks/usePrinter";
 
 interface Client {
   id: number;
@@ -27,6 +28,7 @@ interface Membership {
   price: number;
   duration_days: number;
   description: string;
+  total_hours?: string;
 }
 
 interface ClientMembership {
@@ -42,6 +44,9 @@ interface ClientMembership {
   benefits?: string;
   canRenew?: boolean;
   daysUntilExpiration?: number;
+  id_card?: string;
+  phone?: string;
+  total_hours?: string;
 }
 
 export function RenewMembership() {
@@ -62,9 +67,28 @@ export function RenewMembership() {
   const [notes, setNotes] = useState("");
   const [loading, setLoading] = useState(false);
 
+  // Nuevos campos de membresía
+  const [phone, setPhone] = useState<string>("");
+  const [idCard, setIdCard] = useState<string>("");
+  const [acquisitionDate, setAcquisitionDate] = useState<string>(
+    new Date().toLocaleDateString("sv-SE"),
+  );
+  const [totalHours, setTotalHours] = useState<string>("");
+
+  const formatCedula = (val: string) => {
+    const digits = val.replace(/[^0-9A-ZA-Z]/gi, "").toUpperCase();
+    let formatted = "";
+    if (digits.length > 0) formatted += digits.substring(0, 3);
+    if (digits.length > 3) formatted += "-" + digits.substring(3, 9);
+    if (digits.length > 9) formatted += "-" + digits.substring(9, 13);
+    if (digits.length > 13) formatted += digits.substring(13, 14);
+    return formatted;
+  };
+
   const { formatCurrency } = useCurrency();
   const { success, error } = useNotification();
   const { getActiveCashBox } = useCashBox();
+  const { printMembershipTicket, printMembershipInvoice } = usePrinter();
 
   useEffect(() => {
     loadClients();
@@ -134,6 +158,7 @@ export function RenewMembership() {
     setCustomPrice(null);
     setDiscount(0);
     setNotes("");
+    setPhone(client.phone || "");
     loadClientMemberships(client.id);
   };
 
@@ -153,7 +178,15 @@ export function RenewMembership() {
     );
     if (sameMembership) {
       setSelectedMembership(sameMembership);
-      setCustomPrice(sameMembership.price); // Inicializar con el precio de la membresía
+      setCustomPrice(sameMembership.price);
+      setTotalHours(sameMembership.total_hours || "");
+    }
+    
+    // Si la membresía anterior tenía datos específicos, los usamos como sugerencia
+    if (clientMembership.phone) setPhone(clientMembership.phone);
+    if (clientMembership.id_card) setIdCard(clientMembership.id_card);
+    if (clientMembership.total_hours && !sameMembership?.total_hours) {
+      setTotalHours(clientMembership.total_hours);
     }
   };
 
@@ -178,6 +211,11 @@ export function RenewMembership() {
   const handleRenew = async () => {
     if (!selectedClient || !selectedMembership || !selectedClientMembership) {
       error("Faltan datos para renovar");
+      return;
+    }
+
+    if (!totalHours) {
+      error("El campo N° de Entradas en horas es obligatorio");
       return;
     }
 
@@ -211,7 +249,11 @@ export function RenewMembership() {
         selectedMembership.id,
         finalAmount,
         notes,
-        currentUser.username || "admin",
+        currentUser.id || null,
+        phone,
+        idCard,
+        acquisitionDate,
+        totalHours
       );
 
       // Registrar renovación en historial
@@ -252,6 +294,28 @@ export function RenewMembership() {
 
       await (window as any).api.createSaleWithItems(saleData);
 
+      // Preparamos datos para la impresión (opcional, si se quiere imprimir al renovar)
+      const membershipData = {
+        id: newMembershipId,
+        client_name: selectedClient.name,
+        membership_name: selectedMembership.name,
+        start_date: startDate.toISOString(),
+        end_date: newEndDate.toISOString(),
+        payment_amount: finalAmount,
+        payment_method: paymentMethod,
+        notes: notes,
+        phone: phone,
+        id_card: idCard,
+        total_hours: totalHours,
+        acquisition_date: acquisitionDate,
+      };
+
+      try {
+        await printMembershipTicket(membershipData);
+      } catch (printErr) {
+        console.warn("No se pudo imprimir automáticamente:", printErr);
+      }
+
       success("Membresía renovada exitosamente");
 
       // Limpiar formulario
@@ -263,9 +327,13 @@ export function RenewMembership() {
       setDiscount(0);
       setNotes("");
       setPaymentMethod("cash");
-    } catch (err) {
+      setPhone("");
+      setIdCard("");
+      setAcquisitionDate(new Date().toLocaleDateString("sv-SE"));
+      setTotalHours("");
+    } catch (err: any) {
       console.error("Error renovando membresía:", err);
-      error("Error al renovar membresía");
+      error("Error al renovar membresía: " + (err.message || "Error desconocido"));
     } finally {
       setLoading(false);
     }
@@ -546,6 +614,45 @@ export function RenewMembership() {
                     />
                   </div>
 
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs font-medium mb-1 block">Teléfono</label>
+                      <Input
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
+                        placeholder="Ej: 8888-8888"
+                        className="h-9"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium mb-1 block">Cédula</label>
+                      <Input
+                        value={idCard}
+                        onChange={(e) => setIdCard(formatCedula(e.target.value))}
+                        placeholder="###-######-####L"
+                        className="h-9"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium mb-1 block">Adquisición</label>
+                      <Input
+                        type="date"
+                        value={acquisitionDate}
+                        onChange={(e) => setAcquisitionDate(e.target.value)}
+                        className="h-9"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium mb-1 block">Horas</label>
+                      <Input
+                        value={totalHours}
+                        readOnly
+                        placeholder="Ej: 10 horas"
+                        className="h-9 bg-gray-50 cursor-not-allowed"
+                      />
+                    </div>
+                  </div>
+
                   <div>
                     <label className="text-sm font-medium mb-2 block">
                       Notas (opcional)
@@ -554,7 +661,7 @@ export function RenewMembership() {
                       value={notes}
                       onChange={(e) => setNotes(e.target.value)}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                      rows={3}
+                      rows={2}
                       placeholder="Notas adicionales..."
                     />
                   </div>

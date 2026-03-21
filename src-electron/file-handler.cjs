@@ -49,7 +49,6 @@ async function saveLogo(type, base64Data, extension) {
 
     fs.writeFileSync(filePath, buffer);
 
-    console.log(`✅ Logo ${type} guardado: ${filePath}`);
     return filePath;
   } catch (error) {
     console.error(`Error guardando logo ${type}:`, error);
@@ -100,7 +99,6 @@ async function deleteLogo(type) {
 
       if (fs.existsSync(filePath)) {
         fs.unlinkSync(filePath);
-        console.log(`✅ Logo ${type} eliminado`);
         return true;
       }
     }

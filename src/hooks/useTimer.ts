@@ -15,6 +15,7 @@ export function useTimer(
   durationMinutes: number,
   onExpire?: () => void,
   isPaused: boolean = false,
+  isPending: boolean = false,
 ): UseTimerReturn {
   const [elapsed, setElapsed] = useState(0);
   const [status, setStatus] = useState<TimerStatus>("active");
@@ -22,6 +23,13 @@ export function useTimer(
   const [pausedElapsed, setPausedElapsed] = useState(0);
 
   useEffect(() => {
+    // Si está en espera o pausada, no correr el timer
+    if (isPending) {
+      setElapsed(0);
+      setStatus("active");
+      return;
+    }
+
     if (isPaused) {
       setPausedElapsed(elapsed);
       return;
@@ -53,10 +61,10 @@ export function useTimer(
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [startTime, durationMinutes, hasExpired, onExpire, isPaused]);
+  }, [startTime, durationMinutes, hasExpired, onExpire, isPaused, isPending]);
 
   const durationSeconds = durationMinutes * 60;
-  const remaining = Math.max(0, durationSeconds - elapsed);
+  const remaining = isPending ? durationSeconds : Math.max(0, durationSeconds - elapsed);
 
   const minutes = Math.floor(elapsed / 60);
   const seconds = elapsed % 60;

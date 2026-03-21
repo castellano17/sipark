@@ -241,7 +241,7 @@ export function Suppliers() {
                 </div>
 
                 <div className="p-6 space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium mb-2">
                         Nombre de Empresa *
@@ -272,7 +272,7 @@ export function Suppliers() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium mb-2">
                         Teléfono

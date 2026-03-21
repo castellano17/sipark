@@ -18,7 +18,6 @@ function startBackupScheduler() {
     60 * 60 * 1000,
   ); // Cada hora
 
-  console.log("📅 Programador de respaldos iniciado");
 
   // Ejecutar verificación inmediata
   checkAndRunBackup();
@@ -31,7 +30,6 @@ function stopBackupScheduler() {
   if (schedulerInterval) {
     clearInterval(schedulerInterval);
     schedulerInterval = null;
-    console.log("📅 Programador de respaldos detenido");
   }
 }
 
@@ -58,11 +56,9 @@ async function checkAndRunBackup() {
       }
     }
 
-    console.log("🔄 Iniciando respaldo automático...");
 
     // Crear respaldo local
     const backup = await createAutoBackup();
-    console.log(`✅ Respaldo local creado: ${backup.sizeFormatted}`);
 
     // Enviar por email si está configurado
     const emailEnabled = await getSetting("auto_backup_email_enabled");
@@ -72,7 +68,6 @@ async function checkAndRunBackup() {
         if (emailConfigStr) {
           const emailConfig = JSON.parse(emailConfigStr);
           await sendBackupByEmail(emailConfig);
-          console.log("📧 Respaldo enviado por email");
         }
       } catch (err) {
         console.error("Error enviando respaldo por email:", err);
@@ -87,7 +82,6 @@ async function checkAndRunBackup() {
         if (gdriveConfigStr) {
           const gdriveConfig = JSON.parse(gdriveConfigStr);
           await uploadToGoogleDrive(gdriveConfig, null);
-          console.log("☁️  Respaldo subido a Google Drive");
         }
       } catch (err) {
         console.error("Error subiendo a Google Drive:", err);
@@ -95,7 +89,6 @@ async function checkAndRunBackup() {
     }
 
     lastBackupTime = now;
-    console.log("✅ Respaldo automático completado");
   } catch (error) {
     console.error("❌ Error en respaldo automático:", error);
   }

@@ -3,7 +3,6 @@ const fs = require("fs");
 const filePath = "src-electron/api.cjs";
 let content = fs.readFileSync(filePath, "utf8");
 
-console.log("\n🔍 Corrigiendo referencias a u.full_name...\n");
 
 // Reemplazar todas las referencias a u.full_name con CONCAT
 const replacements = [
@@ -38,14 +37,10 @@ replacements.forEach((fix) => {
       new RegExp(fix.old.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g"),
       fix.new,
     );
-    console.log(`✅ Corregido: ${fix.name} (${occurrences} ocurrencias)`);
     fixedCount += occurrences;
   } else {
-    console.log(`⚠️  No encontrado: ${fix.name}`);
   }
 });
 
 fs.writeFileSync(filePath, content, "utf8");
 
-console.log(`\n${"=".repeat(80)}`);
-console.log(`\n✨ Correcciones full_name completadas: ${fixedCount} cambios\n`);

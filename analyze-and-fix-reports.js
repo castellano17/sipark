@@ -9,7 +9,6 @@ const reportFiles = fs
   .filter((file) => file.endsWith(".tsx"))
   .map((file) => path.join(reportsDir, file));
 
-console.log(
   `\n📊 Analizando ${reportFiles.length} reportes para compatibilidad con PostgreSQL...\n`,
 );
 
@@ -34,7 +33,6 @@ reportFiles.forEach((filePath) => {
   const matches = [...content.matchAll(toFixedPattern)];
 
   if (matches.length > 0) {
-    console.log(`\n🔧 ${fileName}:`);
     matches.forEach((match) => {
       const variable = match[1];
       // Check if already wrapped with Number()
@@ -43,7 +41,6 @@ reportFiles.forEach((filePath) => {
         match.index,
       );
       if (!beforeMatch.includes("Number(")) {
-        console.log(`   ❌ Encontrado: ${variable}.toFixed()`);
         issues.toFixed.push({ file: fileName, variable });
 
         // Fix: wrap with Number()
@@ -69,7 +66,6 @@ reportFiles.forEach((filePath) => {
         match.index,
       );
       if (!beforeMatch.includes("Number(")) {
-        console.log(`   ❌ Encontrado: ${variable}.toLocaleString()`);
         issues.toLocaleString.push({ file: fileName, variable });
 
         // Fix: wrap with Number()
@@ -106,7 +102,6 @@ reportFiles.forEach((filePath) => {
           !beforeMatch.includes("typeof") &&
           !beforeMatch.includes("String(")
         ) {
-          console.log(
             `   ⚠️  Posible problema de fecha: ${variable}.${method}()`,
           );
           issues.dateOperations.push({ file: fileName, variable, method });
@@ -119,31 +114,20 @@ reportFiles.forEach((filePath) => {
   if (fileFixed) {
     fs.writeFileSync(filePath, modified, "utf8");
     totalFixed++;
-    console.log(`   ✅ Archivo corregido`);
   }
 });
 
-console.log("\n" + "=".repeat(80));
-console.log("\n📋 RESUMEN DE ANÁLISIS:\n");
-console.log(`✅ Archivos corregidos automáticamente: ${totalFixed}`);
-console.log(`📊 Total de reportes analizados: ${reportFiles.length}`);
 
 if (issues.toFixed.length > 0) {
-  console.log(`\n🔧 Problemas .toFixed() corregidos: ${issues.toFixed.length}`);
 }
 
 if (issues.toLocaleString.length > 0) {
-  console.log(
     `\n🔧 Problemas .toLocaleString() corregidos: ${issues.toLocaleString.length}`,
   );
 }
 
 if (issues.dateOperations.length > 0) {
-  console.log(
     `\n⚠️  Posibles problemas de fecha detectados: ${issues.dateOperations.length}`,
   );
-  console.log("   (Requieren revisión manual si causan errores)");
 }
 
-console.log("\n" + "=".repeat(80));
-console.log("\n✨ Análisis completado!\n");

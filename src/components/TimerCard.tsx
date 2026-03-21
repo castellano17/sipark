@@ -16,6 +16,8 @@ interface TimerCardProps {
   onPause?: (id: number) => void;
   onViewDetails?: (id: number) => void;
   isPaused?: boolean;
+  isPending?: boolean;
+  onStartTimer?: (id: number) => void;
 }
 
 export const TimerCard: React.FC<TimerCardProps> = ({
@@ -28,6 +30,8 @@ export const TimerCard: React.FC<TimerCardProps> = ({
   onPause,
   onViewDetails,
   isPaused = false,
+  isPending = false,
+  onStartTimer,
 }) => {
   const { warning } = useNotification();
 
@@ -40,9 +44,24 @@ export const TimerCard: React.FC<TimerCardProps> = ({
     durationMinutes,
     handleExpire,
     isPaused,
+    isPending,
   );
 
-  const getStatusStyles = (status: TimerStatus, isPaused: boolean) => {
+  const getStatusStyles = (
+    status: TimerStatus,
+    isPaused: boolean,
+    isPending: boolean,
+  ) => {
+    if (isPending) {
+      return {
+        borderColor: "border-blue-400",
+        bgColor: "bg-blue-50",
+        indicatorColor: "bg-blue-400",
+        badgeColor: "bg-blue-200 text-blue-800",
+        badgeText: "En espera",
+      };
+    }
+
     if (isPaused) {
       return {
         borderColor: "border-slate-400",
@@ -81,7 +100,7 @@ export const TimerCard: React.FC<TimerCardProps> = ({
     }
   };
 
-  const styles = getStatusStyles(status, isPaused);
+  const styles = getStatusStyles(status, isPaused, isPending);
 
   return (
     <Card
@@ -114,10 +133,12 @@ export const TimerCard: React.FC<TimerCardProps> = ({
             className="text-3xl sm:text-4xl font-bold font-mono text-slate-900"
             style={{ fontFamily: "'JetBrains Mono', monospace" }}
           >
-            {isPaused ? "PAUSADA" : formattedTime}
+            {isPending ? "00:00:00" : isPaused ? "PAUSADA" : formattedTime}
           </div>
           <div className="text-xs sm:text-sm text-slate-600 mt-2">
-            {isPaused ? (
+            {isPending ? (
+              <span className="text-blue-600 font-semibold">Esperando inicio...</span>
+            ) : isPaused ? (
               <span className="text-slate-600 font-semibold">
                 Sesión pausada
               </span>
@@ -133,14 +154,23 @@ export const TimerCard: React.FC<TimerCardProps> = ({
 
         {/* Botones de acción */}
         <div className="space-y-2">
-          <Button
-            onClick={() => onPause?.(id)}
-            variant="outline"
-            className="w-full h-10 text-sm font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 flex items-center justify-center gap-0.5"
-          >
-            <Pause className="w-4 h-4" />
-            <span>{isPaused ? "Reanudar" : "Pausar"}</span>
-          </Button>
+          {isPending ? (
+            <Button
+              onClick={() => onStartTimer?.(id)}
+              className="w-full h-10 text-sm font-semibold text-white bg-green-600 hover:bg-green-700 flex items-center justify-center gap-2"
+            >
+              <span>Iniciar Tiempo</span>
+            </Button>
+          ) : (
+            <Button
+              onClick={() => onPause?.(id)}
+              variant="outline"
+              className="w-full h-10 text-sm font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 flex items-center justify-center gap-0.5"
+            >
+              <Pause className="w-4 h-4" />
+              <span>{isPaused ? "Reanudar" : "Pausar"}</span>
+            </Button>
+          )}
 
           <Button
             onClick={() => onViewDetails?.(id)}

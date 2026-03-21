@@ -17,9 +17,7 @@ export function PaymentModal({ sale, onClose, onConfirm }: PaymentModalProps) {
   const [paymentMethod, setPaymentMethod] = useState<
     "cash" | "card" | "transfer"
   >("cash");
-  const [amountReceived, setAmountReceived] = useState<string>(
-    sale.total.toString(),
-  );
+  const [amountReceived, setAmountReceived] = useState<string>("");
   const [reference, setReference] = useState("");
 
   const change =
@@ -67,7 +65,7 @@ export function PaymentModal({ sale, onClose, onConfirm }: PaymentModalProps) {
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <Card className="w-[500px] p-6 border-0">
+      <Card className="w-full max-w-xl p-6 border-0">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-2xl font-bold">Procesar Pago</h2>
@@ -120,7 +118,7 @@ export function PaymentModal({ sale, onClose, onConfirm }: PaymentModalProps) {
 
         {/* Campos según método */}
         {paymentMethod === "cash" && (
-          <div className="space-y-4 mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
             <div>
               <label className="text-sm font-medium mb-2 block">
                 Monto Recibido
@@ -134,7 +132,7 @@ export function PaymentModal({ sale, onClose, onConfirm }: PaymentModalProps) {
                 autoFocus
               />
             </div>
-            <div className="bg-green-50 p-4 rounded-lg">
+            <div className="bg-green-50 p-4 rounded-lg flex flex-col justify-center">
               <div className="text-sm text-gray-600 mb-1">Cambio</div>
               <div className="text-3xl font-bold text-green-600">
                 {formatCurrency(change)}

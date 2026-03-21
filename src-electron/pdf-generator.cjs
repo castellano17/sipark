@@ -1,51 +1,188 @@
 const PDFDocument = require("pdfkit");
 const fs = require("fs");
 const path = require("path");
-const { app } = require("electron");
+const { app, shell } = require("electron");
 const api = require("./api.cjs");
 
 /**
  * Obtiene la configuración de la empresa desde settings
  */
 async function getCompanySettings() {
-  try {
-    // Intentar obtener la configuración del ticket primero
-    const ticketConfig = await api.getSetting("ticket_config");
-    if (ticketConfig) {
-      const config = JSON.parse(ticketConfig);
+  const timeoutPromise = new Promise((_, reject) =>
+    setTimeout(() => reject(new Error("Timeout obteniendo settings")), 5000)
+  );
+
+  const fetchPromise = (async () => {
+    try {
+      const { allAsync } = require("./database-pg.cjs");
+      const rows = await allAsync(
+        `SELECT key, value FROM settings WHERE key IN ('company_name','company_address','company_phone','company_ruc','payment_methods')`,
+      );
+      const map = {};
+      rows.forEach((r) => { map[r.key] = r.value; });
       return {
-        businessName: config.businessName || "Mi Negocio",
-        businessAddress: config.businessAddress || "",
-        businessPhone: config.businessPhone || "",
+        businessName: map["company_name"] || "SIPARK",
+        businessAddress: map["company_address"] || "",
+        businessPhone: map["company_phone"] || "",
+        businessRuc: map["company_ruc"] || "",
+        paymentMethods: map["payment_methods"] ? JSON.parse(map["payment_methods"]) : null,
+      };
+    } catch (error) {
+      console.error("⚠️ Error obteniendo configuración, usando valores por defecto:", error.message);
+      return {
+        businessName: "SIPARK",
+        businessAddress: "",
+        businessPhone: "",
+        businessRuc: "",
+        paymentMethods: null,
       };
     }
+  })();
 
-    // Si no hay configuración de ticket, intentar configuración de factura
-    const invoiceConfig = await api.getSetting("invoice_config");
-    if (invoiceConfig) {
-      const config = JSON.parse(invoiceConfig);
-      return {
-        businessName: config.businessName || "Mi Negocio",
-        businessAddress: config.businessAddress || "",
-        businessPhone: config.businessPhone || "",
-      };
-    }
-
-    // Valores por defecto si no hay configuración
-    return {
-      businessName: "Mi Negocio",
-      businessAddress: "",
-      businessPhone: "",
-    };
-  } catch (error) {
-    console.error("Error obteniendo configuración:", error);
-    return {
-      businessName: "Mi Negocio",
-      businessAddress: "",
-      businessPhone: "",
-    };
-  }
+  return Promise.race([fetchPromise, timeoutPromise]);
 }
+
+const fileHandler = require("./file-handler.cjs");
+
+/**
+ * Dibuja el encabezado estandarizado
+ */
+function drawPDFHeader(doc, companySettings, options = {}) {
+  const { title = "DOCUMENTO", subtitle = null } = options;
+  const MARGIN = 50;
+  let currentY = MARGIN;
+
+  // Intentar cargar logo
+  let logoPath = null;
+  try {
+    const logosDir = fileHandler.getLogosPath();
+    const extensions = ["png", "jpg", "jpeg"];
+    for (const ext of extensions) {
+      const p = path.join(logosDir, `invoice-logo.${ext}`);
+      if (fs.existsSync(p)) {
+        logoPath = p;
+        break;
+      }
+    }
+  } catch (error) {
+    console.error("Error buscando logo para reporte:", error);
+  }
+
+  // Draw Header
+  const textLeftX = logoPath ? 140 : MARGIN;
+  if (logoPath) {
+     doc.image(logoPath, MARGIN, MARGIN, { width: 80, height: 80, fit: [80, 80] });
+  }
+
+  // Draw company info
+  doc.fontSize(12).font("Helvetica-Bold").fillColor("#333333");
+  doc.text(companySettings.businessName, textLeftX, currentY);
+  doc.fontSize(10).font("Helvetica").fillColor("#666666");
+  currentY += 15;
+  if (companySettings.businessAddress) {
+    doc.text(companySettings.businessAddress, textLeftX, currentY);
+    currentY += 15;
+  }
+  if (companySettings.businessPhone) {
+    doc.text(companySettings.businessPhone, textLeftX, currentY);
+    currentY += 15;
+  }
+
+  // Document Title
+  currentY = logoPath ? Math.max(currentY, MARGIN + 100) : currentY + 30;
+
+  doc.fontSize(options.titleSize || 24).font("Helvetica-Bold").fillColor(options.titleColor || "black");
+  doc.text(title, MARGIN, currentY, { align: "center" });
+  currentY = doc.y;
+
+  if (subtitle) {
+    doc.fontSize(12).font("Helvetica").fillColor("#666666");
+    doc.text(subtitle, MARGIN, currentY, { align: "center" });
+    currentY = doc.y;
+  }
+
+  doc.moveDown(1);
+  doc.moveTo(MARGIN, doc.y).lineTo(doc.page.width - MARGIN, doc.y).strokeColor(options.titleColor || "#cccccc").stroke();
+  doc.moveDown(1.5);
+
+  return doc.y;
+}
+
+/**
+ * Dibuja el pie de página estandarizado
+ */
+/**
+ * Dibuja el pie de página estandarizado en la página actual
+ */
+function drawPDFFooter(doc, options = {}) {
+  const { printedBy = "Sistema" } = options;
+  const MARGIN = 50;
+  const pageWidth = doc.page.width;
+  const textWidth = pageWidth - MARGIN * 2;
+  const footerLineY = doc.page.height - 45;
+  const footerTextY = doc.page.height - 35;
+
+  // Guardar estado actual
+  const originalY = doc.y;
+
+  // IMPORTANTE: Desactivar temporalmente el auto-salto de página para el footer
+  const oldBottomMargin = doc.page.margins.bottom;
+  doc.page.margins.bottom = 0;
+
+  // Línea separadora
+  doc.moveTo(MARGIN, footerLineY)
+     .lineTo(pageWidth - MARGIN, footerLineY)
+     .strokeColor("#cccccc")
+     .lineWidth(0.5)
+     .stroke();
+
+  doc.fontSize(8).font("Helvetica").fillColor("#888888");
+
+  // Timestamp a la izquierda
+  const timestamp = `Generado el ${new Date().toLocaleString("es-ES")}`;
+  doc.text(timestamp, MARGIN, footerTextY, {
+    width: textWidth / 2,
+    align: "left",
+    lineBreak: false,
+  });
+
+  // Usuario a la derecha
+  const userText = `Impreso por: ${printedBy}`;
+  doc.text(userText, MARGIN + textWidth / 2, footerTextY, {
+    width: textWidth / 2,
+    align: "right",
+    lineBreak: false,
+  });
+
+  // Restaurar estado
+  doc.page.margins.bottom = oldBottomMargin;
+  doc.y = originalY;
+}
+
+/**
+ * Finaliza el PDF dibujando los footers en todas las páginas bufferizadas
+ */
+/**
+ * Finaliza el PDF dibujando los footers en todas las páginas bufferizadas,
+ * cerrando el documento y opcionalmente abriendo el archivo.
+ * @param {PDFDocument} doc - La instancia del documento PDF.
+ * @param {object} footerOptions - Opciones para el pie de página.
+ * @param {boolean} [openFile=false] - Si se debe abrir el archivo después de generarlo.
+ * @param {string} [filepath=null] - Ruta al archivo generado.
+ */
+function finalizePDF(doc, footerOptions = {}) {
+  const range = doc.bufferedPageRange();
+  for (let i = range.start; i < range.start + range.count; i++) {
+    doc.switchToPage(i);
+    drawPDFFooter(doc, { 
+      ...footerOptions, 
+      pageNumber: i + 1, 
+      totalPages: range.count 
+    });
+  }
+  doc.end();
+}
+
 
 /**
  * Genera un PDF de apertura de caja
@@ -79,28 +216,7 @@ async function generateOpeningPDF(cashBoxData) {
 
       doc.pipe(stream);
 
-      // Encabezado con nombre de la empresa
-      doc.fontSize(10).font("Helvetica").fillColor("#666666");
-      doc.text(companySettings.businessName, { align: "center" });
-      if (companySettings.businessAddress) {
-        doc.text(companySettings.businessAddress, { align: "center" });
-      }
-      if (companySettings.businessPhone) {
-        doc.text(companySettings.businessPhone, { align: "center" });
-      }
-      doc.moveDown();
-
-      // Título
-      doc
-        .fontSize(24)
-        .font("Helvetica-Bold")
-        .fillColor("black")
-        .text("APERTURA DE CAJA", { align: "center" });
-      doc.moveDown();
-
-      // Línea separadora
-      doc.moveTo(50, doc.y).lineTo(550, doc.y).stroke();
-      doc.moveDown();
+      drawPDFHeader(doc, companySettings, { title: "APERTURA DE CAJA" });
 
       // Información
       const openedAt = new Date(cashBoxData.opened_at);
@@ -171,12 +287,7 @@ async function generateOpeningPDF(cashBoxData) {
 
       doc.moveDown(6);
 
-      // Pie de página
-      doc.fontSize(9).font("Helvetica").fillColor("#666666");
-      doc.text(`Generado: ${new Date().toLocaleString("es-ES")}`, {
-        align: "center",
-      });
-
+      drawPDFFooter(doc, { printedBy: cashBoxData.opened_by || "Sistema" });
       doc.end();
     });
   } catch (error) {
@@ -206,7 +317,7 @@ async function generateClosingPDF(closeData) {
     const filepath = path.join(pdfDir, filename);
 
     return new Promise((resolve, reject) => {
-      const doc = new PDFDocument({ margin: 50 });
+      const doc = new PDFDocument({ margin: 50, bufferPages: true });
       const stream = fs.createWriteStream(filepath);
 
       stream.on("finish", () => {
@@ -217,28 +328,9 @@ async function generateClosingPDF(closeData) {
 
       doc.pipe(stream);
 
-      // Encabezado con nombre de la empresa
-      doc.fontSize(10).font("Helvetica").fillColor("#666666");
-      doc.text(companySettings.businessName, { align: "center" });
-      if (companySettings.businessAddress) {
-        doc.text(companySettings.businessAddress, { align: "center" });
-      }
-      if (companySettings.businessPhone) {
-        doc.text(companySettings.businessPhone, { align: "center" });
-      }
-      doc.moveDown();
+      const footerOptions = { printedBy: closeData.closed_by || closeData.cashBoxData.opened_by || "Sistema" };
 
-      // Título
-      doc
-        .fontSize(24)
-        .font("Helvetica-Bold")
-        .fillColor("black")
-        .text("CUADRE DE CAJA", { align: "center" });
-      doc.moveDown();
-
-      // Línea separadora
-      doc.moveTo(50, doc.y).lineTo(550, doc.y).stroke();
-      doc.moveDown();
+      drawPDFHeader(doc, companySettings, { title: "CUADRE DE CAJA" });
 
       // Fechas e información
       const openedAt = new Date(closeData.cashBoxData.opened_at);
@@ -369,15 +461,8 @@ async function generateClosingPDF(closeData) {
         align: "center",
       });
 
-      doc.moveDown(6);
-
-      // Pie de página
-      doc.fillColor("#666666").fontSize(9).font("Helvetica");
-      doc.text(`Generado: ${new Date().toLocaleString("es-ES")}`, {
-        align: "center",
-      });
-
-      doc.end();
+      doc.moveDown(2);
+      finalizePDF(doc, footerOptions);
     });
   } catch (error) {
     console.error("Error generando PDF de cierre:", error);
@@ -392,6 +477,9 @@ function formatCurrency(amount) {
   }).format(amount);
 }
 
+// Removiendo la segunda declaración de finalizePDF para evitar conflictos
+// (Se consolidó arriba en la línea 158)
+
 /**
  * Genera un PDF de membresía (ticket o factura)
  */
@@ -400,12 +488,10 @@ async function generateMembershipPDF(pdfData) {
     const userDataPath = app.getPath("userData");
     const pdfDir = path.join(userDataPath, "pdfs");
 
-    // Crear directorio si no existe
     if (!fs.existsSync(pdfDir)) {
       fs.mkdirSync(pdfDir, { recursive: true });
     }
 
-    // Obtener configuración de la empresa
     const companySettings = await getCompanySettings();
 
     const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
@@ -413,121 +499,107 @@ async function generateMembershipPDF(pdfData) {
     const filename = `membresia_${isTicket ? "ticket" : "factura"}_${timestamp}.pdf`;
     const filepath = path.join(pdfDir, filename);
 
-    // Validar y establecer valores por defecto
-    const membership = {
-      id: pdfData.membership.id || "N/A",
-      client_name: pdfData.membership.client_name || "Cliente",
-      membership_name: pdfData.membership.membership_name || "Membresía",
-      start_date: pdfData.membership.start_date || new Date().toISOString(),
-      end_date: pdfData.membership.end_date || new Date().toISOString(),
-      payment_amount: pdfData.membership.payment_amount || 0,
-      payment_method: pdfData.membership.payment_method || "efectivo",
-      notes: pdfData.membership.notes || "",
-    };
-
     return new Promise((resolve, reject) => {
-      const doc = new PDFDocument({ margin: 50 });
-      const stream = fs.createWriteStream(filepath);
+      // Watchdog para evitar cuelgues eternos (10 segundos)
+      const timeout = setTimeout(() => {
+        reject(new Error("Tiempo de espera agotado generando el PDF"));
+      }, 10000);
 
-      stream.on("finish", () => {
-        // Abrir el PDF automáticamente
-        require("electron").shell.openPath(filepath);
-        resolve(filepath);
-      });
+      try {
+        const doc = new PDFDocument({ margin: 50, bufferPages: true });
+        const stream = fs.createWriteStream(filepath);
 
-      stream.on("error", reject);
-
-      doc.pipe(stream);
-
-      // Encabezado con nombre de la empresa
-      doc.fontSize(10).font("Helvetica").fillColor("#666666");
-      doc.text(companySettings.businessName, { align: "center" });
-      if (companySettings.businessAddress) {
-        doc.text(companySettings.businessAddress, { align: "center" });
-      }
-      if (companySettings.businessPhone) {
-        doc.text(companySettings.businessPhone, { align: "center" });
-      }
-      doc.moveDown();
-
-      // Título
-      doc
-        .fontSize(24)
-        .font("Helvetica-Bold")
-        .fillColor("black")
-        .text(isTicket ? "TICKET DE MEMBRESÍA" : "FACTURA DE MEMBRESÍA", {
-          align: "center",
+        stream.on("finish", () => {
+          clearTimeout(timeout);
+          resolve(filepath);
         });
-      doc.moveDown();
 
-      // Línea separadora
-      doc.moveTo(50, doc.y).lineTo(550, doc.y).stroke();
-      doc.moveDown();
-
-      // Información del cliente
-      doc.fontSize(12).font("Helvetica-Bold");
-      doc.text("DATOS DEL CLIENTE", { underline: true });
-      doc.font("Helvetica").fontSize(11);
-      doc.text(`Cliente: ${membership.client_name}`);
-      doc.moveDown();
-
-      // Información de la membresía
-      doc.fontSize(12).font("Helvetica-Bold");
-      doc.text("DATOS DE LA MEMBRESÍA", { underline: true });
-      doc.font("Helvetica").fontSize(11);
-      doc.text(`Tipo: ${membership.membership_name}`);
-      doc.text(
-        `Fecha Inicio: ${new Date(membership.start_date).toLocaleDateString("es-ES")}`,
-      );
-      doc.text(
-        `Fecha Vencimiento: ${new Date(membership.end_date).toLocaleDateString("es-ES")}`,
-      );
-      doc.moveDown();
-
-      // Línea separadora
-      doc.moveTo(50, doc.y).lineTo(550, doc.y).stroke();
-      doc.moveDown();
-
-      // Detalles de pago
-      doc.fontSize(12).font("Helvetica-Bold");
-      doc.text("DETALLES DE PAGO", { underline: true });
-      doc.font("Helvetica").fontSize(11);
-      doc.text(`Método de Pago: ${membership.payment_method.toUpperCase()}`);
-      doc.moveDown();
-
-      // Total - destacado
-      doc.fontSize(14).font("Helvetica-Bold");
-      doc.text("TOTAL PAGADO:", { continued: false });
-      doc
-        .fontSize(24)
-        .fillColor("#2563eb")
-        .text(`${formatCurrency(membership.payment_amount)}`, {
-          align: "center",
+        stream.on("error", (err) => {
+          clearTimeout(timeout);
+          console.error("Stream error generating PDF:", err);
+          reject(err);
         });
-      doc.fillColor("black");
-      doc.moveDown(2);
 
-      // Notas si existen
-      if (membership.notes) {
-        doc.fontSize(10).font("Helvetica").fillColor("#666666");
-        doc.text(`Notas: ${membership.notes}`);
+        doc.pipe(stream);
+
+        const membership = pdfData.membership || {};
+
+        // Pie de página automático
+        const footerOptions = { 
+          printedBy: pdfData.printedBy || "Sistema", 
+          footerCenter: `ID Membresía: #${membership.id || "N/A"} - ¡Gracias por su preferencia!` 
+        };
+
+        drawPDFHeader(doc, companySettings, { title: isTicket ? "TICKET DE MEMBRESÍA" : "FACTURA DE MEMBRESÍA" });
+
+        // Información del cliente
+        doc.fontSize(12).font("Helvetica-Bold");
+        doc.text("DATOS DEL CLIENTE", { underline: true });
+        doc.font("Helvetica").fontSize(11);
+        doc.text(`Cliente: ${membership.client_name || "N/A"}`);
+        if (membership.id_card) doc.text(`Cédula: ${membership.id_card}`);
+        if (membership.phone) doc.text(`Teléfono: ${membership.phone}`);
         doc.moveDown();
+
+        // Información de la membresía
+        doc.fontSize(12).font("Helvetica-Bold");
+        doc.text("DATOS DE LA MEMBRESÍA", { underline: true });
+        doc.font("Helvetica").fontSize(11);
+        doc.text(`Tipo: ${membership.membership_name || "N/A"}`);
+        if (membership.total_hours) doc.text(`N° Entradas: ${membership.total_hours}`);
+        if (membership.acquisition_date) doc.text(`Adquisición: ${new Date(membership.acquisition_date).toLocaleDateString("es-ES")}`);
+        
+        let start_date = "N/A";
+        let end_date = "N/A";
+        try {
+          if (membership.start_date) start_date = new Date(membership.start_date).toLocaleDateString("es-ES");
+          if (membership.end_date) end_date = new Date(membership.end_date).toLocaleDateString("es-ES");
+        } catch (e) {}
+
+        doc.text(`Fecha Inicio: ${start_date}`);
+        doc.text(`Fecha Vencimiento: ${end_date}`);
+        doc.moveDown();
+
+        // Línea separadora
+        doc.moveTo(50, doc.y).lineTo(550, doc.y).stroke();
+        doc.moveDown();
+
+        // Detalles de pago
+        doc.fontSize(12).font("Helvetica-Bold");
+        doc.text("DETALLES DE PAGO", { underline: true });
+        doc.font("Helvetica").fontSize(11);
+        doc.text(`Método de Pago: ${(membership.payment_method || "N/A").toUpperCase()}`);
+        doc.moveDown();
+
+        // Total - destacado
+        doc.fontSize(14).font("Helvetica-Bold");
+        doc.text("TOTAL PAGADO:", { continued: false });
+        doc
+          .fontSize(24)
+          .fillColor("#2563eb")
+          .text(`${formatCurrency(membership.payment_amount || 0)}`, {
+            align: "center",
+          });
+        doc.fillColor("black");
+        doc.moveDown(2);
+
+        // Notas si existen
+        if (membership.notes) {
+          doc.fontSize(10).font("Helvetica").fillColor("#666666");
+          doc.text(`Notas: ${membership.notes}`);
+          doc.moveDown();
+        }
+
+        // Línea separadora
+        doc.moveTo(50, doc.y).lineTo(550, doc.y).stroke();
+        doc.moveDown();
+
+        finalizePDF(doc, footerOptions);
+      } catch (err) {
+        clearTimeout(timeout);
+        console.error("Internal error in PDF Promise:", err);
+        reject(err);
       }
-
-      // Línea separadora
-      doc.moveTo(50, doc.y).lineTo(550, doc.y).stroke();
-      doc.moveDown();
-
-      // Pie de página
-      doc.fontSize(9).font("Helvetica").fillColor("#666666");
-      doc.text(`Fecha de emisión: ${new Date().toLocaleString("es-ES")}`, {
-        align: "center",
-      });
-      doc.text(`ID Membresía: #${membership.id}`, { align: "center" });
-      doc.moveDown();
-      doc.text("¡Gracias por su preferencia!", { align: "center" });
-
-      doc.end();
     });
   } catch (error) {
     console.error("Error generando PDF de membresía:", error);
@@ -554,7 +626,7 @@ async function generateReservationPDF(reservationData) {
     const filepath = path.join(pdfDir, filename);
 
     return new Promise((resolve, reject) => {
-      const doc = new PDFDocument({ margin: 50 });
+      const doc = new PDFDocument({ margin: 50, bufferPages: true });
       const stream = fs.createWriteStream(filepath);
 
       stream.on("finish", () => {
@@ -565,24 +637,11 @@ async function generateReservationPDF(reservationData) {
 
       doc.pipe(stream);
 
-      // Encabezado
-      doc.fontSize(10).font("Helvetica").fillColor("#666666");
-      doc.text(companySettings.businessName, { align: "center" });
-      if (companySettings.businessAddress) {
-        doc.text(companySettings.businessAddress, { align: "center" });
-      }
-      if (companySettings.businessPhone) {
-        doc.text(companySettings.businessPhone, { align: "center" });
-      }
-      doc.moveDown();
+      const footerOptions = { 
+        printedBy: reservationData.created_by || "Sistema"
+      };
 
-      // Título
-      doc
-        .fontSize(24)
-        .font("Helvetica-Bold")
-        .fillColor("#2563eb")
-        .text("RESERVACIÓN", { align: "center" });
-      doc.moveDown();
+      drawPDFHeader(doc, companySettings, { title: "RESERVACIÓN", titleColor: "#2563eb" });
 
       // Estado
       const statusText =
@@ -666,7 +725,7 @@ async function generateReservationPDF(reservationData) {
       doc.fontSize(12).font("Helvetica").fillColor("#333333");
       doc.text("Total:", startX + 10, doc.y);
       doc.text(
-        `$${reservationData.total_amount.toFixed(2)}`,
+        `$${Number(reservationData.total_amount).toFixed(2)}`,
         startX + 400,
         doc.y,
         { width: 100, align: "right" },
@@ -676,7 +735,7 @@ async function generateReservationPDF(reservationData) {
       // Anticipo
       doc.text("Anticipo:", startX + 10, doc.y);
       doc.text(
-        `$${reservationData.deposit_amount.toFixed(2)}`,
+        `$${Number(reservationData.deposit_amount).toFixed(2)}`,
         startX + 400,
         doc.y,
         { width: 100, align: "right" },
@@ -697,7 +756,7 @@ async function generateReservationPDF(reservationData) {
       doc.fontSize(14).font("Helvetica-Bold").fillColor("#dc2626");
       doc.text("Pendiente:", startX + 10, doc.y);
       doc.text(
-        `$${(reservationData.total_amount - reservationData.deposit_amount).toFixed(2)}`,
+        `$${(Number(reservationData.total_amount) - Number(reservationData.deposit_amount)).toFixed(2)}`,
         startX + 400,
         doc.y,
         { width: 100, align: "right" },
@@ -707,28 +766,18 @@ async function generateReservationPDF(reservationData) {
       // Notas
       if (reservationData.notes) {
         doc.fontSize(16).font("Helvetica-Bold").fillColor("black");
-        doc.text("NOTAS");
+        doc.text("NOTAS", startX, doc.y);
         doc.moveDown(0.5);
 
         doc.fontSize(11).font("Helvetica").fillColor("#666666");
-        doc.text(reservationData.notes, {
+        doc.text(reservationData.notes, startX, doc.y, {
           width: 500,
           align: "justify",
         });
         doc.moveDown(1.5);
       }
 
-      // Pie de página
-      doc.moveDown(2);
-      doc.fontSize(9).font("Helvetica").fillColor("#666666");
-      doc.text(`Fecha de emisión: ${new Date().toLocaleString("es-ES")}`, {
-        align: "center",
-      });
-      doc.text(`ID Reservación: #${reservationData.id}`, { align: "center" });
-      doc.moveDown();
-      doc.text("¡Gracias por su preferencia!", { align: "center" });
-
-      doc.end();
+      finalizePDF(doc, footerOptions);
     });
   } catch (error) {
     console.error("Error generando PDF de reservación:", error);
@@ -755,7 +804,7 @@ async function generateQuotationPDF(quotationData) {
     const filepath = path.join(pdfDir, filename);
 
     return new Promise((resolve, reject) => {
-      const doc = new PDFDocument({ margin: 50 });
+      const doc = new PDFDocument({ margin: 50, bufferPages: true });
       const stream = fs.createWriteStream(filepath);
 
       stream.on("finish", () => {
@@ -766,24 +815,10 @@ async function generateQuotationPDF(quotationData) {
 
       doc.pipe(stream);
 
-      // Encabezado
-      doc.fontSize(10).font("Helvetica").fillColor("#666666");
-      doc.text(companySettings.businessName, { align: "center" });
-      if (companySettings.businessAddress) {
-        doc.text(companySettings.businessAddress, { align: "center" });
-      }
-      if (companySettings.businessPhone) {
-        doc.text(companySettings.businessPhone, { align: "center" });
-      }
-      doc.moveDown();
+      // Configurar pie de página automático para todas las páginas
+      const footerOptions = { printedBy: quotationData.printedBy || "Sistema" };
 
-      // Título
-      doc
-        .fontSize(24)
-        .font("Helvetica-Bold")
-        .fillColor("#9333ea")
-        .text("COTIZACIÓN", { align: "center" });
-      doc.moveDown();
+      drawPDFHeader(doc, companySettings, { title: "COTIZACIÓN", titleColor: "#9333ea" });
 
       // Número y fecha
       doc.fontSize(12).font("Helvetica").fillColor("#333333");
@@ -856,11 +891,11 @@ async function generateQuotationPDF(quotationData) {
           width: 50,
           align: "center",
         });
-        doc.text(`$${item.unit_price.toFixed(2)}`, priceX, yPosition, {
+        doc.text(`$${Number(item.unit_price).toFixed(2)}`, priceX, yPosition, {
           width: 80,
           align: "right",
         });
-        doc.text(`$${item.subtotal.toFixed(2)}`, totalX, yPosition, {
+        doc.text(`$${Number(item.subtotal).toFixed(2)}`, totalX, yPosition, {
           width: 80,
           align: "right",
         });
@@ -883,7 +918,7 @@ async function generateQuotationPDF(quotationData) {
 
       // Subtotal
       doc.text("Subtotal:", priceX, yPosition, { width: 80, align: "right" });
-      doc.text(`$${quotationData.subtotal.toFixed(2)}`, totalX, yPosition, {
+      doc.text(`$${Number(quotationData.subtotal).toFixed(2)}`, totalX, yPosition, {
         width: 80,
         align: "right",
       });
@@ -894,7 +929,7 @@ async function generateQuotationPDF(quotationData) {
         doc
           .fillColor("#16a34a")
           .text("Descuento:", priceX, yPosition, { width: 80, align: "right" });
-        doc.text(`-$${quotationData.discount.toFixed(2)}`, totalX, yPosition, {
+        doc.text(`-$${Number(quotationData.discount).toFixed(2)}`, totalX, yPosition, {
           width: 80,
           align: "right",
         });
@@ -905,7 +940,7 @@ async function generateQuotationPDF(quotationData) {
       // Impuesto
       if (quotationData.tax > 0) {
         doc.text("Impuesto:", priceX, yPosition, { width: 80, align: "right" });
-        doc.text(`$${quotationData.tax.toFixed(2)}`, totalX, yPosition, {
+        doc.text(`$${Number(quotationData.tax).toFixed(2)}`, totalX, yPosition, {
           width: 80,
           align: "right",
         });
@@ -925,7 +960,7 @@ async function generateQuotationPDF(quotationData) {
       // Total
       doc.fontSize(14).font("Helvetica-Bold").fillColor("#9333ea");
       doc.text("TOTAL:", priceX, yPosition, { width: 80, align: "right" });
-      doc.text(`$${quotationData.total.toFixed(2)}`, totalX, yPosition, {
+      doc.text(`$${Number(quotationData.total).toFixed(2)}`, totalX, yPosition, {
         width: 80,
         align: "right",
       });
@@ -944,27 +979,60 @@ async function generateQuotationPDF(quotationData) {
         });
       }
 
-      // Pie de página
-      doc.fontSize(9).font("Helvetica").fillColor("#666666");
-      const footerY = 750;
-      doc.text(
-        `Fecha de emisión: ${new Date().toLocaleString("es-ES")}`,
-        50,
-        footerY,
-        { align: "center" },
-      );
-      doc.text(
-        `Cotización: ${quotationData.quotation_number}`,
-        50,
-        footerY + 15,
-        {
-          align: "center",
-        },
-      );
-      doc.moveDown();
-      doc.text("¡Gracias por su preferencia!", { align: "center" });
+      // Formas de pago (si hay en companySettings)
+      const pm = companySettings.paymentMethods;
+      const hasBankAccounts = pm && Array.isArray(pm.bankAccounts) && pm.bankAccounts.length > 0;
+      const hasPaymentMethods = pm && (pm.checkPayeeName || hasBankAccounts);
+      if (hasPaymentMethods) {
+        yPosition = doc.y + 30;
+        if (yPosition > 660) { doc.addPage(); yPosition = 50; }
 
-      doc.end();
+        doc.fontSize(12).font("Helvetica-Bold").fillColor("#333333");
+        doc.text("FORMAS DE PAGO", itemX, yPosition);
+        yPosition += 18;
+
+        doc.moveTo(itemX, yPosition).lineTo(560, yPosition).strokeColor("#e5e7eb").lineWidth(1).stroke();
+        yPosition += 10;
+
+        doc.fontSize(10).font("Helvetica").fillColor("#333333");
+
+        // Efectivo
+        doc.font("Helvetica-Bold").text("• Efectivo", itemX, yPosition);
+        yPosition += 18;
+
+        // Cheque
+        if (pm.checkPayeeName) {
+          doc.font("Helvetica-Bold").text("• Cheque a nombre de:", itemX, yPosition, { continued: true });
+          doc.font("Helvetica").text(` ${pm.checkPayeeName}`);
+          yPosition = doc.y + 4;
+        }
+
+        // Transferencias (una por cuenta bancaria)
+        let bankAccounts = Array.isArray(pm.bankAccounts) ? pm.bankAccounts : [];
+        if (bankAccounts.length === 0 && pm.bankName && pm.bankAccountNumber) {
+          bankAccounts = [{
+            bankName: pm.bankName,
+            bankAccountType: pm.bankAccountType || "cordobas",
+            bankAccountNumber: pm.bankAccountNumber,
+            bankAccountHolder: pm.bankAccountHolder || ""
+          }];
+        }
+        if (bankAccounts.length > 0) {
+          doc.font("Helvetica-Bold").text("• Transferencia bancaria:", itemX, yPosition);
+          yPosition = doc.y + 4;
+
+          bankAccounts.forEach((acct, idx) => {
+            if (yPosition > 660) { doc.addPage(); yPosition = 50; }
+            const typeLabel = acct.bankAccountType === "dolares" ? "USD" : "NIO";
+            const lineParts = [`  ${acct.bankName} (${typeLabel}) — Cta: ${acct.bankAccountNumber}`];
+            if (acct.bankAccountHolder) lineParts.push(`A nombre de: ${acct.bankAccountHolder}`);
+            doc.font("Helvetica").text(lineParts.join("  |  "), itemX + 8, yPosition, { width: 500 });
+            yPosition = doc.y + 3;
+          });
+        }
+      }
+
+      finalizePDF(doc, footerOptions);
     });
   } catch (error) {
     console.error("Error generando PDF de cotización:", error);
@@ -998,25 +1066,17 @@ async function generateGenericReport(options) {
 
       doc.pipe(stream);
 
-      // Encabezado
-      doc.fontSize(10).font("Helvetica").fillColor("#666666");
-      doc.text(companySettings.businessName, { align: "center" });
-      if (companySettings.businessAddress) {
-        doc.text(companySettings.businessAddress, { align: "center" });
-      }
-      if (companySettings.businessPhone) {
-        doc.text(companySettings.businessPhone, { align: "center" });
-      }
-      doc.moveDown();
+      let tableYOffset = drawPDFHeader(doc, companySettings, { 
+        title: options.title || "REPORTE", 
+        subtitle: options.subtitle,
+        titleSize: 18 
+      });
 
-      // Título
-      doc.fontSize(18).font("Helvetica-Bold").fillColor("black")
-         .text(options.title || "REPORTE", { align: "center" });
+      drawPDFFooter(doc, { printedBy: options.printedBy || "Sistema" });
       
-      if (options.subtitle) {
-        doc.fontSize(12).font("Helvetica").text(options.subtitle, { align: "center" });
-      }
-      doc.moveDown(2);
+      doc.on('pageAdded', () => {
+        drawPDFFooter(doc, { printedBy: options.printedBy || "Sistema" });
+      });
 
       // Resumen
       if (options.summary && options.summary.length > 0) {
@@ -1099,10 +1159,6 @@ async function generateGenericReport(options) {
         });
       }
 
-      // Pie de página
-      doc.fontSize(9).font("Helvetica").fillColor("#666666");
-      doc.text(`Generado: ${new Date().toLocaleString("es-ES")}`, 40, doc.page.height - 50, { align: "center" });
-
       doc.end();
     });
   } catch (error) {
@@ -1140,28 +1196,12 @@ async function generateDailyCashSummaryPDF(data, selectedDate) {
 
       doc.pipe(stream);
 
-      // Encabezado
-      doc.fontSize(10).font("Helvetica").fillColor("#666666");
-      doc.text(companySettings.businessName, { align: "center" });
-      if (companySettings.businessAddress) {
-        doc.text(companySettings.businessAddress, { align: "center" });
-      }
-      if (companySettings.businessPhone) {
-        doc.text(companySettings.businessPhone, { align: "center" });
-      }
-      doc.moveDown();
-
-      // Título
-      doc.fontSize(18).font("Helvetica-Bold").fillColor("black")
-         .text("RESUMEN DIARIO DE CAJA", { align: "center" });
-         
       // Fecha
       const [year, month, day] = selectedDate.split('-');
       const formattedDate = new Date(year, month - 1, day).toLocaleDateString("es-ES", {
         weekday: "long", year: "numeric", month: "long", day: "numeric"
       });
-      doc.fontSize(12).font("Helvetica").text(formattedDate, { align: "center" });
-      doc.moveDown(1.5);
+      drawPDFHeader(doc, companySettings, { title: "RESUMEN DIARIO DE CAJA", subtitle: formattedDate, titleSize: 18 });
 
       // Información de caja
       if (data.cashBox) {
@@ -1274,10 +1314,7 @@ async function generateDailyCashSummaryPDF(data, selectedDate) {
       
       doc.moveDown(3);
 
-      // Footer
-      doc.fontSize(9).font("Helvetica").fillColor("#666666");
-      doc.text(`Generado el ${new Date().toLocaleString("es-ES")}`, { align: "center" });
-
+      drawPDFFooter(doc, { printedBy: data.printedBy || (data.cashBox ? data.cashBox.opened_by : "Sistema") });
       doc.end();
     });
   } catch (error) {

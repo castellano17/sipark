@@ -177,8 +177,10 @@ export const PackagesManager: React.FC = () => {
           formData.name,
           parseFloat(formData.price),
           "package",
-          durationInMinutes,
           formData.description,
+          undefined, // barcode
+          undefined, // stock
+          durationInMinutes,
         );
         if (!result) {
           errorNotification("Error creando el paquete");
@@ -193,8 +195,10 @@ export const PackagesManager: React.FC = () => {
           formData.name,
           parseFloat(formData.price),
           "package",
-          durationInMinutes,
           formData.description,
+          undefined, // barcode
+          undefined, // stock
+          durationInMinutes,
         );
         success(`Paquete "${formData.name}" actualizado correctamente`);
       } else {

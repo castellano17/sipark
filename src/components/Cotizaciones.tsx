@@ -9,7 +9,6 @@ import {
   Printer,
   CheckCircle,
   XCircle,
-  Clock,
 } from "lucide-react";
 import { useSnackbar } from "notistack";
 
@@ -28,6 +27,7 @@ interface Quotation {
   status: string;
   notes: string;
   created_at: string;
+  items?: QuotationItem[];
 }
 
 interface QuotationItem {
@@ -50,6 +50,15 @@ export const Cotizaciones: React.FC = () => {
   const [quotations, setQuotations] = useState<Quotation[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [showModal, setShowModal] = useState(false);
+  const [showApproveModal, setShowApproveModal] = useState(false);
+  const [quotationToApprove, setQuotationToApprove] = useState<Quotation | null>(null);
+  const [approveData, setApproveData] = useState({
+    event_date: "",
+    event_time: "",
+    package_id: "",
+    deposit_amount: 0,
+  });
+
   const [selectedQuotation, setSelectedQuotation] = useState<Quotation | null>(
     null,
   );
@@ -193,8 +202,15 @@ export const Cotizaciones: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.client_name) {
-      enqueueSnackbar("El nombre del cliente es requerido", {
+    if (!formData.client_name.trim()) {
+      enqueueSnackbar("El campo 'Nombre' es obligatorio", {
+        variant: "warning",
+      });
+      return;
+    }
+
+    if (!formData.valid_until) {
+      enqueueSnackbar("El campo 'Válida Hasta' es obligatorio", {
         variant: "warning",
       });
       return;
@@ -261,7 +277,10 @@ export const Cotizaciones: React.FC = () => {
       enqueueSnackbar("Generando PDF...", { variant: "info" });
       const result = await window.api.getQuotationById(quotation.id);
       if (result.success) {
-        await window.api.generateQuotationPDF(result.data);
+        const currentUserStr = localStorage.getItem("currentUser");
+        const currentUser = currentUserStr ? JSON.parse(currentUserStr) : null;
+        const printedBy = currentUser ? currentUser.username : "Sistema";
+        await window.api.generateQuotationPDF({ ...result.data, printedBy });
         enqueueSnackbar("PDF generado exitosamente", { variant: "success" });
       }
     } catch (error) {
@@ -271,6 +290,49 @@ export const Cotizaciones: React.FC = () => {
   };
 
   const handleUpdateStatus = async (id: number, status: string) => {
+    if (status === "approved") {
+      try {
+        // Obtener la cotización completa con items
+        const result = await window.api.getQuotationById(id);
+        if (result.success && result.data) {
+          const q = result.data;
+          setQuotationToApprove(q);
+
+          // Buscar un paquete en los ítems (robusto: buscar tanto 'package' como 'paquete')
+          const pkgItem = q.items?.find((item: any) => {
+            const p = products.find(prod => prod.id === item.product_id);
+            return p?.type?.toLowerCase() === "package" || p?.type?.toLowerCase() === "paquete";
+          });
+
+          // Formatear fecha para el input date (YYYY-MM-DD)
+          let formattedDate = "";
+          if (q.valid_until) {
+            try {
+              const d = new Date(q.valid_until);
+              // Evitar problemas de zona horaria usando split 'T'
+              formattedDate = d.toISOString().split('T')[0];
+            } catch (e) {
+              formattedDate = q.valid_until;
+            }
+          }
+
+          setApproveData({
+            event_date: formattedDate,
+            event_time: "", // La hora sí se debe pedir
+            package_id: pkgItem ? pkgItem.product_id.toString() : (q.items?.find((i: any) => i.product_id)?.product_id?.toString() || ""),
+            deposit_amount: 0,
+          });
+          setShowApproveModal(true);
+        } else {
+          enqueueSnackbar("Error al obtener detalles de la cotización", { variant: "error" });
+        }
+      } catch (error) {
+        console.error("Error al preparar aprobación:", error);
+        enqueueSnackbar("Error al procesar la cotización", { variant: "error" });
+      }
+      return;
+    }
+
     const result = await window.api.updateQuotationStatus(id, status);
     if (result.success) {
       enqueueSnackbar("Estado actualizado", { variant: "success" });
@@ -278,6 +340,95 @@ export const Cotizaciones: React.FC = () => {
       if (selectedQuotation && selectedQuotation.id === id) {
         setSelectedQuotation({ ...selectedQuotation, status });
       }
+    }
+  };
+
+  const handleApproveConfirm = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!quotationToApprove) return;
+
+    if (!approveData.event_date || !approveData.event_time || !approveData.package_id) {
+      enqueueSnackbar("Por favor complete todos los campos obligatorios para la reservación", { variant: "warning" });
+      return;
+    }
+
+    try {
+      // 1. Vincular o crear el cliente (asegurando un ID válido)
+      let finalClientId = 1; // Cliente General por defecto (debe existir)
+      
+      try {
+        if (quotationToApprove && quotationToApprove.client_phone) {
+          // Intentar buscar cliente por teléfono
+          const clientsRes = await window.api.getClients();
+          const existingClient = (clientsRes && Array.isArray(clientsRes)) 
+            ? clientsRes.find((c: any) => c.phone === quotationToApprove.client_phone) 
+            : null;
+          
+          if (existingClient && existingClient.id) {
+            finalClientId = Number(existingClient.id);
+          } else {
+            // Crear nuevo cliente
+            const newClientId = await window.api.createClient(
+              quotationToApprove.client_name,
+              "Persona de Cotización",
+              quotationToApprove.client_phone || "0000000000",
+              null, // emergency phone
+              quotationToApprove.client_email || null,
+              null, // child name
+              0, // child age
+              null, // allergies
+              "Creado automáticamente desde Cotización"
+            );
+            
+            if (newClientId && typeof newClientId === 'number') {
+              finalClientId = newClientId;
+            } else if (newClientId && (newClientId as any).id) {
+              finalClientId = Number((newClientId as any).id);
+            }
+          }
+        }
+      } catch (clientErr) {
+        console.warn("Error vinculando cliente, usando Cliente General (ID 1):", clientErr);
+        finalClientId = 1;
+      }
+
+      // 2. Crear la reservación
+      const resResult = await window.api.createReservation({
+        client_id: Number(finalClientId),
+        client_name: quotationToApprove.client_name,
+        client_phone: quotationToApprove.client_phone,
+        client_email: quotationToApprove.client_email,
+        event_date: approveData.event_date,
+        event_time: approveData.event_time,
+        package_id: parseInt(approveData.package_id || "0"),
+        package_name: products.find(p => p.id === parseInt(approveData.package_id))?.name || "",
+        num_children: 0,
+        total_amount: quotationToApprove.total,
+        deposit_amount: approveData.deposit_amount || 0,
+        status: "pending",
+        notes: `Generada automáticamente desde Cotización #${quotationToApprove.quotation_number}\n${quotationToApprove.notes || ""}`
+      });
+
+      if (!resResult.success) {
+        enqueueSnackbar("Error al crear reserva: " + resResult.error, { variant: "error" });
+        return;
+      }
+
+      // 2. Actualizar estado de la cotización a aprobada
+      const updResult = await window.api.updateQuotationStatus(quotationToApprove.id, "approved");
+      if (updResult.success) {
+        enqueueSnackbar("Cotización aprobada y reservación agendada", { variant: "success" });
+        setShowApproveModal(false);
+        loadQuotations();
+        if (selectedQuotation && selectedQuotation.id === quotationToApprove.id) {
+          setSelectedQuotation({ ...selectedQuotation, status: "approved" });
+        }
+      } else {
+        enqueueSnackbar("Reserva creada pero falló actualizar la cotización", { variant: "warning" });
+      }
+    } catch (error) {
+      console.error("Error en aprobación:", error);
+      enqueueSnackbar("Error en el proceso de aprobación", { variant: "error" });
     }
   };
 
@@ -355,7 +506,7 @@ export const Cotizaciones: React.FC = () => {
                 <tr className="border-b">
                   <th className="text-left p-3">Número</th>
                   <th className="text-left p-3">Cliente</th>
-                  <th className="text-left p-3">Fecha</th>
+                  <th className="text-left p-3">Evento</th>
                   <th className="text-right p-3">Total</th>
                   <th className="w-40 text-center p-3">Estado</th>
                   <th className="text-center p-3">Acciones</th>
@@ -380,7 +531,7 @@ export const Cotizaciones: React.FC = () => {
                       </div>
                     </td>
                     <td className="p-3">
-                      {new Date(quotation.created_at).toLocaleDateString()}
+                      {new Date(quotation.valid_until || quotation.created_at).toLocaleDateString()}
                     </td>
                     <td className="p-3 text-right font-medium">
                       ${Number(quotation.total).toFixed(2)}
@@ -434,20 +585,19 @@ export const Cotizaciones: React.FC = () => {
               <CardTitle>Nueva Cotización</CardTitle>
             </CardHeader>
             <CardContent className="p-6">
-              <form onSubmit={handleSubmit} className="space-y-6">
+              <form onSubmit={handleSubmit} className="space-y-6" noValidate>
                 {/* Datos del Cliente */}
                 <div>
                   <h3 className="font-semibold text-lg mb-3">
                     Datos del Cliente
                   </h3>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium mb-1">
                         Nombre *
                       </label>
                       <input
                         type="text"
-                        required
                         value={formData.client_name}
                         onChange={(e) =>
                           setFormData({
@@ -656,7 +806,7 @@ export const Cotizaciones: React.FC = () => {
                   <div className="space-y-3">
                     <div>
                       <label className="block text-sm font-medium mb-1">
-                        Válida Hasta
+                        Fecha del Evento *
                       </label>
                       <input
                         type="date"
@@ -766,9 +916,7 @@ export const Cotizaciones: React.FC = () => {
                     Cotización {selectedQuotation.quotation_number}
                   </CardTitle>
                   <p className="text-sm text-purple-100 mt-1">
-                    {new Date(
-                      selectedQuotation.created_at,
-                    ).toLocaleDateString()}
+                    Evento: {new Date(selectedQuotation.valid_until).toLocaleDateString()}
                   </p>
                 </div>
                 <span
@@ -919,6 +1067,107 @@ export const Cotizaciones: React.FC = () => {
               </div>
             </CardContent>
           </Card>
+        </div>
+      )}
+      {/* Modal para aprobar y agendar reservación */}
+      {showApproveModal && quotationToApprove && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl shadow-xl max-w-lg w-full p-6">
+            <h2 className="text-xl font-bold mb-4">Aprobar Cotización y Agendar Reservación</h2>
+            <div className="bg-blue-50 text-blue-800 p-3 rounded-md mb-4 text-sm">
+              Al marcar esta cotización como Aprobada, se creará una Reservación automáticamente.
+              Por favor completa los detalles del evento.
+            </div>
+
+            <form onSubmit={handleApproveConfirm} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">
+                    Fecha del Evento *
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    className="w-full p-2 border rounded-md"
+                    value={approveData.event_date}
+                    onChange={(e) =>
+                      setApproveData({ ...approveData, event_date: e.target.value })
+                    }
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">
+                    Hora del Evento *
+                  </label>
+                  <input
+                    type="time"
+                    required
+                    className="w-full p-2 border rounded-md"
+                    value={approveData.event_time}
+                    onChange={(e) =>
+                      setApproveData({ ...approveData, event_time: e.target.value })
+                    }
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  Paquete *
+                </label>
+                <select
+                  required
+                  className="w-full p-2 border rounded-md"
+                  value={approveData.package_id}
+                  onChange={(e) =>
+                    setApproveData({ ...approveData, package_id: e.target.value })
+                  }
+                >
+                  <option value="">Seleccione un paquete</option>
+                  {products
+                    .filter((p) => p.type?.toLowerCase() === "paquete" || p.type?.toLowerCase() === "package")
+                    .map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name}
+                      </option>
+                    ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  Anticipo (Deposit)
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  className="w-full p-2 border rounded-md"
+                  value={approveData.deposit_amount}
+                  onChange={(e) =>
+                    setApproveData({
+                      ...approveData,
+                      deposit_amount: parseFloat(e.target.value) || 0,
+                    })
+                  }
+                />
+              </div>
+
+              <div className="flex space-x-3 pt-4 border-t">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => setShowApproveModal(false)}
+                >
+                  Cancelar
+                </Button>
+                <Button type="submit" className="flex-1 max-w-[200px]">
+                  Aprobar y Agendar
+                </Button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
     </div>

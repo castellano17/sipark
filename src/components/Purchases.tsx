@@ -32,11 +32,13 @@ interface Product {
   name: string;
   price: number;
   stock: number;
+  barcode?: string;
 }
 
 interface Supplier {
   id: number;
   name: string;
+  contact_name?: string;
 }
 
 interface PurchaseItem {
@@ -374,7 +376,7 @@ export function Purchases() {
 
                 <div className="flex-1 overflow-auto p-6 space-y-6">
                   {/* Datos de la factura */}
-                  <div className="grid grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="relative supplier-search-container">
                       <label className="block text-sm font-medium mb-2">
                         Proveedor *

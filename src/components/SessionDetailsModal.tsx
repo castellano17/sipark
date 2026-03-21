@@ -25,23 +25,27 @@ export const SessionDetailsModal: React.FC<SessionDetailsModalProps> = ({
 }) => {
   if (!session) return null;
 
+  const isPending = session.status === "pending";
   const startTime = new Date(session.start_time);
   const now = new Date();
-  const elapsedMs = now.getTime() - startTime.getTime();
+  const elapsedMs = isPending ? 0 : now.getTime() - startTime.getTime();
   const elapsedMinutes = Math.floor(elapsedMs / 60000);
   const elapsedSeconds = Math.floor((elapsedMs % 60000) / 1000);
+  const remainingMinutes = isPending
+    ? session.duration_minutes || 60
+    : Math.max(0, (session.duration_minutes || 60) - elapsedMinutes);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-xl md:max-w-2xl">
         <DialogHeader>
           <DialogTitle className="text-2xl">Detalles de Sesión</DialogTitle>
           <DialogDescription>
-            Información completa de la sesión activa
+            Información completa de la sesión
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {/* Cliente */}
           <Card className="shadow-md border-none">
             <CardContent className="p-4 space-y-2">
@@ -76,10 +80,10 @@ export const SessionDetailsModal: React.FC<SessionDetailsModalProps> = ({
           </Card>
 
           {/* Tiempo */}
-          <Card className="shadow-md border-none bg-blue-50">
-            <CardContent className="p-4 space-y-3">
+          <Card className="shadow-md border-none bg-blue-50 sm:col-span-2">
+            <CardContent className="p-4 grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
-                <p className="text-sm text-slate-600">Hora de Entrada</p>
+                <p className="text-sm text-slate-600">Hora de Registro</p>
                 <p className="text-lg font-semibold text-slate-900">
                   {startTime.toLocaleTimeString("es-ES", {
                     hour: "2-digit",
@@ -92,18 +96,22 @@ export const SessionDetailsModal: React.FC<SessionDetailsModalProps> = ({
               <div>
                 <p className="text-sm text-slate-600">Tiempo Transcurrido</p>
                 <p className="text-lg font-semibold text-slate-900">
-                  {elapsedMinutes}m {elapsedSeconds}s
+                  {isPending ? (
+                    <span className="text-blue-600">En espera</span>
+                  ) : (
+                    `${elapsedMinutes}m ${elapsedSeconds}s`
+                  )}
                 </p>
               </div>
 
               <div>
                 <p className="text-sm text-slate-600">Tiempo Restante</p>
                 <p className="text-lg font-semibold text-slate-900">
-                  {Math.max(
-                    0,
-                    (session.duration_minutes || 60) - elapsedMinutes,
+                  {isPending ? (
+                    <span className="text-blue-600">{remainingMinutes}m (disponible)</span>
+                  ) : (
+                    `${remainingMinutes}m`
                   )}
-                  m
                 </p>
               </div>
             </CardContent>
@@ -114,7 +122,12 @@ export const SessionDetailsModal: React.FC<SessionDetailsModalProps> = ({
             <CardContent className="p-4 space-y-2">
               <p className="text-sm text-slate-600">Estado</p>
               <div className="flex items-center gap-2">
-                {isPaused ? (
+                {isPending ? (
+                  <span className="inline-flex items-center gap-2 px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">
+                    <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
+                    En espera de inicio
+                  </span>
+                ) : isPaused ? (
                   <span className="inline-flex items-center gap-2 px-3 py-1 bg-slate-200 text-slate-800 rounded-full text-sm font-medium">
                     <span className="w-2 h-2 bg-slate-600 rounded-full"></span>
                     Pausada

@@ -42,6 +42,10 @@ interface ClientMembership {
   notes: string;
   created_at: string;
   days_remaining: number;
+  phone?: string;
+  id_card?: string;
+  acquisition_date?: string;
+  total_hours?: string;
 }
 
 export function ClientMembershipsManager() {
@@ -121,16 +125,34 @@ export function ClientMembershipsManager() {
   ) => {
     try {
       if (type === "ticket") {
-        await printMembershipTicket(membership);
+        await printMembershipTicket({
+          ...membership,
+          client_name: membership.client_name,
+          membership_name: membership.membership_name,
+          payment_amount: membership.payment_amount,
+          payment_method: membership.payment_method || "N/A",
+          phone: membership.phone || membership.client_phone,
+          id_card: membership.id_card,
+          total_hours: membership.total_hours,
+        });
         success("Imprimiendo ticket en impresora térmica...");
       } else {
-        await printMembershipInvoice(membership);
-        success("Generando PDF de factura...");
+        await printMembershipInvoice({
+          ...membership,
+          client_name: membership.client_name,
+          membership_name: membership.membership_name,
+          payment_amount: membership.payment_amount,
+          payment_method: membership.payment_method || "N/A",
+          phone: membership.phone || membership.client_phone,
+          id_card: membership.id_card,
+          total_hours: membership.total_hours,
+        });
+        success("Factura PDF generada");
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error:", err);
       error(
-        type === "ticket" ? "Error al imprimir ticket" : "Error al generar PDF",
+        type === "ticket" ? "Error al imprimir ticket" : "Error al generar PDF: " + (err.message || "Error desconocido"),
       );
     }
   };
@@ -263,10 +285,13 @@ export function ClientMembershipsManager() {
                   Membresía
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Inicio
+                  Cédula / Tel.
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Vencimiento
+                  Horas
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  Inicio / Vence
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                   Estado
@@ -274,7 +299,7 @@ export function ClientMembershipsManager() {
                 <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
                   Monto
                 </th>
-                <th className="w-40 px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">
+                <th className="w-32 px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">
                   Acciones
                 </th>
               </tr>
@@ -298,16 +323,23 @@ export function ClientMembershipsManager() {
                       </span>
                     </div>
                   </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-1 text-sm text-gray-600">
-                      <Calendar className="w-3 h-3" />
-                      {new Date(membership.start_date).toLocaleDateString()}
+                  <td className="px-4 py-3 whitespace-nowrap">
+                    <div className="text-xs text-gray-900 font-medium">
+                      {membership.id_card || "-"}
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      {membership.phone || "-"}
                     </div>
                   </td>
                   <td className="px-4 py-3">
-                    <div className="flex items-center gap-1 text-sm text-gray-600">
-                      <Calendar className="w-3 h-3" />
-                      {new Date(membership.end_date).toLocaleDateString()}
+                    <span className="text-xs font-medium text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full">
+                      {membership.total_hours || "-"}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex flex-col text-xs text-gray-600">
+                      <span>Inicia: {new Date(membership.start_date).toLocaleDateString()}</span>
+                      <span className="font-semibold">Vence: {new Date(membership.end_date).toLocaleDateString()}</span>
                     </div>
                   </td>
                   <td className="px-4 py-3">{getStatusBadge(membership)}</td>

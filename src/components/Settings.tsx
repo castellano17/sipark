@@ -27,7 +27,6 @@ import {
   Mail,
   Cloud,
   CheckCircle,
-  XCircle,
 } from "lucide-react";
 import { useDatabase } from "@/hooks/useDatabase";
 import { useNotification } from "@/hooks/useNotification";
@@ -45,6 +44,15 @@ export const Settings: React.FC = () => {
   const [systemName, setSystemName] = useState("SIPARK");
   const [companyName, setCompanyName] = useState("");
   const [companyRuc, setCompanyRuc] = useState("");
+  const [companyPhone, setCompanyPhone] = useState("");
+  const [companyAddress, setCompanyAddress] = useState("");
+
+  // Formas de pago
+  const [checkPayeeName, setCheckPayeeName] = useState("");
+  const [bankAccounts, setBankAccounts] = useState<Array<{bankName: string; bankAccountType: string; bankAccountNumber: string; bankAccountHolder: string}>>([]);
+  const [editingBankIndex, setEditingBankIndex] = useState<number | null>(null);
+  const [newBankForm, setNewBankForm] = useState({ bankName: "", bankAccountType: "cordobas", bankAccountNumber: "", bankAccountHolder: "" });
+  const [showAddBankForm, setShowAddBankForm] = useState(false);
 
   // Operaciones
   const [currency, setCurrency] = useState("NIO");
@@ -91,8 +99,10 @@ export const Settings: React.FC = () => {
   const { success, error: errorNotification } = useNotification();
   const {
     printers,
-    selectedPrinter,
-    setSelectedPrinter,
+    ticketPrinter,
+    normalPrinter,
+    setTicketPrinter,
+    setNormalPrinter,
     isLoading: isLoadingPrinters,
     printerStatus,
     printTestTicket,
@@ -141,6 +151,36 @@ export const Settings: React.FC = () => {
               break;
             case "company_ruc":
               setCompanyRuc(setting.value);
+              break;
+            case "company_phone":
+              setCompanyPhone(setting.value);
+              break;
+            case "company_address":
+              setCompanyAddress(setting.value);
+              break;
+            case "payment_methods":
+              try {
+                const pm = JSON.parse(setting.value);
+                setCheckPayeeName(pm.checkPayeeName || "");
+                if (Array.isArray(pm.bankAccounts)) {
+                  setBankAccounts(pm.bankAccounts);
+                } else if (pm.bankName && pm.bankAccountNumber) {
+                  // Manejar formato antiguo (una sola cuenta)
+                  setBankAccounts([
+                    {
+                      bankName: pm.bankName,
+                      bankAccountType: pm.bankAccountType || "cordobas",
+                      bankAccountNumber: pm.bankAccountNumber,
+                      bankAccountHolder: pm.bankAccountHolder || "",
+                    },
+                  ]);
+                } else {
+                  setBankAccounts([]);
+                }
+              } catch (e) {
+                console.error("Error parseando payment_methods:", e);
+                setBankAccounts([]);
+              }
               break;
             case "currency_primary":
               setCurrency(setting.value);
@@ -304,12 +344,6 @@ export const Settings: React.FC = () => {
         success(
           `Respaldo subido a Google Drive: ${result.fileName} (${result.sizeFormatted})`,
         );
-        // Mostrar información adicional
-        console.log("Archivo en Google Drive:", {
-          nombre: result.fileName,
-          id: result.fileId,
-          enlace: result.webViewLink,
-        });
       }
     } catch (err: any) {
       errorNotification(`Error subiendo a Google Drive: ${err.message}`);
@@ -324,6 +358,15 @@ export const Settings: React.FC = () => {
       await setSetting("system_name", systemName);
       await setSetting("company_name", companyName);
       await setSetting("company_ruc", companyRuc);
+      await setSetting("company_phone", companyPhone);
+      await setSetting("company_address", companyAddress);
+
+      const paymentMethods = {
+        checkPayeeName,
+        bankAccounts,
+      };
+      await setSetting("payment_methods", JSON.stringify(paymentMethods));
+
       success("Configuración de empresa guardada correctamente");
     } catch (err) {
       console.error("Error guardando configuración:", err);
@@ -478,6 +521,190 @@ export const Settings: React.FC = () => {
                     className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     placeholder="123456789"
                   />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-slate-900 mb-2">
+                    Teléfono de la Empresa
+                  </label>
+                  <input
+                    type="text"
+                    value={companyPhone}
+                    onChange={(e) => setCompanyPhone(e.target.value)}
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="+505 2222-3333"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-slate-900 mb-2">
+                    Dirección de la Empresa
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={companyAddress}
+                    onChange={(e) => setCompanyAddress(e.target.value)}
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                    placeholder="Calle y número, ciudad, país"
+                  />
+                </div>
+
+                <div className="border-t pt-4">
+                  <h4 className="text-sm font-bold text-slate-800 mb-3">Formas de Pago (para Cotizaciones)</h4>
+
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-700 mb-1">
+                        Cheque a nombre de:
+                      </label>
+                      <input
+                        type="text"
+                        value={checkPayeeName}
+                        onChange={(e) => setCheckPayeeName(e.target.value)}
+                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                        placeholder="Nombre para cheques"
+                      />
+                    </div>
+
+                    {/* Lista de cuentas bancarias */}
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="text-xs font-bold text-slate-600 uppercase tracking-wide">Cuentas Bancarias para Transferencia</p>
+                        <button
+                          type="button"
+                          onClick={() => { setShowAddBankForm(true); setEditingBankIndex(null); setNewBankForm({ bankName: "", bankAccountType: "cordobas", bankAccountNumber: "", bankAccountHolder: "" }); }}
+                          className="text-xs bg-blue-600 text-white px-2 py-1 rounded hover:bg-blue-700"
+                        >
+                          + Agregar
+                        </button>
+                      </div>
+
+                      {/* Formulario de agregar/editar */}
+                      {(showAddBankForm || editingBankIndex !== null) && (
+                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-3 space-y-2">
+                          <p className="text-xs font-bold text-blue-800">{editingBankIndex !== null ? "Editar cuenta" : "Nueva cuenta bancaria"}</p>
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <label className="block text-xs text-slate-600 mb-1">Nombre del Banco</label>
+                              <input
+                                type="text"
+                                value={newBankForm.bankName}
+                                onChange={(e) => setNewBankForm({ ...newBankForm, bankName: e.target.value })}
+                                className="w-full px-2 py-1.5 border border-slate-300 rounded text-sm"
+                                placeholder="Banpro, BAC, Lafise..."
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs text-slate-600 mb-1">Tipo de Cuenta</label>
+                              <select
+                                value={newBankForm.bankAccountType}
+                                onChange={(e) => setNewBankForm({ ...newBankForm, bankAccountType: e.target.value })}
+                                className="w-full px-2 py-1.5 border border-slate-300 rounded text-sm"
+                              >
+                                <option value="cordobas">Córdobas (NIO)</option>
+                                <option value="dolares">Dólares (USD)</option>
+                              </select>
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <label className="block text-xs text-slate-600 mb-1">Número de Cuenta</label>
+                              <input
+                                type="text"
+                                value={newBankForm.bankAccountNumber}
+                                onChange={(e) => setNewBankForm({ ...newBankForm, bankAccountNumber: e.target.value })}
+                                className="w-full px-2 py-1.5 border border-slate-300 rounded text-sm"
+                                placeholder="0000-0000-0000"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs text-slate-600 mb-1">Nombre de la Cuenta</label>
+                              <input
+                                type="text"
+                                value={newBankForm.bankAccountHolder}
+                                onChange={(e) => setNewBankForm({ ...newBankForm, bankAccountHolder: e.target.value })}
+                                className="w-full px-2 py-1.5 border border-slate-300 rounded text-sm"
+                                placeholder="Razón social o nombre"
+                              />
+                            </div>
+                          </div>
+                          <div className="flex gap-2 justify-end">
+                            <button
+                              type="button"
+                              onClick={() => { setShowAddBankForm(false); setEditingBankIndex(null); }}
+                              className="text-xs px-3 py-1.5 border border-slate-300 rounded hover:bg-slate-100"
+                            >
+                              Cancelar
+                            </button>
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                if (!newBankForm.bankName || !newBankForm.bankAccountNumber) return;
+                                let updatedAccounts;
+                                if (editingBankIndex !== null) {
+                                  updatedAccounts = [...bankAccounts];
+                                  updatedAccounts[editingBankIndex] = newBankForm;
+                                  setEditingBankIndex(null);
+                                } else {
+                                  updatedAccounts = [...bankAccounts, newBankForm];
+                                  setShowAddBankForm(false);
+                                }
+                                setBankAccounts(updatedAccounts);
+                                setNewBankForm({ bankName: "", bankAccountType: "cordobas", bankAccountNumber: "", bankAccountHolder: "" });
+                                
+                                // Opcional: Auto-guardar para evitar confusión del usuario
+                                const paymentMethods = {
+                                  checkPayeeName,
+                                  bankAccounts: updatedAccounts,
+                                };
+                                await setSetting("payment_methods", JSON.stringify(paymentMethods));
+                              }}
+                              className="text-xs bg-blue-600 text-white px-3 py-1.5 rounded hover:bg-blue-700"
+                            >
+                              {editingBankIndex !== null ? "Guardar" : "Agregar"}
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Lista de cuentas guardadas */}
+                      {bankAccounts.length === 0 && !showAddBankForm && editingBankIndex === null && (
+                        <p className="text-xs text-slate-400 italic">No hay cuentas bancarias configuradas.</p>
+                      )}
+                      {bankAccounts.map((acct, idx) => (
+                        <div key={idx} className="bg-slate-50 border border-slate-200 rounded-lg p-3 mb-2">
+                          <div className="flex items-start justify-between">
+                            <div className="text-sm">
+                              <p className="font-semibold text-slate-800">{acct.bankName} — <span className="text-slate-500">{acct.bankAccountType === "dolares" ? "Dólares (USD)" : "Córdobas (NIO)"}</span></p>
+                              <p className="text-slate-600">N° {acct.bankAccountNumber}</p>
+                              {acct.bankAccountHolder && <p className="text-slate-500 text-xs">{acct.bankAccountHolder}</p>}
+                            </div>
+                            <div className="flex gap-1 ml-2 shrink-0">
+                              <button
+                                type="button"
+                                onClick={() => { setNewBankForm(acct); setEditingBankIndex(idx); setShowAddBankForm(false); }}
+                                className="text-xs text-blue-600 hover:underline px-1"
+                              >Editar</button>
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  const updatedAccounts = bankAccounts.filter((_, i) => i !== idx);
+                                  setBankAccounts(updatedAccounts);
+                                  // Auto-guardar eliminación
+                                  const paymentMethods = {
+                                    checkPayeeName,
+                                    bankAccounts: updatedAccounts,
+                                  };
+                                  await setSetting("payment_methods", JSON.stringify(paymentMethods));
+                                }}
+                                className="text-xs text-red-500 hover:underline px-1"
+                              >Eliminar</button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 </div>
 
                 <Button
@@ -1045,22 +1272,49 @@ export const Settings: React.FC = () => {
               </CardContent>
             </Card>
 
-            {/* Impresora Térmica */}
+            {/* Configuración de Impresoras */}
             <Card className="shadow-md border-none">
               <CardHeader>
-                <CardTitle className="text-lg">Impresora Térmica</CardTitle>
+                <CardTitle className="text-lg">Impresoras</CardTitle>
                 <CardDescription>
-                  Configura la impresora para tickets y recibos
+                  Configura la impresora para tickets/recibos y la impresora para documentos A4
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
                   <label className="block text-sm font-semibold text-slate-900 mb-2">
-                    Seleccionar Impresora
+                    Impresora de Tickets (Térmica)
                   </label>
                   <select
-                    value={selectedPrinter}
-                    onChange={(e) => setSelectedPrinter(e.target.value)}
+                    value={ticketPrinter}
+                    onChange={async (e) => {
+                      setTicketPrinter(e.target.value);
+                      await setSetting("ticket_printer", e.target.value);
+                    }}
+                    disabled={isLoadingPrinters || printers.length === 0}
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-slate-100 disabled:cursor-not-allowed mb-4"
+                  >
+                    {printers.length === 0 ? (
+                      <option value="">No hay impresoras disponibles</option>
+                    ) : (
+                      printers.map((printer) => (
+                        <option key={printer.name} value={printer.name}>
+                          {printer.displayName}
+                          {printer.isDefault ? " (Predeterminada)" : ""}
+                        </option>
+                      ))
+                    )}
+                  </select>
+
+                  <label className="block text-sm font-semibold text-slate-900 mb-2">
+                    Impresora Normal (A4 / Documentos)
+                  </label>
+                  <select
+                    value={normalPrinter}
+                    onChange={async (e) => {
+                      setNormalPrinter(e.target.value);
+                      await setSetting("normal_printer", e.target.value);
+                    }}
                     disabled={isLoadingPrinters || printers.length === 0}
                     className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-slate-100 disabled:cursor-not-allowed"
                   >
@@ -1102,19 +1356,19 @@ export const Settings: React.FC = () => {
                     </span>
                   </div>
                   <p className="text-sm text-slate-600">
-                    {selectedPrinter
-                      ? `Impresora seleccionada: ${selectedPrinter}`
-                      : "Selecciona una impresora"}
+                    {ticketPrinter
+                      ? `Impresora tickets: ${ticketPrinter}`
+                      : "Selecciona una impresora de tickets"}
                   </p>
                 </div>
 
                 <Button
-                  onClick={() => printTestTicket(selectedPrinter)}
-                  disabled={!selectedPrinter || isLoadingPrinters}
+                  onClick={() => printTestTicket(ticketPrinter)}
+                  disabled={!ticketPrinter || isLoadingPrinters}
                   className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold gap-2 disabled:bg-slate-300 disabled:cursor-not-allowed"
                 >
                   <Printer className="w-4 h-4" />
-                  Imprimir Ticket de Prueba
+                  Imprimir Ticket Térmico de Prueba
                 </Button>
               </CardContent>
             </Card>

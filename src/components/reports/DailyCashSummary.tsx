@@ -104,7 +104,7 @@ export function DailyCashSummary({ onBack }: DailyCashSummaryProps) {
       ticketText += `Generado: ${new Date().toLocaleString("es-ES")}\n`;
       ticketText += "================================\n\n\n";
 
-      console.log("Imprimiendo en impresora térmica:", ticketText);
+      // Enviar a impresora térmica...
 
       // TODO: Integrar con API de impresora cuando esté disponible
       // await window.api.printTicket(selectedPrinter, ticketText);

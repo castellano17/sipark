@@ -184,6 +184,12 @@ async function createUser(userData, createdBy) {
       permissions,
     } = userData;
 
+    if (!username || !username.trim()) throw new Error("El usuario es obligatorio");
+    if (!password) throw new Error("La contraseña es obligatoria");
+    if (!first_name || !first_name.trim()) throw new Error("El nombre es obligatorio");
+    if (!last_name || !last_name.trim()) throw new Error("El apellido es obligatorio");
+    if (!role) throw new Error("El rol es obligatorio");
+
     // Verificar que el username no exista
     const existing = await getAsync("SELECT id FROM users WHERE username = ?", [
       username,
@@ -285,6 +291,10 @@ async function updateUser(userId, userData, updatedBy) {
       is_active,
       permissions,
     } = userData;
+
+    if (!first_name || !first_name.trim()) throw new Error("El nombre es obligatorio");
+    if (!last_name || !last_name.trim()) throw new Error("El apellido es obligatorio");
+    if (!role) throw new Error("El rol es obligatorio");
 
     // Verificar si se está intentando desactivar el último admin
     if (is_active === false || is_active === 0) {

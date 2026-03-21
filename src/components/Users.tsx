@@ -175,13 +175,13 @@ export function Users() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.username || !formData.first_name || !formData.last_name) {
-      error("Complete los campos obligatorios");
-      return;
-    }
+    if (!formData.username.trim()) return error("El campo 'Usuario' es obligatorio");
+    if (!formData.first_name.trim()) return error("El campo 'Nombre' es obligatorio");
+    if (!formData.last_name.trim()) return error("El campo 'Apellido' es obligatorio");
+    if (!formData.role) return error("El campo 'Rol' es obligatorio");
 
     if (!editingUser && !formData.password) {
-      error("La contraseña es obligatoria para nuevos usuarios");
+      error("El campo 'Contraseña' es obligatorio para nuevos usuarios");
       return;
     }
 
@@ -543,7 +543,7 @@ export function Users() {
         <Dialog open={showModal} onOpenChange={setShowModal}>
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
             <Card className="w-full max-w-2xl bg-white border-0">
-              <form onSubmit={handleSubmit}>
+              <form onSubmit={handleSubmit} noValidate>
                 {/* Header */}
                 <div className="flex items-center justify-between p-6 border-b bg-gradient-to-r from-blue-600 to-blue-700">
                   <div className="flex items-center gap-3">
@@ -557,7 +557,7 @@ export function Users() {
                 </div>
 
                 <div className="p-6 space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium mb-2">
                         Usuario * {editingUser && "(no editable)"}
@@ -567,7 +567,6 @@ export function Users() {
                         onChange={(e) =>
                           setFormData({ ...formData, username: e.target.value })
                         }
-                        required
                         disabled={!!editingUser}
                         placeholder="usuario123"
                       />
@@ -587,7 +586,6 @@ export function Users() {
                               password: e.target.value,
                             })
                           }
-                          required={!editingUser}
                           placeholder="Mínimo 6 caracteres"
                         />
                       </div>
@@ -605,7 +603,6 @@ export function Users() {
                             first_name: e.target.value,
                           })
                         }
-                        required
                         placeholder="Juan"
                       />
                     </div>
@@ -622,7 +619,6 @@ export function Users() {
                             last_name: e.target.value,
                           })
                         }
-                        required
                         placeholder="Pérez"
                       />
                     </div>
@@ -664,7 +660,6 @@ export function Users() {
                         onChange={(e) =>
                           setFormData({ ...formData, role: e.target.value })
                         }
-                        required
                       >
                         {roles.map((role) => (
                           <option key={role.value} value={role.value}>

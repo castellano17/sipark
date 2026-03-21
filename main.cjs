@@ -28,18 +28,11 @@ let mainWindow;
 
 async function initializeApp() {
   try {
-    console.log("🚀 Inicializando aplicación SIPARK...");
-    console.log("📊 Conectando a PostgreSQL del sistema...");
-    console.log("💡 Asegúrate de que PostgreSQL esté instalado y corriendo");
-    console.log("💡 Host: 127.0.0.1:5432");
-    console.log("💡 Base de datos: ludoteca_pos");
-    console.log("💡 Usuario: ludoteca_user");
 
     // Inicializar base de datos
     await initializeDatabase();
     await seedDatabase();
 
-    console.log("✅ Aplicación inicializada correctamente");
   } catch (error) {
     console.error("❌ Error inicializando aplicación:", error);
     console.error("\n⚠️  POSTGRESQL NO ESTÁ CORRIENDO O NO ESTÁ CONFIGURADO");
@@ -74,7 +67,6 @@ function createWindow() {
     ? "http://localhost:5173"
     : `file://${path.join(__dirname, "dist", "index.html")}`;
 
-  console.log("🔗 Cargando URL:", startUrl);
   mainWindow.loadURL(startUrl);
 
   if (isDev) {
@@ -95,11 +87,7 @@ app.on("ready", async () => {
     // Crear primer admin si no existen usuarios
     try {
       const result = await api.createFirstAdmin();
-      if (result.success) {
-        console.log(result.message);
-      }
     } catch (error) {
-      console.log("Admin ya existe o error:", error.message);
     }
 
     setupIpcHandlers();
@@ -121,7 +109,6 @@ app.on("window-all-closed", () => {
 });
 
 app.on("quit", () => {
-  console.log("👋 Aplicación cerrada");
 });
 
 app.on("activate", () => {
@@ -401,7 +388,14 @@ function setupIpcHandlers() {
       data.phone,
       data.packageId,
       data.durationMinutes,
+      data.isPaid,
     ),
+  );
+  ipcMain.handle("api:startTimerSession", (event, sessionId) =>
+    api.startTimerSession(sessionId),
+  );
+  ipcMain.handle("api:updateSessionPaidStatus", (event, data) =>
+    api.updateSessionPaidStatus(data.sessionId, data.isPaid),
   );
 
   // Health Check
@@ -416,6 +410,9 @@ function setupIpcHandlers() {
   );
   ipcMain.handle("api:printTestTicket", (event, printerName) =>
     printerModule.printTestTicket(printerName),
+  );
+  ipcMain.handle("api:openCashDrawer", (event, printerName) =>
+    printerModule.openCashDrawer(printerName),
   );
 
   // Cash Box
@@ -530,13 +527,10 @@ function setupIpcHandlers() {
   // Categories
   ipcMain.handle("api:getCategories", () => api.getCategories());
   ipcMain.handle("api:createCategory", async (event, data) => {
-    console.log("📝 IPC: createCategory llamado con:", data);
     try {
       const result = await api.createCategory(data.name, data.description);
-      console.log("✅ IPC: createCategory exitoso, ID:", result);
       return result;
     } catch (error) {
-      console.error("❌ IPC: createCategory falló:", error);
       throw error;
     }
   });
@@ -597,6 +591,10 @@ function setupIpcHandlers() {
       data.paymentAmount,
       data.notes,
       data.createdBy,
+      data.phone,
+      data.id_card,
+      data.acquisition_date,
+      data.total_hours
     ),
   );
   ipcMain.handle("api:cancelClientMembership", (event, data) =>
@@ -757,9 +755,16 @@ function setupIpcHandlers() {
   );
 
   // PDF Generator
-  ipcMain.handle("pdf:generateMembershipPDF", (event, pdfData) =>
-    pdfGenerator.generateMembershipPDF(pdfData),
-  );
+  ipcMain.handle("pdf:generateMembershipPDF", async (event, pdfData) => {
+    try {
+      const result = await pdfGenerator.generateMembershipPDF(pdfData);
+      // Abrir el archivo desde el proceso principal para máxima compatibilidad con macOS
+      shell.openPath(result);
+      return result;
+    } catch (error) {
+      throw error;
+    }
+  });
   ipcMain.handle(
     "pdf:generateReservationPDF",
     async (event, reservationData) => {

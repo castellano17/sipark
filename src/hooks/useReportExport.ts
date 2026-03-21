@@ -83,8 +83,12 @@ export function useReportExport() {
     }
   };
 
-  const exportToPDF = async (options: ExportOptions) => {
+  const exportToPDF = async (options: ExportOptions & { printedBy?: string }) => {
     try {
+      const currentUserStr = localStorage.getItem("currentUser");
+      const currentUser = currentUserStr ? JSON.parse(currentUserStr) : null;
+      options.printedBy = currentUser?.username || currentUser?.nombre || "Usuario del Sistema";
+
       // Delegar la generación del PDF al main context (Electron)
       await (window as any).api.exportPDF(options);
       success("Reporte exportado a PDF");

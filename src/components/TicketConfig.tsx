@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import { Card, CardContent } from "./ui/card";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -64,6 +64,7 @@ const defaultSettings: TicketSettings = {
 
 export const TicketConfig: React.FC = () => {
   const [settings, setSettings] = useState<TicketSettings>(defaultSettings);
+  const [printerMode, setPrinterMode] = useState<"test" | "real">("test");
   const [showPreview, setShowPreview] = useState(true);
   const [loading, setLoading] = useState(false);
   const [logoPreview, setLogoPreview] = useState<string>("");
@@ -73,7 +74,19 @@ export const TicketConfig: React.FC = () => {
   useEffect(() => {
     loadSettings();
     loadLogo();
+    loadPrinterMode();
   }, []);
+
+  const loadPrinterMode = async () => {
+    try {
+      const mode = await (window as any).api.getSetting("printer_mode");
+      if (mode) {
+        setPrinterMode(mode as "test" | "real");
+      }
+    } catch (err) {
+      console.error("Error cargando modo de impresora:", err);
+    }
+  };
 
   const loadSettings = async () => {
     try {
@@ -106,6 +119,7 @@ export const TicketConfig: React.FC = () => {
         "ticket_config",
         JSON.stringify(settings),
       );
+      await (window as any).api.setSetting("printer_mode", printerMode);
       success("Configuración guardada correctamente");
     } catch (err) {
       error("Error guardando configuración");
@@ -596,6 +610,43 @@ export const TicketConfig: React.FC = () => {
                       <option value="normal">Normal</option>
                       <option value="large">Grande</option>
                     </select>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Modo de Impresión */}
+            <Card className="shadow-md border-none border-l-4 border-l-orange-500">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold text-slate-900">
+                    Modo de Operación
+                  </h3>
+                  <div className={`px-3 py-1 rounded-full text-xs font-bold ${
+                    printerMode === "real" ? "bg-green-100 text-green-700" : "bg-orange-100 text-orange-700"
+                  }`}>
+                    {printerMode === "real" ? "ENVÍO REAL" : "MODO PRUEBA"}
+                  </div>
+                </div>
+                <div className="space-y-4">
+                  <p className="text-sm text-slate-600">
+                    En <b>Modo Prueba</b>, los tickets se muestran solo en la consola del navegador para que puedas verificar el diseño sin gastar papel.
+                  </p>
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={() => setPrinterMode("test")}
+                      variant={printerMode === "test" ? "default" : "outline"}
+                      className={`flex-1 ${printerMode === "test" ? "bg-orange-500 hover:bg-orange-600" : ""}`}
+                    >
+                      Modo Prueba (Consola)
+                    </Button>
+                    <Button
+                      onClick={() => setPrinterMode("real")}
+                      variant={printerMode === "real" ? "default" : "outline"}
+                      className={`flex-1 ${printerMode === "real" ? "bg-green-600 hover:bg-green-700" : ""}`}
+                    >
+                      Modo Real (Impresora)
+                    </Button>
                   </div>
                 </div>
               </CardContent>

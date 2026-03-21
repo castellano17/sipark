@@ -65,7 +65,13 @@ declare global {
         phone: string,
         packageId: number,
         durationMinutes: number,
+        isPaid?: boolean,
       ) => Promise<any>;
+      startTimerSession: (sessionId: number) => Promise<boolean>;
+      updateSessionPaidStatus: (
+        sessionId: number,
+        isPaid: boolean,
+      ) => Promise<boolean>;
       checkDatabaseConnection: () => Promise<{
         connected: boolean;
         message: string;
@@ -169,6 +175,15 @@ declare global {
         durationMinutes: number,
       ) => Promise<boolean>;
       getActiveMemberships: (statusFilter: string) => Promise<any>;
+      // Quotations
+      getAllQuotations: () => Promise<any>;
+      getQuotationById: (id: number) => Promise<any>;
+      createQuotation: (quotationData: any) => Promise<any>;
+      updateQuotationStatus: (id: number, status: string) => Promise<any>;
+      deleteQuotation: (id: number) => Promise<any>;
+      generateQuotationPDF: (quotationData: any) => Promise<any>;
+      // Reservations
+      createReservation: (reservationData: any) => Promise<any>;
     };
   }
 }
@@ -200,10 +215,14 @@ export function useDatabase() {
   const createClient = useCallback(
     async (
       name: string,
-      parentName?: string,
-      phone?: string,
-      photoPath?: string,
-      isMember?: boolean,
+      parentName: string | null,
+      phone: string,
+      emergencyPhone: string | null,
+      email: string | null,
+      childName: string | null,
+      childAge: number | null,
+      allergies: string | null,
+      specialNotes: string | null,
     ) => {
       try {
         setLoading(true);
@@ -212,13 +231,54 @@ export function useDatabase() {
           name,
           parentName,
           phone,
-          photoPath,
-          isMember,
+          emergencyPhone,
+          email,
+          childName,
+          childAge,
+          allergies,
+          specialNotes,
         );
         return result;
       } catch (err) {
         handleError(err);
         return null;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [handleError],
+  );
+
+  const startTimerSession = useCallback(
+    async (sessionId: number) => {
+      try {
+        setLoading(true);
+        setError(null);
+        const result = await window.api.startTimerSession(sessionId);
+        return result;
+      } catch (err) {
+        handleError(err);
+        return null;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [handleError],
+  );
+
+  const updateSessionPaidStatus = useCallback(
+    async (sessionId: number, isPaid: boolean) => {
+      try {
+        setLoading(true);
+        setError(null);
+        const result = await window.api.updateSessionPaidStatus(
+          sessionId,
+          isPaid,
+        );
+        return result;
+      } catch (err) {
+        handleError(err);
+        return false;
       } finally {
         setLoading(false);
       }
@@ -348,6 +408,7 @@ export function useDatabase() {
         const result = await window.api.setSetting(key, value);
         return result;
       } catch (err) {
+        console.error(`❌ Error guardando setting ${key}:`, err);
         handleError(err);
         return null;
       } finally {
@@ -378,6 +439,7 @@ export function useDatabase() {
       phone: string,
       packageId: number,
       durationMinutes: number,
+      isPaid: boolean = false,
     ) => {
       try {
         setLoading(true);
@@ -388,6 +450,7 @@ export function useDatabase() {
           phone,
           packageId,
           durationMinutes,
+          isPaid,
         );
         return result;
       } catch (err) {
@@ -405,19 +468,21 @@ export function useDatabase() {
       name: string,
       price: number,
       type: string,
-      durationMinutes?: number,
       category?: string,
+      barcode?: string,
+      stock?: number,
+      durationMinutes?: number,
     ) => {
       try {
         setLoading(true);
         setError(null);
-        const result = await window.api.createProductService(
+        const result = await (window as any).api.createProductService(
           name,
           price,
           type,
-          category || null,
-          null, // barcode
-          null, // stock
+          category,
+          barcode,
+          stock,
           durationMinutes,
         );
         return result;
@@ -437,24 +502,28 @@ export function useDatabase() {
       name: string,
       price: number,
       type: string,
-      durationMinutes?: number,
       category?: string,
+      barcode?: string,
+      stock?: number,
+      durationMinutes?: number,
     ) => {
       try {
         setLoading(true);
         setError(null);
-        await window.api.updateProductService(
+        const result = await (window as any).api.updateProductService(
           id,
           name,
           price,
           type,
-          category || null,
-          null, // barcode
-          null, // stock
+          category,
+          barcode,
+          stock,
           durationMinutes,
         );
+        return result;
       } catch (err) {
         handleError(err);
+        return null;
       } finally {
         setLoading(false);
       }
@@ -502,6 +571,8 @@ export function useDatabase() {
     setSetting,
     getAllSettings,
     createSession,
+    startTimerSession,
+    updateSessionPaidStatus,
     createProductService,
     updateProductService,
     deleteProductService,

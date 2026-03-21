@@ -135,11 +135,9 @@ export const Reservaciones: React.FC = () => {
   const loadPackages = async () => {
     try {
       const result = await window.api.getProductsServices();
-      console.log("Paquetes cargados:", result);
       // api.getProductsServices devuelve un array directamente
       if (Array.isArray(result)) {
         const pkgs = result.filter((p: PackageItem) => p.type === "package");
-        console.log("Paquetes filtrados:", pkgs);
         setPackages(pkgs);
       }
     } catch (error) {
@@ -150,7 +148,6 @@ export const Reservaciones: React.FC = () => {
   const loadClients = async () => {
     try {
       const result = await window.api.getClients();
-      console.log("Clientes cargados:", result);
       // api.getClients devuelve un array directamente
       if (Array.isArray(result)) {
         setClients(result);
@@ -197,12 +194,10 @@ export const Reservaciones: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.client_name || !formData.event_date || !formData.package_id) {
-      enqueueSnackbar("Por favor completa todos los campos requeridos", {
-        variant: "warning",
-      });
-      return;
-    }
+    if (!formData.client_name.trim()) return enqueueSnackbar("El campo 'Nombre' es obligatorio", { variant: "warning" });
+    if (!formData.event_date) return enqueueSnackbar("El campo 'Fecha del Evento' es obligatorio", { variant: "warning" });
+    if (!formData.event_time) return enqueueSnackbar("El campo 'Hora del Evento' es obligatorio", { variant: "warning" });
+    if (!formData.package_id) return enqueueSnackbar("El campo 'Paquete' es obligatorio", { variant: "warning" });
 
     const result = await window.api.createReservation(formData);
 
@@ -282,21 +277,14 @@ export const Reservaciones: React.FC = () => {
     if (!selectedReservation) return;
 
     try {
-      console.log("Obteniendo caja activa...");
       const cashBox = await window.api.getActiveCashBox();
-      console.log("Caja activa:", cashBox);
 
       if (!cashBox) {
         enqueueSnackbar("No hay caja abierta", { variant: "error" });
         return;
       }
 
-      console.log("Registrando pago con datos:", {
-        reservationId: selectedReservation.id,
-        amount: paymentAmount,
-        paymentMethod,
-        cashBoxId: cashBox.id,
-      });
+      // Registrar pago...
 
       const result = await window.api.registerReservationPayment(
         selectedReservation.id,
@@ -308,7 +296,6 @@ export const Reservaciones: React.FC = () => {
         },
       );
 
-      console.log("Resultado del pago:", result);
 
       if (result.success) {
         enqueueSnackbar("Pago registrado exitosamente", {
@@ -375,10 +362,13 @@ export const Reservaciones: React.FC = () => {
   };
 
   const filteredReservations = reservations.filter((r) => {
-    const eventDate =
-      typeof r.event_date === "string"
-        ? r.event_date
-        : new Date(r.event_date).toISOString().split("T")[0];
+    let eventDate = "";
+    if (typeof r.event_date === "string") {
+      eventDate = r.event_date.includes("T") ? r.event_date.split("T")[0] : r.event_date;
+    } else {
+      eventDate = new Date(r.event_date).toISOString().split("T")[0];
+    }
+    
     return (
       r.client_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       eventDate.includes(searchTerm)
@@ -480,7 +470,12 @@ export const Reservaciones: React.FC = () => {
                       </div>
                     </td>
                     <td className="p-3">
-                      {new Date(reservation.event_date).toLocaleDateString()}
+                      {(() => {
+                        const dateStr = typeof reservation.event_date === "string" && reservation.event_date.includes("T")
+                          ? reservation.event_date.split("T")[0]
+                          : reservation.event_date;
+                        return new Date(`${dateStr}T00:00:00`).toLocaleDateString();
+                      })()}
                     </td>
                     <td className="p-3">{reservation.event_time}</td>
                     <td className="p-3">{reservation.package_name}</td>
@@ -540,7 +535,7 @@ export const Reservaciones: React.FC = () => {
               <CardTitle>Nueva Reservación</CardTitle>
             </CardHeader>
             <CardContent>
-              <form onSubmit={handleSubmit} className="space-y-4">
+              <form onSubmit={handleSubmit} className="space-y-4" noValidate>
                 <div>
                   <label className="block text-sm font-medium mb-1">
                     Buscar Cliente
@@ -584,14 +579,13 @@ export const Reservaciones: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium mb-1">
                       Nombre *
                     </label>
                     <input
                       type="text"
-                      required
                       value={formData.client_name}
                       onChange={(e) =>
                         setFormData({
@@ -634,14 +628,13 @@ export const Reservaciones: React.FC = () => {
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium mb-1">
                       Fecha del Evento *
                     </label>
                     <input
                       type="date"
-                      required
                       value={formData.event_date}
                       onChange={(e) =>
                         setFormData({ ...formData, event_date: e.target.value })
@@ -655,7 +648,6 @@ export const Reservaciones: React.FC = () => {
                     </label>
                     <input
                       type="time"
-                      required
                       value={formData.event_time}
                       onChange={(e) =>
                         setFormData({ ...formData, event_time: e.target.value })
@@ -708,7 +700,7 @@ export const Reservaciones: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium mb-1">
                       Total
@@ -944,8 +936,7 @@ export const Reservaciones: React.FC = () => {
                       Registrar Pago
                     </Button>
                   )}
-                {selectedReservation.status === "confirmed" &&
-                  selectedReservation.status !== "completed" && (
+                {selectedReservation.status === "confirmed" && (
                     <Button
                       onClick={() =>
                         handleOpenCompleteModal(selectedReservation)

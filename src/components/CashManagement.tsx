@@ -109,7 +109,7 @@ export function CashManagement() {
     ticketText += "_______________________\n";
     ticketText += "\n\n";
 
-    console.log("Imprimiendo apertura (ticket):", ticketText);
+    // Enviar a impresora térmica...
     success("Ticket de apertura generado");
     // TODO: Integrar con impresora térmica real
   };
@@ -120,7 +120,7 @@ export function CashManagement() {
     try {
       const filepath = await window.api.generateOpeningPDF(activeCashBox);
       success("PDF de apertura generado y abierto");
-      console.log("PDF generado en:", filepath);
+      // Generado con éxito
     } catch (error) {
       showError("Error generando PDF de apertura");
       console.error(error);
@@ -130,7 +130,10 @@ export function CashManagement() {
   const handleAddExpense = async () => {
     if (!activeCashBox) return;
 
-    const amount = parseFloat(expenseAmount);
+    // Reemplazar coma por punto para asegurar la conversión correcta en Windows/diferentes locales
+    const normalizedAmount = expenseAmount.trim().replace(",", ".");
+    const amount = parseFloat(normalizedAmount);
+    
     if (isNaN(amount) || amount <= 0) {
       showError("Ingrese un monto válido");
       return;
@@ -140,18 +143,24 @@ export function CashManagement() {
       return;
     }
 
-    const result = await addCashMovement(
-      activeCashBox.id,
-      "expense",
-      amount,
-      expenseDescription,
-    );
+    try {
+      const result = await addCashMovement(
+        activeCashBox.id,
+        "expense",
+        amount,
+        expenseDescription,
+      );
 
-    if (result) {
-      success("Gasto registrado exitosamente");
-      setExpenseAmount("");
-      setExpenseDescription("");
-      await loadCashBoxData();
+      if (result) {
+        success("Gasto registrado exitosamente");
+        setExpenseAmount("");
+        setExpenseDescription("");
+        await loadCashBoxData();
+      } else {
+        showError("No se pudo registrar el gasto");
+      }
+    } catch (err) {
+      showError("Error al registrar el gasto");
     }
   };
 
@@ -216,7 +225,7 @@ export function CashManagement() {
       };
       const filepath = await window.api.generateClosingPDF(dataWithNotes);
       success("PDF de cuadre generado y abierto");
-      console.log("PDF generado en:", filepath);
+      // Generado con éxito
     } catch (error) {
       showError("Error generando PDF de cuadre");
       console.error(error);
@@ -278,12 +287,12 @@ export function CashManagement() {
       ticketText += "_______________________\n";
       ticketText += "\n\n";
 
-      console.log("Imprimiendo cuadre (ticket):", ticketText);
+      // Enviar a impresora térmica...
       success("Ticket de cuadre generado");
       // TODO: Integrar con impresora térmica real
     } else {
       // Formato PDF
-      console.log("Generando PDF de cuadre...");
+      // Generando...
       success("PDF de cuadre generado");
       // TODO: Implementar generación de PDF
     }
@@ -496,7 +505,7 @@ export function CashManagement() {
       {/* Modal de Cierre */}
       {showCloseModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <Card className="w-[500px] p-6 border-0">
+          <Card className="w-full max-w-lg md:max-w-xl p-6 border-0">
             <h2 className="text-2xl font-bold mb-4">Cerrar Caja</h2>
 
             <div className="bg-blue-50 p-4 rounded-lg mb-4">

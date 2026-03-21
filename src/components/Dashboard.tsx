@@ -8,13 +8,31 @@ import {
   ShoppingCart,
   TrendingUp,
   Clock,
-  CheckCircle,
   Calendar as CalendarIcon,
   ArrowRight,
   ChevronLeft,
   ChevronRight,
   Users,
+  UserPlus,
 } from "lucide-react";
+
+// Componente de Icono de Brazalete personalizado
+const BraceletIcon = ({ className }: { className?: string }) => (
+  <svg
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2.5"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className}
+  >
+    <path d="M6 3c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2H6z" />
+    <path d="M4 8h16" />
+    <path d="M4 16h16" />
+    <circle cx="12" cy="12" r="2" />
+  </svg>
+);
 
 interface DashboardProps {
   currentUser: any;
@@ -28,8 +46,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const [stats, setStats] = useState({
     totalSales: 0,
     inProgress: 0,
-    pending: 0,
-    completed: 0,
+    ticketAverage: 0,
+    newClients: 0,
+    salesCount: 0,
   });
   const [weekReservations, setWeekReservations] = useState<any[]>([]);
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -57,20 +76,39 @@ export const Dashboard: React.FC<DashboardProps> = ({
       // Obtener ventas del día desde la caja activa
       let totalSales = 0;
       const activeCashBox = await getActiveCashBox();
+      let currentDaySalesCount = 0;
 
       if (activeCashBox) {
         const sales = await getCashBoxSales(activeCashBox.id);
+        currentDaySalesCount = sales.length;
         totalSales = sales.reduce(
           (sum: number, sale: any) => sum + (sale.total || 0),
           0,
         );
       }
 
+      // Obtener clientes registrados hoy
+      let newClientsCount = 0;
+      try {
+        const clients = await window.api.getClients();
+        const todayStr = new Date().toISOString().split('T')[0];
+        newClientsCount = clients.filter((c: any) => {
+          if (!c.created_at) return false;
+          const createdAtStr = typeof c.created_at === 'string' 
+            ? c.created_at 
+            : new Date(c.created_at).toISOString();
+          return createdAtStr.startsWith(todayStr);
+        }).length;
+      } catch (err) {
+        console.error("Error cargando clientes hoy:", err);
+      }
+
       setStats({
         totalSales: totalSales,
         inProgress: sessions.length || 0,
-        pending: 0,
-        completed: totalSales > 0 ? 1 : 0,
+        ticketAverage: currentDaySalesCount > 0 ? totalSales / currentDaySalesCount : 0,
+        newClients: newClientsCount,
+        salesCount: currentDaySalesCount,
       });
 
       // Cargar membresías activas
@@ -159,25 +197,58 @@ export const Dashboard: React.FC<DashboardProps> = ({
         0,
       );
 
+      const formatDate = (d: Date) => {
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${y}-${m}-${day}`;
+      };
+
       const result = await window.api.getReservationsByDateRange(
-        firstDay.toISOString().split("T")[0],
-        lastDay.toISOString().split("T")[0],
+        formatDate(firstDay),
+        formatDate(lastDay),
       );
 
       if (result.success) {
-        const reservations = result.data.map((res: any) => ({
-          id: res.id,
-          date: new Date(res.event_date + "T" + res.event_time),
-          time: res.event_time,
-          title: res.package_name,
-          client: res.client_name,
-          color:
-            res.status === "confirmed"
-              ? "bg-green-500"
-              : res.status === "cancelled"
-                ? "bg-red-500"
-                : "bg-blue-500",
-        }));
+        const reservations = result.data.map((res: any) => {
+          const dateStr = typeof res.event_date === 'string' && res.event_date.includes('T')
+            ? res.event_date.split('T')[0]
+            : res.event_date;
+            
+          let year, month, day;
+          if (dateStr && typeof dateStr === 'string' && dateStr.includes('-')) {
+            const parts = dateStr.split('-');
+            year = parseInt(parts[0], 10);
+            month = parseInt(parts[1], 10) - 1; // Meses en JS son 0-indexed
+            day = parseInt(parts[2], 10);
+          } else {
+            const d = new Date(res.event_date);
+            year = d.getFullYear();
+            month = d.getMonth();
+            day = d.getDate();
+          }
+
+          let hours = 0, minutes = 0;
+          if (res.event_time) {
+            const tParts = res.event_time.split(':');
+            hours = parseInt(tParts[0], 10) || 0;
+            minutes = parseInt(tParts[1], 10) || 0;
+          }
+            
+          return {
+            id: res.id,
+            date: new Date(year, month, day, hours, minutes),
+            time: res.event_time,
+            title: res.package_name,
+            client: res.client_name,
+            color:
+              res.status === "confirmed"
+                ? "bg-green-500"
+                : res.status === "cancelled"
+                  ? "bg-red-500"
+                  : "bg-blue-500",
+          };
+        });
         setAllReservations(reservations);
         filterReservationsByDate(selectedDate, reservations);
       }
@@ -252,7 +323,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
       {/* Header con Welcome */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-slate-900">Dashboard</h1>
+          <h1 className="text-3xl font-bold text-slate-900">Dashboard Principal</h1>
           <p className="text-slate-600 mt-1">
             {new Date().toLocaleDateString("es-ES", {
               weekday: "long",
@@ -333,23 +404,28 @@ export const Dashboard: React.FC<DashboardProps> = ({
               </CardContent>
             </Card>
 
-            <Card className="shadow-md border-none bg-gradient-to-br from-pink-500 to-pink-600 text-white">
+            <Card className="shadow-md border-none bg-gradient-to-br from-indigo-500 to-indigo-600 text-white">
               <CardContent className="p-4">
                 <div className="flex items-center justify-between mb-2">
                   <TrendingUp className="w-8 h-8 opacity-80" />
                 </div>
-                <p className="text-3xl font-bold">{stats.pending}</p>
-                <p className="text-sm text-pink-100">Pendientes</p>
+                <p className="text-xl sm:text-2xl font-bold">
+                  {formatCurrency(stats.ticketAverage)}
+                </p>
+                <p className="text-sm text-indigo-100">Ticket Promedio</p>
               </CardContent>
             </Card>
 
-            <Card className="shadow-md border-none bg-gradient-to-br from-green-500 to-green-600 text-white">
+            <Card 
+              className="shadow-md border-none bg-gradient-to-br from-orange-500 to-orange-600 text-white cursor-pointer hover:scale-105 transition-transform"
+              onClick={() => onNavigate("/clientes")}
+            >
               <CardContent className="p-4">
                 <div className="flex items-center justify-between mb-2">
-                  <CheckCircle className="w-8 h-8 opacity-80" />
+                  <UserPlus className="w-8 h-8 opacity-80" />
                 </div>
-                <p className="text-3xl font-bold">{stats.completed}</p>
-                <p className="text-sm text-green-100">Completadas</p>
+                <p className="text-3xl font-bold">{stats.newClients}</p>
+                <p className="text-sm text-orange-100">Nuevos Clientes</p>
               </CardContent>
             </Card>
           </div>
@@ -579,7 +655,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                       </p>
                     </div>
                     <span className="text-2xl font-bold text-purple-600">
-                      {stats.completed}
+                      {stats.salesCount}
                     </span>
                   </div>
                   <div className="flex items-center justify-between text-xs text-purple-700 mt-2">
@@ -739,52 +815,49 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </CardContent>
           </Card>
 
-          {/* Ocupación en Tiempo Real */}
+          {/* Colores de las Brazaletes */}
           <Card className="shadow-md border-none">
             <CardHeader>
-              <CardTitle className="text-lg">Ocupación Actual</CardTitle>
+              <CardTitle className="text-lg">Colores de las Brazaletes</CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="flex flex-col items-center justify-center">
-                <div className="relative w-40 h-40 mb-4">
-                  <svg className="w-full h-full" viewBox="0 0 100 100">
-                    <circle
-                      cx="50"
-                      cy="50"
-                      r="40"
-                      fill="none"
-                      stroke="#e2e8f0"
-                      strokeWidth="10"
-                    />
-                    <circle
-                      cx="50"
-                      cy="50"
-                      r="40"
-                      fill="none"
-                      stroke="#10b981"
-                      strokeWidth="10"
-                      strokeDasharray="251.2"
-                      strokeDashoffset={251.2 - (251.2 * stats.inProgress) / 10}
-                      transform="rotate(-90 50 50)"
-                      strokeLinecap="round"
-                    />
-                  </svg>
-                  <div className="absolute inset-0 flex flex-col items-center justify-center">
-                    <p className="text-3xl font-bold text-slate-900">
-                      {stats.inProgress}
-                    </p>
-                    <p className="text-xs text-slate-500">Activas</p>
-                  </div>
+            <CardContent className="space-y-4">
+              <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg border border-slate-100">
+                <div className="w-10 h-10 rounded-full bg-red-500 shadow-sm flex items-center justify-center">
+                  <BraceletIcon className="w-6 h-6 text-white" />
                 </div>
-                <div className="text-center">
-                  <p className="text-sm text-slate-600 mb-1">
-                    Sesiones en progreso
-                  </p>
-                  <p className="text-xs text-slate-500">
-                    {stats.inProgress > 0
-                      ? `${Math.round((stats.inProgress / 10) * 100)}% de capacidad`
-                      : "Sin sesiones activas"}
-                  </p>
+                <div>
+                  <p className="text-sm font-bold text-slate-900">Membresía y Reservación</p>
+                  <p className="text-xs text-slate-500">Brazalete Rojo</p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg border border-slate-100">
+                <div className="w-10 h-10 rounded-full bg-sky-400 shadow-sm flex items-center justify-center">
+                  <BraceletIcon className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-slate-900">Niño/niña individual</p>
+                  <p className="text-xs text-slate-500">Brazalete Celeste</p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg border border-slate-100">
+                <div className="w-10 h-10 rounded-full bg-pink-400 shadow-sm flex items-center justify-center">
+                  <BraceletIcon className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-slate-900">Niño/niña individual</p>
+                  <p className="text-xs text-slate-500">Brazalete Rosado</p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg border border-slate-100">
+                <div className="w-10 h-10 rounded-full bg-amber-400 shadow-sm flex items-center justify-center">
+                  <BraceletIcon className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-slate-900">Promociones</p>
+                  <p className="text-xs text-slate-500">Brazalete Dorado</p>
                 </div>
               </div>
             </CardContent>

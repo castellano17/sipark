@@ -56,12 +56,6 @@ export function SalesHistory() {
   const loadSales = async () => {
     try {
       const data = await window.api.getSales(100);
-      console.log("📊 Ventas cargadas:", data.length);
-      console.log("📊 Primeras 5 ventas:", data.slice(0, 5));
-      console.log(
-        "📊 Ejemplo venta completa:",
-        JSON.stringify(data[0], null, 2),
-      );
       setSales(data);
       setFilteredSales(data);
     } catch (err) {
@@ -71,7 +65,6 @@ export function SalesHistory() {
   };
 
   const handleReprint = (saleId: number) => {
-    console.log("Reimprimir ticket:", saleId);
     info(`Reimprimiendo ticket #${saleId}`);
   };
 

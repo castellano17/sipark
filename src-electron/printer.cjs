@@ -25,33 +25,14 @@ function getPrinters() {
         displayName: p.Name,
         isDefault: false,
       }));
-    } else if (platform === "darwin") {
-      // macOS: usar lpstat
+    } else if (platform === "darwin" || platform === "linux") {
+      // macOS y Linux: usar lpstat
       const result = execSync("lpstat -p -d", { encoding: "utf-8" });
       const lines = result.split("\n").filter((line) => line.trim());
 
       const printers = lines
-        .filter((line) => line.startsWith("printer"))
         .map((line) => {
-          const match = line.match(/printer\s+(\S+)/);
-          return match ? match[1] : null;
-        })
-        .filter(Boolean);
-
-      return printers.map((name) => ({
-        name,
-        displayName: name,
-        isDefault: false,
-      }));
-    } else if (platform === "linux") {
-      // Linux: usar lpstat
-      const result = execSync("lpstat -p -d", { encoding: "utf-8" });
-      const lines = result.split("\n").filter((line) => line.trim());
-
-      const printers = lines
-        .filter((line) => line.startsWith("printer"))
-        .map((line) => {
-          const match = line.match(/printer\s+(\S+)/);
+          const match = line.match(/(?:printer|impresora)\s+(\S+)/i);
           return match ? match[1] : null;
         })
         .filter(Boolean);
@@ -95,10 +76,10 @@ function getDefaultPrinter() {
     } else if (platform === "darwin" || platform === "linux") {
       // macOS y Linux
       const result = execSync("lpstat -d", { encoding: "utf-8" }).trim();
-      const match = result.match(/device for (.*?):/);
+      const match = result.match(/:\s*(.+)/);
 
       if (match) {
-        const name = match[1];
+        const name = match[1].trim();
         return {
           name,
           displayName: name,
@@ -172,10 +153,50 @@ async function printTestTicket(printerName) {
     // Limpiar archivo temporal
     fs.unlinkSync(tempFile);
 
-    console.log("Ticket impreso exitosamente");
     return true;
   } catch (error) {
     console.error("Error al imprimir ticket:", error.message);
+    return false;
+  }
+}
+
+/**
+ * Abre el cajón de dinero enviando la secuencia ESC/POS
+ */
+async function openCashDrawer(printerName) {
+  if (!printerName) return false;
+  try {
+    const platform = os.platform();
+    const fs = require("fs");
+    const path = require("path");
+    
+    // Secuencia típica ESC/POS para abrir cajón (ESC p m t1 t2)
+    // 27 112 0 25 250 (0x1B 0x70 0x00 0x19 0xFA)
+    const drawerKick = Buffer.from([27, 112, 0, 25, 250]);
+    
+    const tempDir = os.tmpdir();
+    const tempFile = path.join(tempDir, "sipark_drawer_kick.bin");
+    
+    fs.writeFileSync(tempFile, drawerKick);
+
+    if (platform === "win32") {
+      // Windows
+      const printCommand = `powershell -Command "Print-Document -FilePath '${tempFile}' -PrinterName '${printerName}'"`;
+      execSync(printCommand);
+    } else if (platform === "darwin" || platform === "linux") {
+      // macOS y Linux
+      const printCommand = `lp -d ${printerName} -o raw "${tempFile}"`;
+      execSync(printCommand);
+    }
+
+    // Limpiar archivo temporal
+    if (fs.existsSync(tempFile)) {
+      fs.unlinkSync(tempFile);
+    }
+
+    return true;
+  } catch (error) {
+    console.error("Error al abrir cajón:", error.message);
     return false;
   }
 }
@@ -341,6 +362,7 @@ module.exports = {
   getPrinters,
   getDefaultPrinter,
   printTestTicket,
+  openCashDrawer,
   generateTicketContent,
   getDefaultTicketConfig,
 };
