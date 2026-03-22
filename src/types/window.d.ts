@@ -196,6 +196,14 @@ type AppApi = {
   getLogo: (type: string) => Promise<string | null>;
   saveLogo: (type: string, base64: string, extension: string) => Promise<boolean>;
   deleteLogo: (type: string) => Promise<boolean>;
+
+  // NFC Cards
+  getNfcCardByUid: (uid: string) => Promise<any | null>;
+  assignNfcCard: (data: { clientMembershipId: number; uid: string; clientId: number }) => Promise<{ success: boolean; cardId: number }>;
+  rechargeNfcCard: (data: { clientMembershipId: number; amount: number; saleId: number | null; userId: number | null }) => Promise<{ success: boolean; newBalance: number }>;
+  chargeNfcEntry: (data: { uid: string; amount: number; userId: number | null }) => Promise<{ success: boolean; clientName: string; newBalance: number }>;
+  refundNfcCard: (data: { clientMembershipId: number; amount: number; reason: string; userId: number | null }) => Promise<{ success: boolean; newBalance: number }>;
+  getNfcTransactions: (clientMembershipId: number) => Promise<any[]>;
 } & Record<string, (...args: any[]) => Promise<any>>;
 
 declare global {

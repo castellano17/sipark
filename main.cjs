@@ -12,8 +12,9 @@ const backupEmail = require("./src-electron/backup-email.cjs");
 const backupGDrive = require("./src-electron/backup-gdrive.cjs");
 const backupScheduler = require("./src-electron/backup-scheduler.cjs");
 const pdfGenerator = require("./src-electron/pdf-generator.cjs");
-const reservationsApi = require("./src-electron/reservations-api.cjs");
 const quotationsApi = require("./src-electron/quotations-api.cjs");
+const reservationsApi = require("./src-electron/reservations-api.cjs");
+const nfcApi = require("./src-electron/nfc-api.cjs");
 
 // Hot reload en desarrollo
 if (isDev) {
@@ -196,6 +197,24 @@ function setupIpcHandlers() {
 
   // Sales
   ipcMain.handle("api:getSales", (event, limit) => api.getSales(limit));
+
+  // NFC
+  ipcMain.handle("api:getNfcCardByUid", (event, uid) => nfcApi.getNfcCardByUid(uid));
+  ipcMain.handle("api:assignNfcCard", (event, data) => 
+    nfcApi.assignNfcCard(data.clientMembershipId, data.uid, data.clientId)
+  );
+  ipcMain.handle("api:rechargeNfcCard", (event, data) => 
+    nfcApi.rechargeNfcCard(data.clientMembershipId, data.amount, data.saleId, data.userId)
+  );
+  ipcMain.handle("api:chargeNfcEntry", (event, data) => 
+    nfcApi.chargeNfcEntry(data.uid, data.amount, data.userId)
+  );
+  ipcMain.handle("api:refundNfcCard", (event, data) => 
+    nfcApi.refundNfcCard(data.clientMembershipId, data.amount, data.reason, data.userId)
+  );
+  ipcMain.handle("api:getNfcTransactions", (event, clientMembershipId) => 
+    nfcApi.getNfcTransactions(clientMembershipId)
+  );
 
   // Stats
   ipcMain.handle("api:getDailyStats", () => api.getDailyStats());

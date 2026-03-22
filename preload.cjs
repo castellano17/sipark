@@ -545,6 +545,15 @@ contextBridge.exposeInMainWorld("api", {
   checkPermission: (userId, module, action) =>
     ipcRenderer.invoke("api:checkPermission", { userId, module, action }),
 
+  // NFC
+  getNfcCardByUid: (uid) => ipcRenderer.invoke("api:getNfcCardByUid", uid),
+  assignNfcCard: (data) => ipcRenderer.invoke("api:assignNfcCard", data),
+  rechargeNfcCard: (data) => ipcRenderer.invoke("api:rechargeNfcCard", data),
+  chargeNfcEntry: (data) => ipcRenderer.invoke("api:chargeNfcEntry", data),
+  refundNfcCard: (data) => ipcRenderer.invoke("api:refundNfcCard", data),
+  getNfcTransactions: (clientMembershipId) => 
+    ipcRenderer.invoke("api:getNfcTransactions", clientMembershipId),
+
   // File Handlers (Logos)
   saveLogo: (type, base64Data, extension) =>
     ipcRenderer.invoke("file:saveLogo", { type, base64Data, extension }),

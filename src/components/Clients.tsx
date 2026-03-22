@@ -614,6 +614,7 @@ function MembershipModal({
   );
   const [paymentAmount, setPaymentAmount] = useState("");
   const [notes, setNotes] = useState("");
+  const [nfcUid, setNfcUid] = useState("");
   const { success, error } = useNotification();
 
   useEffect(() => {
@@ -635,7 +636,7 @@ function MembershipModal({
 
   const handleAssign = async () => {
     if (!selectedMembership || !paymentAmount) {
-      error("Complete todos los campos");
+      error("Complete todos los campos obligatorios");
       return;
     }
 
@@ -643,18 +644,33 @@ function MembershipModal({
       const currentUser = JSON.parse(
         localStorage.getItem("currentUser") || "{}",
       );
-      await window.api.assignMembership(
+      const newClientMembershipId = await window.api.assignMembership(
         client.id,
         selectedMembership,
         parseFloat(paymentAmount),
         notes,
         currentUser.username || "Admin",
       );
+
+      // Si se especificó una tarjeta NFC, vincularla
+      if (nfcUid.trim()) {
+        try {
+          await window.api.assignNfcCard({
+            clientMembershipId: newClientMembershipId,
+            uid: nfcUid.trim(),
+            clientId: client.id,
+          });
+        } catch (nfcErr: any) {
+          error(`Aviso: Membresía creada, pero falló NFC: ${nfcErr.message}`);
+        }
+      }
+
       success("Membresía asignada");
       setShowAssignModal(false);
       setSelectedMembership(null);
       setPaymentAmount("");
       setNotes("");
+      setNfcUid("");
       loadData();
     } catch (err) {
       error("Error asignando membresía");
@@ -815,6 +831,19 @@ function MembershipModal({
                     value={paymentAmount}
                     onChange={(e) => setPaymentAmount(e.target.value)}
                   />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2 text-purple-600">
+                    Acercar Tarjeta NFC (Opcional)
+                  </label>
+                  <Input
+                    type="text"
+                    placeholder="Escanee la tarjeta o ingrese UID"
+                    value={nfcUid}
+                    onChange={(e) => setNfcUid(e.target.value)}
+                    autoFocus
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Haga clic aquí y acerque la tarjeta al lector.</p>
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-2">

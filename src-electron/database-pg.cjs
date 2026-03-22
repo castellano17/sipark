@@ -351,6 +351,35 @@ async function createTables() {
       FOREIGN KEY (sale_id) REFERENCES sales(id)
     )`,
 
+    `CREATE TABLE IF NOT EXISTS nfc_cards (
+      id SERIAL PRIMARY KEY,
+      uid VARCHAR(255) UNIQUE NOT NULL,
+      client_id INTEGER,
+      is_active BOOLEAN DEFAULT TRUE,
+      issued_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      last_used_at TIMESTAMP,
+      FOREIGN KEY (client_id) REFERENCES clients(id)
+    )`,
+
+    `CREATE INDEX IF NOT EXISTS idx_nfc_cards_uid ON nfc_cards(uid)`,
+
+    `CREATE TABLE IF NOT EXISTS nfc_transactions (
+      id SERIAL PRIMARY KEY,
+      client_membership_id INTEGER NOT NULL,
+      card_id INTEGER NOT NULL,
+      type VARCHAR(50) NOT NULL,
+      amount DECIMAL(10,2) NOT NULL,
+      previous_balance DECIMAL(10,2) NOT NULL,
+      new_balance DECIMAL(10,2) NOT NULL,
+      related_sale_id INTEGER,
+      created_by INTEGER,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (client_membership_id) REFERENCES client_memberships(id),
+      FOREIGN KEY (card_id) REFERENCES nfc_cards(id),
+      FOREIGN KEY (related_sale_id) REFERENCES sales(id),
+      FOREIGN KEY (created_by) REFERENCES users(id)
+    )`,
+
     `CREATE TABLE IF NOT EXISTS client_visits (
       id SERIAL PRIMARY KEY,
       client_id INTEGER NOT NULL,
@@ -605,6 +634,24 @@ async function createTables() {
           ALTER TABLE client_memberships ADD COLUMN acquisition_date DATE;
           ALTER TABLE client_memberships ADD COLUMN total_hours VARCHAR(50);
         END IF;
+
+        -- Migración para NFC en client_memberships
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='client_memberships' AND column_name='nfc_card_id') THEN
+          ALTER TABLE client_memberships ADD COLUMN nfc_card_id INTEGER;
+          ALTER TABLE client_memberships ADD CONSTRAINT fk_nfc_card FOREIGN KEY (nfc_card_id) REFERENCES nfc_cards(id);
+        END IF;
+
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='client_memberships' AND column_name='balance') THEN
+          ALTER TABLE client_memberships ADD COLUMN balance DECIMAL(10,2) DEFAULT 0.00;
+        END IF;
+
+        -- Migración para last_used_at en nfc_cards
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='nfc_cards' AND column_name='last_used_at') THEN
+          ALTER TABLE nfc_cards ADD COLUMN last_used_at TIMESTAMP;
+        END IF;
+
+        -- Asegurar índice explícito en uid de nfc_cards (UNIQUE ya lo crea pero lo hacemos visible)
+        CREATE INDEX IF NOT EXISTS idx_nfc_cards_uid ON nfc_cards(uid);
 
         -- Migración para client_name en sales (agregado aquí para asegurar ejecución)
         ALTER TABLE sales ADD COLUMN IF NOT EXISTS client_name VARCHAR(255);

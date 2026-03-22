@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from "react";
-import { Search, Scan, User, Trash2, Plus, Minus } from "lucide-react";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { Search, Scan, User, Trash2, Plus, Minus, CreditCard, Wifi } from "lucide-react";
 import { Button } from "./ui/button";
 import { Card } from "./ui/card";
 import { Input } from "./ui/input";
@@ -67,6 +67,15 @@ export function POSScreen({
     total: 0,
   });
   const [isCheckIn, setIsCheckIn] = useState(false);
+
+  // NFC state
+  type NfcMode = 'charge' | 'recharge' | null;
+  const [nfcMode, setNfcMode] = useState<NfcMode>(null);
+  const [nfcInput, setNfcInput] = useState("");
+  const [nfcRechargeAmount, setNfcRechargeAmount] = useState("");
+  const [nfcStatus, setNfcStatus] = useState<'idle' | 'scanning' | 'found' | 'error'>('idle');
+  const [nfcCardInfo, setNfcCardInfo] = useState<any | null>(null);
+  const nfcInputRef = useRef<HTMLInputElement>(null);
 
   const barcodeInputRef = useRef<HTMLInputElement>(null);
 
@@ -210,6 +219,96 @@ export function POSScreen({
     }
   };
 
+  // NFC: abrir modal
+  const openNfcModal = useCallback((mode: 'charge' | 'recharge') => {
+    setNfcMode(mode);
+    setNfcInput("");
+    setNfcRechargeAmount("");
+    setNfcStatus('idle');
+    setNfcCardInfo(null);
+    setTimeout(() => nfcInputRef.current?.focus(), 150);
+  }, []);
+
+  // NFC: cerrar modal
+  const closeNfcModal = () => {
+    setNfcMode(null);
+    setNfcInput("");
+    setNfcStatus('idle');
+    setNfcCardInfo(null);
+    setTimeout(() => barcodeInputRef.current?.focus(), 150);
+  };
+
+  // NFC: buscar tarjeta
+  const handleNfcScan = async (uid: string) => {
+    if (!uid.trim()) return;
+    setNfcStatus('scanning');
+    try {
+      const cardInfo = await (window as any).api.getNfcCardByUid(uid.trim());
+      if (cardInfo) {
+        setNfcCardInfo(cardInfo);
+        setNfcStatus('found');
+      } else {
+        setNfcStatus('error');
+        error("Tarjeta no encontrada o membresía inactiva");
+      }
+    } catch (err) {
+      setNfcStatus('error');
+      error("Error leyendo tarjeta NFC");
+    }
+  };
+
+  // NFC: cobrar entrada
+  const handleNfcChargeEntry = async () => {
+    if (!nfcCardInfo) return;
+    try {
+      const settings = await window.api.getAllSettings();
+      const entryPriceSetting = Array.isArray(settings)
+        ? settings.find((s: any) => s.key === 'nfc_entry_price')
+        : null;
+      const entryPrice = parseFloat(entryPriceSetting?.value || '100');
+      const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+      const result = await (window as any).api.chargeNfcEntry({
+        uid: nfcInput.trim(),
+        amount: entryPrice,
+        userId: currentUser.id || null,
+      });
+      success(`Entrada cobrada. Nuevo saldo: C$ ${result.newBalance.toFixed(2)}`);
+      closeNfcModal();
+    } catch (err: any) {
+      error(`Error cobrando entrada: ${err.message}`);
+    }
+  };
+
+  // NFC: recargar membresía (agrega al carrito como producto especial)
+  const handleNfcRecharge = async () => {
+    const amount = parseFloat(nfcRechargeAmount);
+    if (!nfcCardInfo || isNaN(amount) || amount <= 0) {
+      error("Ingrese un monto válido");
+      return;
+    }
+    if (!cashBoxOpen) {
+      error("Debe abrir la caja antes de recargar");
+      return;
+    }
+
+    // Agrega la recarga al carrito para que pase por caja
+    const rechargeItem: SaleItem = {
+      id: crypto.randomUUID(),
+      product_id: -99,                              // ID especial para recarga NFC
+      product_name: `Recarga NFC – ${nfcCardInfo.client_name}`,
+      product_type: 'membership',
+      quantity: 1,
+      unit_price: amount,
+      subtotal: amount,
+      _nfc_recharge: { clientMembershipId: nfcCardInfo.client_membership_id, amount },
+    } as any;
+
+    const updatedItems = [...currentSale.items, rechargeItem];
+    updateSaleTotals(updatedItems, currentSale.discount);
+    success(`Recarga de C$ ${amount.toFixed(2)} añadida al carrito`);
+    closeNfcModal();
+  };
+
   // Agregar producto al ticket
   const addItemToSale = (product: ProductService) => {
     if (!cashBoxOpen) {
@@ -317,16 +416,12 @@ export function POSScreen({
   // Procesar pago
   const handlePayment = async (payment: PaymentDetails) => {
     try {
-      // Registrar venta...
-
-      // Obtener caja activa
       const activeCashBox = await getActiveCashBox();
       if (!activeCashBox) {
         error("No hay caja abierta");
         return;
       }
 
-      // Guardar venta en BD
       const saleId = await createSaleWithItems({
         client_id: currentSale.client_id,
         client_name: currentSale.client_name,
@@ -343,18 +438,31 @@ export function POSScreen({
         return;
       }
 
+      // Post-proceso de recargas NFC vinculadas en el carrito
+      const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+      for (const item of currentSale.items) {
+        if ((item as any)._nfc_recharge) {
+          const { clientMembershipId, amount } = (item as any)._nfc_recharge;
+          try {
+            await (window as any).api.rechargeNfcCard({
+              clientMembershipId,
+              amount,
+              saleId,
+              userId: currentUser.id || null,
+            });
+          } catch (rechargeErr) {
+            console.error('Error aplicando recarga NFC en BD:', rechargeErr);
+          }
+        }
+      }
+
       // Si hay una sesión activa vinculada
       if (activeSessionId) {
         try {
           if (isCheckIn) {
-            // Si es check-in, solo marcamos como pagada
             await (window as any).api.updateSessionPaidStatus(activeSessionId, true);
           } else {
-            // Si es check-out, finalizamos la sesión completamente
-            await (window as any).api.endSession(
-              activeSessionId,
-              currentSale.total,
-            );
+            await (window as any).api.endSession(activeSessionId, currentSale.total);
           }
           setActiveSessionId(null);
         } catch (err) {
@@ -375,7 +483,6 @@ export function POSScreen({
         change: payment.change,
       });
 
-      // Limpiar venta
       clearSale();
       setShowPaymentModal(false);
       success("Venta procesada exitosamente");
@@ -429,6 +536,27 @@ export function POSScreen({
               💰 Abrir Cajón
             </Button>
           )}
+          {/* NFC Buttons */}
+          <Button
+            variant="outline"
+            className="gap-2 border-purple-400 text-purple-700 hover:bg-purple-50 font-semibold"
+            onClick={() => openNfcModal('charge')}
+            disabled={!cashBoxOpen}
+            title="Cobrar entrada con tarjeta NFC"
+          >
+            <Wifi className="w-4 h-4" />
+            Cobrar NFC
+          </Button>
+          <Button
+            variant="outline"
+            className="gap-2 border-blue-400 text-blue-700 hover:bg-blue-50 font-semibold"
+            onClick={() => openNfcModal('recharge')}
+            disabled={!cashBoxOpen}
+            title="Recargar membresía con tarjeta NFC"
+          >
+            <CreditCard className="w-4 h-4" />
+            Recargar NFC
+          </Button>
           <Button
             variant="outline"
             className="gap-2"
@@ -670,6 +798,136 @@ export function POSScreen({
           onClose={() => setShowPaymentModal(false)}
           onConfirm={handlePayment}
         />
+      )}
+
+      {/* Modal NFC */}
+      {nfcMode && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+          <Card className="w-full max-w-md bg-white shadow-2xl">
+            {/* Header */}
+            <div className={`p-5 rounded-t-lg text-white ${nfcMode === 'charge' ? 'bg-gradient-to-r from-purple-600 to-purple-800' : 'bg-gradient-to-r from-blue-600 to-blue-800'}`}>
+              <div className="flex items-center gap-3">
+                {nfcMode === 'charge'
+                  ? <Wifi className="w-7 h-7" />
+                  : <CreditCard className="w-7 h-7" />}
+                <div>
+                  <h2 className="text-xl font-bold">
+                    {nfcMode === 'charge' ? 'Cobrar Entrada NFC' : 'Recargar Membresía NFC'}
+                  </h2>
+                  <p className="text-sm opacity-80">
+                    {nfcMode === 'charge'
+                      ? 'Acerque la tarjeta para descontar la entrada'
+                      : 'Acerque la tarjeta para cargar una recarga al carrito'}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-6 space-y-5">
+              {/* NFC UID reader */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  UID de la Tarjeta
+                </label>
+                <div className="relative">
+                  <Wifi className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-purple-400" />
+                  <input
+                    ref={nfcInputRef}
+                    type="text"
+                    value={nfcInput}
+                    onChange={(e) => setNfcInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') handleNfcScan(nfcInput);
+                    }}
+                    placeholder="Acerque la tarjeta al lector..."
+                    className="w-full pl-10 pr-4 py-3 border-2 border-dashed border-purple-300 rounded-lg focus:outline-none focus:border-purple-500 text-center font-mono text-sm bg-purple-50"
+                    autoComplete="off"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleNfcScan(nfcInput)}
+                  className="mt-2 w-full text-sm py-2 bg-gray-100 hover:bg-gray-200 border rounded-lg font-medium text-gray-700"
+                >
+                  🔍 Buscar tarjeta manualmente
+                </button>
+              </div>
+
+              {/* Card info */}
+              {nfcStatus === 'scanning' && (
+                <div className="text-center py-3 text-gray-500">
+                  <div className="animate-spin text-2xl inline-block">⌛</div>
+                  <p className="mt-1 text-sm">Buscando tarjeta...</p>
+                </div>
+              )}
+
+              {nfcStatus === 'found' && nfcCardInfo && (
+                <div className="bg-green-50 border border-green-300 rounded-lg p-4">
+                  <p className="text-green-700 font-bold text-base">✅ Tarjeta encontrada</p>
+                  <div className="mt-2 text-sm space-y-1 text-gray-700">
+                    <p><span className="font-semibold">Cliente:</span> {nfcCardInfo.client_name}</p>
+                    <p><span className="font-semibold">Membresía:</span> {nfcCardInfo.membership_name}</p>
+                    <p className="text-lg font-bold text-green-800">
+                      Saldo: C$ {Number(nfcCardInfo.balance).toFixed(2)}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {nfcStatus === 'error' && (
+                <div className="bg-red-50 border border-red-300 rounded-lg p-3 text-red-700 text-sm">
+                  ❌ Tarjeta no encontrada o membresía inactiva.
+                </div>
+              )}
+
+              {/* Recharge amount */}
+              {nfcMode === 'recharge' && nfcStatus === 'found' && (
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Monto de Recarga (C$)
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={nfcRechargeAmount}
+                    onChange={(e) => setNfcRechargeAmount(e.target.value)}
+                    placeholder="0.00"
+                    className="w-full px-4 py-3 border-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-right text-xl font-bold"
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Footer actions */}
+            <div className="p-5 border-t bg-gray-50 flex justify-end gap-3 rounded-b-lg">
+              <button
+                type="button"
+                onClick={closeNfcModal}
+                className="px-5 py-2 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-100"
+              >
+                Cancelar
+              </button>
+              {nfcMode === 'charge' && nfcStatus === 'found' && (
+                <button
+                  type="button"
+                  onClick={handleNfcChargeEntry}
+                  className="px-5 py-2 bg-purple-600 text-white rounded-lg text-sm font-bold hover:bg-purple-700"
+                >
+                  ✓ Cobrar Entrada
+                </button>
+              )}
+              {nfcMode === 'recharge' && nfcStatus === 'found' && (
+                <button
+                  type="button"
+                  onClick={handleNfcRecharge}
+                  className="px-5 py-2 bg-blue-600 text-white rounded-lg text-sm font-bold hover:bg-blue-700"
+                >
+                  + Agregar Recarga al Carrito
+                </button>
+              )}
+            </div>
+          </Card>
+        </div>
       )}
     </div>
   );

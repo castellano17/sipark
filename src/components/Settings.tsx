@@ -57,6 +57,7 @@ export const Settings: React.FC = () => {
   // Operaciones
   const [currency, setCurrency] = useState("NIO");
   const [exchangeRate, setExchangeRate] = useState("1.00");
+  const [nfcEntryPrice, setNfcEntryPrice] = useState("100.00");
 
   // Contabilidad
   const [enableTax, setEnableTax] = useState(false);
@@ -187,6 +188,9 @@ export const Settings: React.FC = () => {
               break;
             case "exchange_rate":
               setExchangeRate(setting.value);
+              break;
+            case "nfc_entry_price":
+              setNfcEntryPrice(setting.value);
               break;
             case "enable_tax":
               setEnableTax(setting.value === "true");
@@ -381,6 +385,7 @@ export const Settings: React.FC = () => {
       setLoading(true);
       await setSetting("currency_primary", currency);
       await setSetting("exchange_rate", exchangeRate);
+      await setSetting("nfc_entry_price", nfcEntryPrice.toString());
       success("Configuración de operaciones guardada correctamente");
     } catch (err) {
       console.error("Error guardando configuración:", err);
@@ -785,6 +790,20 @@ export const Settings: React.FC = () => {
                       onChange={(e) => setExchangeRate(e.target.value)}
                       className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       placeholder="1.00"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-900 mb-2">
+                      Precio de Entrada por NFC
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={nfcEntryPrice}
+                      onChange={(e) => setNfcEntryPrice(e.target.value)}
+                      className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="100.00"
                     />
                   </div>
                 </div>
