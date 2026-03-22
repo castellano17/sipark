@@ -22,6 +22,8 @@ export interface SystemStatus {
   database: "connected" | "disconnected" | "error" | "loading";
   printer: "connected" | "disconnected" | "error" | "loading";
   cashBox: "open" | "closed" | "loading";
+  drawer: "connected" | "disconnected" | "loading";
+  nfcReaders: number; // 0 = ninguno detectado
   currentTime: Date;
   isOnline: boolean;
 }

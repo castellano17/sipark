@@ -57,7 +57,6 @@ export function PurchaseDetailModal({
       setPurchase(data);
     } catch (err) {
       error("Error cargando detalle de compra");
-      console.error("Error loading purchase detail:", err);
     } finally {
       setLoading(false);
     }

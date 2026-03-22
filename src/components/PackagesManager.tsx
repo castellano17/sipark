@@ -82,7 +82,6 @@ export const PackagesManager: React.FC = () => {
       const data = await (window as any).api.getPackageFeatures();
       setFeatures(data || []);
     } catch (err) {
-      console.error("Error cargando características:", err);
     }
   };
 
@@ -128,7 +127,6 @@ export const PackagesManager: React.FC = () => {
       });
       setFeatureSelections(selections);
     } catch (err) {
-      console.error("Error cargando características del paquete:", err);
       setFeatureSelections({});
     }
 
@@ -239,7 +237,6 @@ export const PackagesManager: React.FC = () => {
       await cargarPaquetes();
       cerrarModal();
     } catch (err) {
-      console.error("Error en operación:", err);
       errorNotification("Error al guardar el paquete");
     }
   };
@@ -254,7 +251,6 @@ export const PackagesManager: React.FC = () => {
       await cargarPaquetes();
       cerrarModal();
     } catch (err) {
-      console.error("Error eliminando paquete:", err);
       errorNotification("Error al eliminar el paquete");
     }
   };

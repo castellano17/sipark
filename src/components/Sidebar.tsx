@@ -13,6 +13,7 @@ import {
   UserCog,
   Calendar,
   FileText,
+  Gift,
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { cn } from "@/lib/utils";
@@ -231,6 +232,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
       ],
     },
     {
+      id: "promociones",
+      label: "Promociones",
+      icon: <Gift className="w-5 h-5" />,
+      path: "/promociones",
+    },
+    {
       id: "usuarios",
       label: "Usuarios",
       icon: <UserCog className="w-5 h-5" />,
@@ -319,16 +326,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
             const moduleMap: Record<string, string> = {
               dashboard: "dashboard",
               operaciones: "operations",
-              membresias: "operations", // Membresías usa el mismo permiso que operaciones
+              membresias: "memberships",
               pos: "pos",
               clientes: "clients",
-              reservaciones: "operations", // Reservaciones usa el mismo permiso que operaciones
-              cotizaciones: "operations", // Cotizaciones usa el mismo permiso que operaciones
+              reservaciones: "reservations",
+              cotizaciones: "quotations",
               inventario: "inventory",
-              "inventario-interno": "inventory",
+              "inventario-interno": "internal",
               reportes: "reports",
               configuracion: "settings",
               usuarios: "users",
+              promociones: "promotions",
             };
 
             const module = moduleMap[item.id];

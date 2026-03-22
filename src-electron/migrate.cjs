@@ -120,7 +120,6 @@ async function migrateDatabase() {
 
     return Promise.resolve();
   } catch (error) {
-    console.error("❌ Error en migraciones:", error);
     return Promise.reject(error);
   }
 }

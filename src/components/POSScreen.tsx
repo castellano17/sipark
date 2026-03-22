@@ -60,6 +60,10 @@ export function POSScreen({
   const [cashBoxOpen, setCashBoxOpen] = useState(false);
   const [isCheckingCashBox, setIsCheckingCashBox] = useState(true);
   const [activeSessionId, setActiveSessionId] = useState<number | null>(null);
+  // Voucher modal state
+  const [voucherInfo, setVoucherInfo] = useState<any>(null);
+  const [showVoucherModal, setShowVoucherModal] = useState(false);
+  const [pendingVoucherCode, setPendingVoucherCode] = useState("");
   const [currentSale, setCurrentSale] = useState<CurrentSale>({
     items: [],
     subtotal: 0,
@@ -181,7 +185,6 @@ export function POSScreen({
       );
       setDbCategories(filtered);
     } catch (err) {
-      console.error("Error cargando categorías:", err);
     }
   };
 
@@ -205,18 +208,71 @@ export function POSScreen({
     setFilteredProducts(filtered);
   }, [selectedCategory, searchQuery, products]);
 
-  // Buscar por código de barras
-  const handleBarcodeSearch = (barcode: string) => {
+  // Buscar por código de barras — detecta vouchers SIPARK-VOUCHER:
+  const handleBarcodeSearch = async (barcode: string) => {
     if (!barcode.trim()) return;
 
-    const product = products.find((p) => p.barcode === barcode);
+    const VOUCHER_PREFIX = "SIPARK-VOUCHER:";
+    const cleanBarcode = barcode.trim();
+
+    // ── Voucher de promoción ──
+    if (cleanBarcode.toUpperCase().startsWith(VOUCHER_PREFIX) || cleanBarcode.length >= 8) {
+      const codeCandidate = cleanBarcode.replace(VOUCHER_PREFIX, "").trim();
+      try {
+        const result = await (window as any).api.getVoucherByCode(codeCandidate);
+        if (result?.valid && result?.voucher) {
+          setVoucherInfo(result.voucher);
+          setPendingVoucherCode(codeCandidate);
+          setShowVoucherModal(true);
+          setBarcodeInput("");
+          return;
+        }
+      } catch { /* si falla, continúa buscando producto normal */ }
+    }
+
+    // ── Producto normal ──
+    const product = products.find((p) => p.barcode === cleanBarcode);
     if (product) {
       addItemToSale(product);
       setBarcodeInput("");
     } else {
-      error(`Producto con código ${barcode} no encontrado`);
+      error(`Producto con código ${cleanBarcode} no encontrado`);
       setBarcodeInput("");
     }
+  };
+
+  // Confirmar canje de voucher en el carrito (genera item en C$0)
+  const handleConfirmVoucher = () => {
+    if (!voucherInfo) return;
+    const benefitLabel = voucherInfo.type === "hours"
+      ? `${voucherInfo.benefit_value}h de juego gratis`
+      : voucherInfo.type === "discount_pct"
+      ? `${voucherInfo.benefit_value}% descuento`
+      : voucherInfo.type === "discount_fixed"
+      ? `C$${parseFloat(voucherInfo.benefit_value).toFixed(2)} descuento`
+      : "Paquete gratis";
+
+    const voucherItem: SaleItem = {
+      id: crypto.randomUUID(),
+      product_id: -98,                          // ID especial voucher
+      product_name: `🎟 Voucher: ${voucherInfo.campaign_name} (${benefitLabel})`,
+      product_type: "service",
+      quantity: 1,
+      unit_price: 0,
+      subtotal: 0,
+      discount: 0,
+      nfc_membership_id: undefined,
+      voucher_code: pendingVoucherCode,          // guardado para redeemVoucher al pagar
+    } as any;
+
+    setCurrentSale(prev => {
+      const items = [...prev.items, voucherItem];
+      const subtotal = items.reduce((sum, i) => sum + i.subtotal, 0);
+      return { ...prev, items, subtotal, total: Math.max(0, subtotal - prev.discount) };
+    });
+    setShowVoucherModal(false);
+    setVoucherInfo(null);
+    success(`Voucher ${pendingVoucherCode} agregado al carrito`);
   };
 
   // NFC: abrir modal
@@ -438,7 +494,7 @@ export function POSScreen({
         return;
       }
 
-      // Post-proceso de recargas NFC vinculadas en el carrito
+      // Post-proceso: recargas NFC vinculadas en el carrito
       const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
       for (const item of currentSale.items) {
         if ((item as any)._nfc_recharge) {
@@ -450,9 +506,19 @@ export function POSScreen({
               saleId,
               userId: currentUser.id || null,
             });
-          } catch (rechargeErr) {
-            console.error('Error aplicando recarga NFC en BD:', rechargeErr);
-          }
+          } catch { /* silencioso en producción */ }
+        }
+        // Post-proceso: vouchers de promoción canjeados
+        if ((item as any).voucher_code) {
+          try {
+            await (window as any).api.redeemVoucher({
+              code: (item as any).voucher_code,
+              saleId,
+              clientId: currentSale.client_id || null,
+              redeemedBy: currentUser.id || null,
+              benefitApplied: { type: (item as any).product_name },
+            });
+          } catch { /* silencioso en producción */ }
         }
       }
 
@@ -465,9 +531,7 @@ export function POSScreen({
             await (window as any).api.endSession(activeSessionId, currentSale.total);
           }
           setActiveSessionId(null);
-        } catch (err) {
-          console.error("Error actualizando sesión:", err);
-        }
+        } catch { /* silencioso en producción */ }
       }
 
       // Imprimir ticket
@@ -486,8 +550,7 @@ export function POSScreen({
       clearSale();
       setShowPaymentModal(false);
       success("Venta procesada exitosamente");
-    } catch (err) {
-      console.error("Error procesando venta:", err);
+    } catch {
       error("Error al procesar la venta");
     }
   };
@@ -925,6 +988,64 @@ export function POSScreen({
                   + Agregar Recarga al Carrito
                 </button>
               )}
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {/* ── Voucher Confirmation Modal ── */}
+      {showVoucherModal && voucherInfo && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <Card className="bg-white rounded-xl shadow-2xl w-full max-w-sm p-6">
+            <div className="text-center mb-4">
+              <div className="text-4xl mb-2">🎟</div>
+              <h3 className="text-lg font-bold text-slate-800">Voucher Válido</h3>
+              <p className="text-sm text-slate-500 mt-1">{voucherInfo.campaign_name}</p>
+            </div>
+            <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 text-sm space-y-2 mb-5">
+              <div className="flex justify-between">
+                <span className="text-slate-500">Beneficio:</span>
+                <span className="font-bold text-purple-700">
+                  {voucherInfo.type === "hours"
+                    ? `${voucherInfo.benefit_value}h de juego gratis`
+                    : voucherInfo.type === "discount_pct"
+                    ? `${voucherInfo.benefit_value}% descuento`
+                    : voucherInfo.type === "discount_fixed"
+                    ? `C$${parseFloat(voucherInfo.benefit_value).toFixed(2)} descuento`
+                    : "Paquete gratis"}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Código:</span>
+                <span className="font-mono font-bold text-slate-700">{pendingVoucherCode}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Usos restantes:</span>
+                <span className="font-medium">{voucherInfo.max_uses - voucherInfo.times_used}</span>
+              </div>
+              {voucherInfo.valid_until && (
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Vence:</span>
+                  <span>{voucherInfo.valid_until}</span>
+                </div>
+              )}
+            </div>
+            <p className="text-xs text-slate-400 text-center mb-4">
+              Se agregará al carrito con total C$0.00 y quedará registrado en el sistema al procesar la venta.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => { setShowVoucherModal(false); setVoucherInfo(null); setBarcodeInput(""); }}
+                className="flex-1 py-2 border border-slate-300 rounded-lg text-sm font-medium hover:bg-slate-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleConfirmVoucher}
+                className="flex-1 py-2 bg-purple-600 text-white rounded-lg text-sm font-bold hover:bg-purple-700"
+              >
+                ✓ Canjear Voucher
+              </button>
             </div>
           </Card>
         </div>

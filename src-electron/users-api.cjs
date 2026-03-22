@@ -55,7 +55,6 @@ async function createFirstAdmin() {
       message: "Usuario admin creado. Usuario: admin, Contraseña: admin123",
     };
   } catch (error) {
-    console.error("Error creando primer admin:", error);
     throw error;
   }
 }
@@ -103,7 +102,6 @@ async function authenticateUser(username, password) {
       },
     };
   } catch (error) {
-    console.error("Error autenticando usuario:", error);
     throw error;
   }
 }
@@ -127,7 +125,6 @@ async function getUsers() {
 
     return users;
   } catch (error) {
-    console.error("Error obteniendo usuarios:", error);
     throw error;
   }
 }
@@ -162,7 +159,6 @@ async function getUserById(userId) {
       permissions: permissions,
     };
   } catch (error) {
-    console.error("Error obteniendo usuario:", error);
     throw error;
   }
 }
@@ -267,7 +263,6 @@ async function createUser(userData, createdBy) {
 
     return { success: true, userId: userId };
   } catch (error) {
-    console.error("Error creando usuario:", error);
     throw error;
   }
 }
@@ -369,7 +364,6 @@ async function updateUser(userId, userData, updatedBy) {
 
     return { success: true };
   } catch (error) {
-    console.error("Error actualizando usuario:", error);
     throw error;
   }
 }
@@ -397,7 +391,6 @@ async function changePassword(userId, newPassword, changedBy) {
 
     return { success: true };
   } catch (error) {
-    console.error("Error cambiando contraseña:", error);
     throw error;
   }
 }
@@ -437,7 +430,6 @@ async function deleteUser(userId, deletedBy) {
 
     return { success: true };
   } catch (error) {
-    console.error("Error eliminando usuario:", error);
     throw error;
   }
 }
@@ -466,7 +458,6 @@ async function getUserAuditLog(limit = 100) {
 
     return logs;
   } catch (error) {
-    console.error("Error obteniendo log de auditoría:", error);
     throw error;
   }
 }
@@ -503,7 +494,6 @@ async function checkPermission(userId, module, action) {
         return false;
     }
   } catch (error) {
-    console.error("Error verificando permiso:", error);
     return false;
   }
 }

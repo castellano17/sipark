@@ -97,7 +97,6 @@ async function createQuotation(data) {
 
     return { success: true, id: quotationId, quotationNumber };
   } catch (error) {
-    console.error("Error creando cotización:", error);
     return { success: false, error: error.message };
   }
 }
@@ -110,7 +109,6 @@ async function getAllQuotations() {
     );
     return { success: true, data: quotations };
   } catch (error) {
-    console.error("Error obteniendo cotizaciones:", error);
     return { success: false, error: error.message };
   }
 }
@@ -133,7 +131,6 @@ async function getQuotationById(id) {
 
     return { success: true, data: { ...quotation, items } };
   } catch (error) {
-    console.error("Error obteniendo cotización:", error);
     return { success: false, error: error.message };
   }
 }
@@ -147,7 +144,6 @@ async function updateQuotationStatus(id, status) {
     ]);
     return { success: true };
   } catch (error) {
-    console.error("Error actualizando estado:", error);
     return { success: false, error: error.message };
   }
 }
@@ -158,7 +154,6 @@ async function deleteQuotation(id) {
     await runAsync(`DELETE FROM quotations WHERE id = ?`, [id]);
     return { success: true };
   } catch (error) {
-    console.error("Error eliminando cotización:", error);
     return { success: false, error: error.message };
   }
 }

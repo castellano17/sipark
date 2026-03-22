@@ -7,7 +7,6 @@ async function getSupplyCategories() {
     const sql = `SELECT * FROM supply_categories ORDER BY name ASC`;
     return await allAsync(sql);
   } catch (error) {
-    console.error("Error obteniendo categorías de insumos:", error);
     throw error;
   }
 }
@@ -18,7 +17,6 @@ async function createSupplyCategory(name, description = '') {
     const result = await runAsync(sql, [name, description]);
     return result;
   } catch (error) {
-    console.error("Error creando categoría de insumos:", error);
     throw error;
   }
 }
@@ -29,7 +27,6 @@ async function updateSupplyCategory(id, name, description = '') {
     const result = await runAsync(sql, [name, description, id]);
     return result;
   } catch (error) {
-    console.error("Error actualizando categoría de insumos:", error);
     throw error;
   }
 }
@@ -40,7 +37,6 @@ async function deleteSupplyCategory(id) {
     const result = await runAsync(sql, [id]);
     return result;
   } catch (error) {
-    console.error("Error eliminando categoría de insumos:", error);
     throw error;
   }
 }
@@ -57,7 +53,6 @@ async function getSupplies() {
     `;
     return await allAsync(sql);
   } catch (error) {
-    console.error("Error obteniendo insumos:", error);
     throw error;
   }
 }
@@ -79,7 +74,6 @@ async function createSupply(name, category_id, stock, unit_of_measure, min_stock
     ]);
     return result;
   } catch (error) {
-    console.error("Error creando insumo:", error);
     throw error;
   }
 }
@@ -103,7 +97,6 @@ async function updateSupply(id, name, category_id, stock, unit_of_measure, min_s
     ]);
     return result;
   } catch (error) {
-    console.error("Error actualizando insumo:", error);
     throw error;
   }
 }
@@ -114,7 +107,6 @@ async function deleteSupply(id) {
     const result = await runAsync(sql, [id]);
     return result;
   } catch (error) {
-    console.error("Error eliminando insumo:", error);
     throw error;
   }
 }
@@ -150,7 +142,6 @@ async function adjustSupplyStock(supply_id, adjustment_type, quantity, reason, n
 
     return result;
   } catch (error) {
-    console.error("Error ajustando stock de insumo:", error);
     throw error;
   }
 }
@@ -166,7 +157,6 @@ async function getSupplyAdjustments(supply_id) {
     `;
     return await allAsync(sql, [supply_id]);
   } catch (error) {
-    console.error("Error obteniendo historial de insumo:", error);
     throw error;
   }
 }

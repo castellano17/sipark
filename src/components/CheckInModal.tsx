@@ -114,7 +114,6 @@ export const CheckInModal: React.FC<CheckInModalProps> = ({
       const data = await getClients();
       setClients(data || []);
     } catch (err) {
-      console.error("Error cargando clientes:", err);
     }
   };
 
@@ -175,7 +174,6 @@ export const CheckInModal: React.FC<CheckInModalProps> = ({
         packagePrice: selectedPackage?.price || 0,
       });
     } catch (err) {
-      console.error("Error en check-in:", err);
       errorNotification("Error al registrar la entrada");
     }
   };
@@ -209,7 +207,6 @@ export const CheckInModal: React.FC<CheckInModalProps> = ({
 
       setShowClientForm(false);
     } catch (err) {
-      console.error("Error creando cliente:", err);
       errorNotification("Error al crear cliente");
     }
   };

@@ -32,7 +32,6 @@ export default function ExpiringMemberships({
       );
       setReportData(data);
     } catch (error) {
-      console.error("Error cargando reporte:", error);
     } finally {
       setLoading(false);
     }

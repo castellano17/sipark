@@ -52,7 +52,6 @@ export function SessionsByPeriodReport({
       const timePackages = result.filter((p: any) => p.type === "time");
       setPackages(timePackages);
     } catch (err) {
-      console.error("Error cargando paquetes:", err);
     }
   };
 
@@ -71,7 +70,6 @@ export function SessionsByPeriodReport({
       setData(result);
     } catch (err) {
       error("Error cargando reporte");
-      console.error(err);
     } finally {
       setLoading(false);
     }

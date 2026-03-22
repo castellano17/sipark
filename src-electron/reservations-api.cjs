@@ -34,7 +34,6 @@ async function createReservation(data) {
 
     return { success: true, id: result.lastID };
   } catch (error) {
-    console.error("Error creando reservación:", error);
     return { success: false, error: error.message };
   }
 }
@@ -51,7 +50,6 @@ async function getAllReservations() {
     );
     return { success: true, data: reservations };
   } catch (error) {
-    console.error("Error obteniendo reservaciones:", error);
     return { success: false, error: error.message };
   }
 }
@@ -70,7 +68,6 @@ async function getReservationsByDateRange(startDate, endDate) {
     );
     return { success: true, data: reservations };
   } catch (error) {
-    console.error("Error obteniendo reservaciones por fecha:", error);
     return { success: false, error: error.message };
   }
 }
@@ -88,7 +85,6 @@ async function getReservationById(id) {
     );
     return { success: true, data: reservation };
   } catch (error) {
-    console.error("Error obteniendo reservación:", error);
     return { success: false, error: error.message };
   }
 }
@@ -102,7 +98,6 @@ async function updateReservationStatus(id, status) {
     ]);
     return { success: true };
   } catch (error) {
-    console.error("Error actualizando estado:", error);
     return { success: false, error: error.message };
   }
 }
@@ -116,7 +111,6 @@ async function cancelReservation(id) {
     );
     return { success: true };
   } catch (error) {
-    console.error("Error cancelando reservación:", error);
     return { success: false, error: error.message };
   }
 }
@@ -213,7 +207,6 @@ async function registerReservationPayment(reservationId, paymentData) {
 
     return { success: true, saleId };
   } catch (error) {
-    console.error("Error registrando pago:", error);
     return { success: false, error: error.message };
   }
 }
@@ -287,7 +280,6 @@ async function completeReservation(reservationId, paymentData) {
 
     return { success: true, finalSaleId };
   } catch (error) {
-    console.error("Error completando reservación:", error);
     return { success: false, error: error.message };
   }
 }

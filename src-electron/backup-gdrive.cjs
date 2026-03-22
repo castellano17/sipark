@@ -66,7 +66,6 @@ async function uploadToGoogleDrive(credentials, folderId = null) {
       webViewLink: response.data.webViewLink,
     };
   } catch (error) {
-    console.error("❌ Error subiendo a Google Drive:", error);
     throw error;
   }
 }
@@ -111,7 +110,6 @@ async function listGoogleDriveBackups(credentials, folderId = null) {
       webViewLink: file.webViewLink,
     }));
   } catch (error) {
-    console.error("Error listando respaldos en Google Drive:", error);
     throw error;
   }
 }
@@ -146,13 +144,11 @@ async function downloadFromGoogleDrive(credentials, fileId, destinationPath) {
           resolve({ success: true, path: destinationPath });
         })
         .on("error", (err) => {
-          console.error("Error descargando archivo:", err);
           reject(err);
         })
         .pipe(dest);
     });
   } catch (error) {
-    console.error("Error descargando desde Google Drive:", error);
     throw error;
   }
 }
@@ -222,7 +218,6 @@ async function getRefreshToken(clientId, clientSecret, code) {
       access_token: tokens.access_token,
     };
   } catch (error) {
-    console.error("Error obteniendo refresh token:", error);
     throw error;
   }
 }

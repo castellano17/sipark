@@ -122,7 +122,6 @@ export function SellMembership() {
       setClients(clientsData);
       setMemberships(membershipsData.filter((m: any) => m.is_active));
     } catch (err: any) {
-      console.error("Error renovando membresía:", err);
       error("Error al renovar membresía: " + (err.message || "Error desconocido"));
     } finally {
       setLoading(false);
@@ -257,7 +256,6 @@ export function SellMembership() {
       try {
         await printMembershipTicket(membershipData);
       } catch (printErr) {
-        console.warn("No se pudo imprimir automáticamente:", printErr);
       }
 
       // Mostrar modal de impresión (opcional ahora, para reimprimir o ver factura)
@@ -266,7 +264,6 @@ export function SellMembership() {
 
       success("Membresía vendida exitosamente - Registrado en caja");
     } catch (err: any) {
-      console.error("Error vendiendo membresía:", err);
       error("Error al procesar la venta de membresía: " + (err.message || "Error desconocido"));
     } finally {
       setProcessing(false);
@@ -285,7 +282,6 @@ export function SellMembership() {
           await printMembershipTicket(lastMembershipData);
           success("Ticket enviado a impresora");
         } catch (printErr) {
-          console.warn("No se pudo imprimir automáticamente:", printErr);
           error("Error al imprimir ticket");
         }
       } else {
@@ -293,7 +289,6 @@ export function SellMembership() {
         success("Factura PDF generada");
       }
     } catch (err) {
-      console.error("Error imprimiendo:", err);
       error("Error al imprimir");
     }
   };

@@ -194,7 +194,6 @@ export function useDatabase() {
   const handleError = useCallback((err: any) => {
     const message = err instanceof Error ? err.message : "Error desconocido";
     setError(message);
-    console.error("Database error:", message);
   }, []);
 
   const getClients = useCallback(async () => {
@@ -403,7 +402,6 @@ export function useDatabase() {
         const result = await window.api.setSetting(key, value);
         return result;
       } catch (err) {
-        console.error(`❌ Error guardando setting ${key}:`, err);
         handleError(err);
         return null;
       } finally {
@@ -546,7 +544,6 @@ export function useDatabase() {
       const result = await window.api.checkDatabaseConnection();
       return result;
     } catch (err) {
-      console.error("Error verificando conexión:", err);
       return { connected: false, message: "Error de conexión" };
     }
   }, []);

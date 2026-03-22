@@ -70,7 +70,6 @@ export function CashBoxReport({ onBack }: CashBoxReportProps) {
       setCashBoxes(filtered);
     } catch (err) {
       error("Error cargando cajas");
-      console.error(err);
     } finally {
       setLoadingList(false);
     }
@@ -98,7 +97,6 @@ export function CashBoxReport({ onBack }: CashBoxReportProps) {
       setShowSelector(false);
     } catch (err) {
       error("Error cargando reporte");
-      console.error(err);
     } finally {
       setLoading(false);
     }

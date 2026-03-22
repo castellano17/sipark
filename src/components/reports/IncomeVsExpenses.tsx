@@ -51,7 +51,6 @@ export default function IncomeVsExpenses({ onBack }: IncomeVsExpensesProps) {
       );
       setReportData(data);
     } catch (error) {
-      console.error("Error cargando reporte:", error);
     } finally {
       setLoading(false);
     }

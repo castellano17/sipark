@@ -50,7 +50,6 @@ export default function AverageSessionDuration({
       );
       setReportData(data);
     } catch (error) {
-      console.error("Error cargando reporte:", error);
     } finally {
       setLoading(false);
     }

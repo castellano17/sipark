@@ -23,7 +23,6 @@ async function getClients() {
                  created_at FROM clients ORDER BY name`;
     return await allAsync(sql);
   } catch (error) {
-    console.error("Error obteniendo clientes:", error);
     throw error;
   }
 }
@@ -68,7 +67,6 @@ async function createClient(
     ]);
     return result.lastID;
   } catch (error) {
-    console.error("Error creando cliente:", error);
     throw error;
   }
 }
@@ -102,7 +100,6 @@ async function updateClient(
     ]);
     return true;
   } catch (error) {
-    console.error("Error actualizando cliente:", error);
     throw error;
   }
 }
@@ -142,7 +139,6 @@ async function deleteClient(id) {
     await runAsync("DELETE FROM clients WHERE id = ?", [id]);
     return true;
   } catch (error) {
-    console.error("Error eliminando cliente:", error);
     throw error;
   }
 }
@@ -154,7 +150,6 @@ async function getClientById(clientId) {
                  created_at FROM clients WHERE id = ?`;
     return await getAsync(sql, [clientId]);
   } catch (error) {
-    console.error("Error obteniendo cliente:", error);
     throw error;
   }
 }
@@ -181,7 +176,6 @@ async function startSession(clientId, packageId, durationMinutes = 60) {
       duration_minutes: durationMinutes,
     };
   } catch (error) {
-    console.error("Error iniciando sesión:", error);
     throw error;
   }
 }
@@ -210,8 +204,6 @@ async function getActiveSessions() {
     const result = await allAsync(sql);
     return result;
   } catch (error) {
-    console.error("❌ Error obteniendo sesiones activas:", error);
-    console.error("SQL que falló:", error.message);
     throw error;
   }
 }
@@ -248,7 +240,6 @@ async function endSession(sessionId, finalPrice) {
       elapsed_minutes: elapsedMinutes,
     };
   } catch (error) {
-    console.error("Error finalizando sesión:", error);
     throw error;
   }
 }
@@ -260,7 +251,6 @@ async function getProductsServices() {
     const sql = "SELECT * FROM products_services ORDER BY name";
     return await allAsync(sql);
   } catch (error) {
-    console.error("Error obteniendo productos/servicios:", error);
     throw error;
   }
 }
@@ -288,7 +278,6 @@ async function createProductService(
     ]);
     return result.lastID;
   } catch (error) {
-    console.error("Error creando producto/servicio:", error);
     throw error;
   }
 }
@@ -317,7 +306,6 @@ async function updateProductService(
       id,
     ]);
   } catch (error) {
-    console.error("Error actualizando producto/servicio:", error);
     throw error;
   }
 }
@@ -332,7 +320,6 @@ async function updateProductCategory(productId, categoryName) {
     await runAsync(sql, [categoryName, type, productId]);
     return true;
   } catch (error) {
-    console.error("Error actualizando categoría:", error);
     throw error;
   }
 }
@@ -342,7 +329,6 @@ async function deleteProductService(id) {
     const sql = "DELETE FROM products_services WHERE id = ?";
     await runAsync(sql, [id]);
   } catch (error) {
-    console.error("Error eliminando producto/servicio:", error);
     throw error;
   }
 }
@@ -367,7 +353,6 @@ async function getSales(limit = 100) {
     const sales = await allAsync(sql, [limit]);
     return sales;
   } catch (error) {
-    console.error("Error obteniendo ventas:", error);
     throw error;
   }
 }
@@ -389,7 +374,6 @@ async function getDailyStats() {
     const result = await getAsync(sql, [today]);
     return result || { total_sales: 0, total_revenue: 0, unique_clients: 0 };
   } catch (error) {
-    console.error("Error obteniendo estadísticas:", error);
     throw error;
   }
 }
@@ -577,7 +561,6 @@ async function getExecutiveDashboard() {
       activeSessions: activeSessions.count,
     };
   } catch (error) {
-    console.error("Error obteniendo dashboard ejecutivo:", error);
     throw error;
   }
 }
@@ -670,7 +653,6 @@ async function getSalesByPeriod(startDate, endDate, paymentMethod = null) {
       paymentMethodBreakdown,
     };
   } catch (error) {
-    console.error("Error obteniendo ventas por período:", error);
     throw error;
   }
 }
@@ -759,7 +741,6 @@ async function getCashBoxReport(cashBoxId) {
       },
     };
   } catch (error) {
-    console.error("Error obteniendo reporte de caja:", error);
     throw error;
   }
 }
@@ -810,7 +791,6 @@ async function getStockReport(categoryFilter = null, lowStockOnly = false) {
       },
     };
   } catch (error) {
-    console.error("Error obteniendo reporte de stock:", error);
     throw error;
   }
 }
@@ -858,7 +838,6 @@ async function getTopClientsReport(startDate, endDate, limit = 10) {
       frequentClients,
     };
   } catch (error) {
-    console.error("Error obteniendo reporte de clientes top:", error);
     throw error;
   }
 }
@@ -884,7 +863,6 @@ async function getSetting(key) {
     const result = await getAsync(sql, [key]);
     return result ? result.value : null;
   } catch (error) {
-    console.error("Error obteniendo setting:", error);
     throw error;
   }
 }
@@ -898,7 +876,6 @@ async function setSetting(key, value) {
     await runAsync(sql, [key, value, value]);
     return value;
   } catch (error) {
-    console.error("Error guardando setting:", error);
     throw error;
   }
 }
@@ -908,7 +885,6 @@ async function getAllSettings() {
     const sql = "SELECT key, value FROM settings";
     return await allAsync(sql);
   } catch (error) {
-    console.error("Error obteniendo settings:", error);
     throw error;
   }
 }
@@ -921,7 +897,6 @@ async function checkDatabaseConnection() {
     await getAsync(sql);
     return { connected: true, message: "Base de datos conectada" };
   } catch (error) {
-    console.error("Error verificando conexión BD:", error);
     return { connected: false, message: "Error de conexión" };
   }
 }
@@ -985,7 +960,6 @@ async function createSession(
       is_paid: isPaid,
     };
   } catch (error) {
-    console.error("Error creando sesión:", error);
     throw error;
   }
 }
@@ -999,7 +973,6 @@ async function startTimerSession(sessionId) {
     );
     return true;
   } catch (error) {
-    console.error("Error iniciando temporizador manual de sesión:", error);
     throw error;
   }
 }
@@ -1012,7 +985,6 @@ async function updateSessionPaidStatus(sessionId, isPaid) {
     );
     return true;
   } catch (error) {
-    console.error("Error actualizando estado de pago de sesión:", error);
     throw error;
   }
 }
@@ -1031,7 +1003,6 @@ async function openCashBox(openingAmount, openedBy = "Admin") {
     ]);
     return result.lastID;
   } catch (error) {
-    console.error("Error abriendo caja:", error);
     throw error;
   }
 }
@@ -1042,7 +1013,6 @@ async function getActiveCashBox() {
       "SELECT * FROM cash_boxes WHERE status = 'open' ORDER BY opened_at DESC LIMIT 1";
     return await getAsync(sql);
   } catch (error) {
-    console.error("Error obteniendo caja activa:", error);
     throw error;
   }
 }
@@ -1104,7 +1074,6 @@ async function closeCashBox(
       expensesTotal: expensesTotal.total,
     };
   } catch (error) {
-    console.error("Error cerrando caja:", error);
     throw error;
   }
 }
@@ -1124,7 +1093,6 @@ async function addCashMovement(cashBoxId, type, amount, description) {
     ]);
     return result.lastID;
   } catch (error) {
-    console.error("Error agregando movimiento:", error);
     throw error;
   }
 }
@@ -1138,7 +1106,6 @@ async function getCashBoxMovements(cashBoxId) {
     `;
     return await allAsync(sql, [cashBoxId]);
   } catch (error) {
-    console.error("Error obteniendo movimientos:", error);
     throw error;
   }
 }
@@ -1154,7 +1121,6 @@ async function getCashBoxSales(cashBoxId) {
     `;
     return await allAsync(sql, [cashBoxId]);
   } catch (error) {
-    console.error("Error obteniendo ventas de caja:", error);
     throw error;
   }
 }
@@ -1223,7 +1189,6 @@ async function createSaleWithItems(saleData) {
 
     return saleId;
   } catch (error) {
-    console.error("Error creando venta:", error);
     throw error;
   }
 }
@@ -1247,7 +1212,6 @@ async function getSaleWithItems(saleId) {
     ]);
     return { ...sale, items };
   } catch (error) {
-    console.error("Error obteniendo venta:", error);
     throw error;
   }
 }
@@ -1263,7 +1227,6 @@ async function getInventoryProducts() {
     `;
     return await allAsync(sql);
   } catch (error) {
-    console.error("Error obteniendo inventario:", error);
     throw error;
   }
 }
@@ -1274,7 +1237,6 @@ async function updateProductStock(productId, newStock) {
     await runAsync(sql, [newStock, productId]);
     return true;
   } catch (error) {
-    console.error("Error actualizando stock:", error);
     throw error;
   }
 }
@@ -1346,7 +1308,6 @@ async function adjustProductStock(
       productName: product.name,
     };
   } catch (error) {
-    console.error("Error ajustando stock:", error);
     throw error;
   }
 }
@@ -1370,7 +1331,6 @@ async function getStockAdjustments(productId = null, limit = 50) {
 
     return await allAsync(sql, params);
   } catch (error) {
-    console.error("Error obteniendo ajustes de stock:", error);
     throw error;
   }
 }
@@ -1385,7 +1345,6 @@ async function getLowStockProducts(threshold = 10) {
     `;
     return await allAsync(sql, [threshold]);
   } catch (error) {
-    console.error("Error obteniendo productos con bajo stock:", error);
     throw error;
   }
 }
@@ -1397,7 +1356,6 @@ async function getSuppliers() {
     const sql = "SELECT * FROM suppliers ORDER BY name ASC";
     return await allAsync(sql);
   } catch (error) {
-    console.error("Error obteniendo proveedores:", error);
     throw error;
   }
 }
@@ -1419,7 +1377,6 @@ async function createSupplier(name, contactName, phone, email, address, notes) {
     ]);
     return result.lastID;
   } catch (error) {
-    console.error("Error creando proveedor:", error);
     throw error;
   }
 }
@@ -1442,7 +1399,6 @@ async function updateSupplier(
     await runAsync(sql, [name, contactName, phone, email, address, notes, id]);
     return true;
   } catch (error) {
-    console.error("Error actualizando proveedor:", error);
     throw error;
   }
 }
@@ -1452,7 +1408,6 @@ async function deleteSupplier(id) {
     await runAsync("DELETE FROM suppliers WHERE id = ?", [id]);
     return true;
   } catch (error) {
-    console.error("Error eliminando proveedor:", error);
     throw error;
   }
 }
@@ -1464,7 +1419,6 @@ async function getCategories() {
     const sql = "SELECT * FROM categories ORDER BY name ASC";
     return await allAsync(sql);
   } catch (error) {
-    console.error("Error obteniendo categorías:", error);
     throw error;
   }
 }
@@ -1476,8 +1430,6 @@ async function createCategory(name, description, type = "food") {
     const result = await runAsync(sql, [name, description, type]);
     return result.lastID;
   } catch (error) {
-    console.error("❌ API: Error creando categoría:", error);
-    console.error("❌ API: Stack trace:", error.stack);
     throw error;
   }
 }
@@ -1488,7 +1440,6 @@ async function updateCategory(id, name, description, type = "food") {
     await runAsync(sql, [name, description, type, id]);
     return true;
   } catch (error) {
-    console.error("Error actualizando categoría:", error);
     throw error;
   }
 }
@@ -1498,7 +1449,6 @@ async function deleteCategory(id) {
     await runAsync("DELETE FROM categories WHERE id = ?", [id]);
     return true;
   } catch (error) {
-    console.error("Error eliminando categoría:", error);
     throw error;
   }
 }
@@ -1557,7 +1507,6 @@ async function createPurchaseOrder(purchaseData) {
     }
     return purchaseOrderId;
   } catch (error) {
-    console.error("Error creando orden de compra:", error);
     throw error;
   }
 }
@@ -1573,7 +1522,6 @@ async function getPurchaseOrders(limit = 50) {
     `;
     return await allAsync(sql, [limit]);
   } catch (error) {
-    console.error("Error obteniendo órdenes de compra:", error);
     throw error;
   }
 }
@@ -1599,7 +1547,6 @@ async function getPurchaseOrderWithItems(purchaseOrderId) {
 
     return { ...po, items };
   } catch (error) {
-    console.error("Error obteniendo orden de compra:", error);
     throw error;
   }
 }
@@ -1655,7 +1602,6 @@ async function clearAllData() {
       } catch (err) {
         // Si la tabla no existe, continuar
         if (!err.message.includes("no such table")) {
-          console.warn(`  ⚠ Error limpiando ${table}:`, err.message);
         }
       }
     }
@@ -1669,7 +1615,6 @@ async function clearAllData() {
 
     return { success: true, message: "Base de datos limpiada exitosamente" };
   } catch (error) {
-    console.error("❌ Error limpiando base de datos:", error);
     // Asegurar que las claves foráneas se reactiven incluso si hay error
     try {
       await runAsync("PRAGMA foreign_keys = ON");
@@ -1688,7 +1633,6 @@ async function getMemberships() {
       "SELECT * FROM memberships WHERE is_active = TRUE ORDER BY name ASC";
     return await allAsync(sql);
   } catch (error) {
-    console.error("Error obteniendo membresías:", error);
     throw error;
   }
 }
@@ -1743,7 +1687,6 @@ async function createMembership(
     ]);
     return result.rows[0].id;
   } catch (error) {
-    console.error("Error creando membresía:", error);
     throw error;
   }
 }
@@ -1798,7 +1741,6 @@ async function updateMembership(
     ]);
     return true;
   } catch (error) {
-    console.error("Error actualizando membresía:", error);
     throw error;
   }
 }
@@ -1810,7 +1752,6 @@ async function deleteMembership(id) {
     ]);
     return true;
   } catch (error) {
-    console.error("Error eliminando membresía:", error);
     throw error;
   }
 }
@@ -1828,7 +1769,6 @@ async function getClientMemberships(clientId) {
     `;
     return await allAsync(sql, [clientId]);
   } catch (error) {
-    console.error("Error obteniendo membresías del cliente:", error);
     throw error;
   }
 }
@@ -1900,7 +1840,6 @@ async function assignMembership(
     ]);
     return result.rows[0].id;
   } catch (error) {
-    console.error("Error asignando membresía:", error);
     throw error;
   }
 }
@@ -1913,7 +1852,6 @@ async function cancelClientMembership(id, canceledBy) {
     );
     return true;
   } catch (error) {
-    console.error("Error cancelando membresía:", error);
     throw error;
   }
 }
@@ -1945,7 +1883,6 @@ async function recordMembershipRenewal(renewalData) {
 
     return result.lastID;
   } catch (error) {
-    console.error("Error registrando renovación:", error);
     throw error;
   }
 }
@@ -1971,7 +1908,6 @@ async function getClientActiveMembership(clientId) {
 
     return await getAsync(sql, [clientId]);
   } catch (error) {
-    console.error("Error obteniendo membresía activa:", error);
     throw error;
   }
 }
@@ -1999,7 +1935,6 @@ async function recordMembershipUsage(usageData) {
 
     return result.lastID;
   } catch (error) {
-    console.error("Error registrando uso de membresía:", error);
     throw error;
   }
 }
@@ -2025,7 +1960,6 @@ async function getMembershipUsageHistory(clientMembershipId) {
 
     return await allAsync(sql, [clientMembershipId]);
   } catch (error) {
-    console.error("Error obteniendo historial de uso:", error);
     throw error;
   }
 }
@@ -2067,7 +2001,6 @@ async function checkDailySessionLimit(clientId, clientMembershipId) {
       used: used,
     };
   } catch (error) {
-    console.error("Error verificando límite de sesiones:", error);
     throw error;
   }
 }
@@ -2084,7 +2017,6 @@ async function getClientVisits(clientId, limit = 50) {
     `;
     return await allAsync(sql, [clientId, limit]);
   } catch (error) {
-    console.error("Error obteniendo visitas del cliente:", error);
     throw error;
   }
 }
@@ -2114,7 +2046,6 @@ async function createClientVisit(
     ]);
     return result.lastID;
   } catch (error) {
-    console.error("Error creando visita:", error);
     throw error;
   }
 }
@@ -2133,7 +2064,6 @@ async function updateClientVisitCheckout(
     await runAsync(sql, [checkOutTime, durationMinutes, visitId]);
     return true;
   } catch (error) {
-    console.error("Error actualizando checkout:", error);
     throw error;
   }
 }
@@ -2146,7 +2076,6 @@ async function getPackageFeatures() {
       "SELECT * FROM package_features WHERE is_active = TRUE ORDER BY category, name ASC";
     return await allAsync(sql);
   } catch (error) {
-    console.error("Error obteniendo características:", error);
     throw error;
   }
 }
@@ -2161,7 +2090,6 @@ async function createPackageFeature(name, description, category, requires_quanti
     const result = await runAsync(sql, [name, description, category, requires_quantity]);
     return result.lastID;
   } catch (error) {
-    console.error("Error creando característica:", error);
     throw error;
   }
 }
@@ -2176,7 +2104,6 @@ async function updatePackageFeature(id, name, description, category, requires_qu
     await runAsync(sql, [name, description, category, requires_quantity, id]);
     return true;
   } catch (error) {
-    console.error("Error actualizando característica:", error);
     throw error;
   }
 }
@@ -2189,7 +2116,6 @@ async function deletePackageFeature(id) {
     );
     return true;
   } catch (error) {
-    console.error("Error eliminando característica:", error);
     throw error;
   }
 }
@@ -2205,7 +2131,6 @@ async function getPackageIncludedFeatures(packageId) {
     `;
     return await allAsync(sql, [packageId]);
   } catch (error) {
-    console.error("Error obteniendo características del paquete:", error);
     throw error;
   }
 }
@@ -2232,7 +2157,6 @@ async function setPackageFeatures(packageId, features) {
     }
     return true;
   } catch (error) {
-    console.error("Error asignando características:", error);
     throw error;
   }
 }
@@ -2245,7 +2169,6 @@ async function getPackageFeatureCategories() {
       "SELECT * FROM package_feature_categories WHERE is_active = TRUE ORDER BY name ASC";
     return await allAsync(sql);
   } catch (error) {
-    console.error("Error obteniendo categorías de características:", error);
     throw error;
   }
 }
@@ -2260,7 +2183,6 @@ async function createPackageFeatureCategory(name, description) {
     const result = await runAsync(sql, [name, description]);
     return result.lastID;
   } catch (error) {
-    console.error("Error creando categoría:", error);
     throw error;
   }
 }
@@ -2275,7 +2197,6 @@ async function updatePackageFeatureCategory(id, name, description) {
     await runAsync(sql, [name, description, id]);
     return true;
   } catch (error) {
-    console.error("Error actualizando categoría:", error);
     throw error;
   }
 }
@@ -2288,7 +2209,6 @@ async function deletePackageFeatureCategory(id) {
     );
     return true;
   } catch (error) {
-    console.error("Error eliminando categoría:", error);
     throw error;
   }
 }
@@ -2311,7 +2231,6 @@ async function getCashBoxes() {
     `;
     return await allAsync(sql);
   } catch (error) {
-    console.error("Error obteniendo cajas:", error);
     throw error;
   }
 }
@@ -2378,7 +2297,6 @@ async function getSalesByProduct(startDate, endDate, categoryFilter = null) {
       },
     };
   } catch (error) {
-    console.error("Error obteniendo ventas por producto:", error);
     throw error;
   }
 }
@@ -2541,7 +2459,6 @@ async function getCashFlowReport(startDate, endDate) {
       summary,
     };
   } catch (error) {
-    console.error("Error obteniendo flujo de efectivo:", error);
     throw error;
   }
 }
@@ -2599,7 +2516,6 @@ async function getInventoryMovements(startDate, endDate, productFilter = null) {
       summary,
     };
   } catch (error) {
-    console.error("Error obteniendo movimientos de inventario:", error);
     throw error;
   }
 }
@@ -2681,7 +2597,6 @@ async function getPurchasesByPeriod(startDate, endDate, supplierFilter = null) {
       dailyPurchases,
     };
   } catch (error) {
-    console.error("Error obteniendo compras por período:", error);
     throw error;
   }
 }
@@ -2775,7 +2690,6 @@ async function getSessionsByPeriod(startDate, endDate, packageFilter = null) {
       dailySessions,
     };
   } catch (error) {
-    console.error("Error obteniendo sesiones por período:", error);
     throw error;
   }
 }
@@ -2819,7 +2733,6 @@ async function getSalesByPaymentMethod(startDate, endDate) {
       },
     };
   } catch (error) {
-    console.error("Error obteniendo ventas por método de pago:", error);
     throw error;
   }
 }
@@ -2866,7 +2779,6 @@ async function getSalesByHour(startDate, endDate) {
       },
     };
   } catch (error) {
-    console.error("Error obteniendo ventas por hora:", error);
     throw error;
   }
 }
@@ -2908,7 +2820,6 @@ async function getLowStockProducts(threshold = null) {
       summary,
     };
   } catch (error) {
-    console.error("Error obteniendo productos con stock bajo:", error);
     throw error;
   }
 }
@@ -2975,7 +2886,6 @@ async function getProductsWithoutMovement(days = 30) {
       },
     };
   } catch (error) {
-    console.error("Error obteniendo productos sin movimiento:", error);
     throw error;
   }
 }
@@ -3015,7 +2925,6 @@ async function getPurchasesBySupplier(startDate, endDate) {
       summary,
     };
   } catch (error) {
-    console.error("Error obteniendo compras por proveedor:", error);
     throw error;
   }
 }
@@ -3058,7 +2967,6 @@ async function getMostPurchasedProducts(startDate, endDate, limit = 20) {
       totals,
     };
   } catch (error) {
-    console.error("Error obteniendo productos más comprados:", error);
     throw error;
   }
 }
@@ -3127,7 +3035,6 @@ async function getPurchaseOrdersHistory(startDate, endDate, supplierId = null) {
       stats,
     };
   } catch (error) {
-    console.error("Error obteniendo historial de órdenes de compra:", error);
     throw error;
   }
 }
@@ -3163,7 +3070,6 @@ async function getFrequentClients(startDate, endDate, minVisits = 5) {
       },
     };
   } catch (error) {
-    console.error("Error obteniendo clientes frecuentes:", error);
     throw error;
   }
 }
@@ -3211,7 +3117,6 @@ async function getInactiveClients(days = 30) {
       },
     };
   } catch (error) {
-    console.error("Error obteniendo clientes inactivos:", error);
     throw error;
   }
 }
@@ -3258,7 +3163,6 @@ async function getSalesByClient(startDate, endDate, limit = 20) {
       },
     };
   } catch (error) {
-    console.error("Error obteniendo ventas por cliente:", error);
     throw error;
   }
 }
@@ -3312,7 +3216,6 @@ async function getSalesComparison(
       },
     };
   } catch (error) {
-    console.error("Error obteniendo comparativo de ventas:", error);
     throw error;
   }
 }
@@ -3357,7 +3260,6 @@ async function getIncomeVsExpenses(startDate, endDate) {
       },
     };
   } catch (error) {
-    console.error("Error obteniendo ingresos vs gastos:", error);
     throw error;
   }
 }
@@ -3404,7 +3306,6 @@ async function getInventoryValuation(categoryFilter = null) {
       },
     };
   } catch (error) {
-    console.error("Error obteniendo valorización de inventario:", error);
     throw error;
   }
 }
@@ -3442,7 +3343,6 @@ async function getActiveClients(days = 30) {
       },
     };
   } catch (error) {
-    console.error("Error obteniendo clientes activos:", error);
     throw error;
   }
 }
@@ -3477,7 +3377,6 @@ async function getNewClients(startDate, endDate) {
       },
     };
   } catch (error) {
-    console.error("Error obteniendo nuevos clientes:", error);
     throw error;
   }
 }
@@ -3523,7 +3422,6 @@ async function getBestSellingPackages(startDate, endDate) {
       },
     };
   } catch (error) {
-    console.error("Error obteniendo paquetes más vendidos:", error);
     throw error;
   }
 }
@@ -3566,7 +3464,6 @@ async function getAverageSessionDuration(
       },
     };
   } catch (error) {
-    console.error("Error obteniendo duración promedio de sesiones:", error);
     throw error;
   }
 }
@@ -3630,7 +3527,6 @@ async function getHourlyOccupancy(startDate, endDate) {
       },
     };
   } catch (error) {
-    console.error("Error obteniendo ocupación por hora:", error);
     throw error;
   }
 }
@@ -3706,7 +3602,6 @@ async function getActiveMemberships(statusFilter = "all") {
       summary: stats,
     };
   } catch (error) {
-    console.error("Error obteniendo membresías activas:", error);
     throw error;
   }
 }
@@ -3767,7 +3662,6 @@ async function getExpiringMemberships(daysThreshold = 30) {
       },
     };
   } catch (error) {
-    console.error("Error obteniendo membresías por vencer:", error);
     throw error;
   }
 }
@@ -3843,7 +3737,6 @@ async function getSessionsHistory(
       },
     };
   } catch (error) {
-    console.error("Error obteniendo historial de sesiones:", error);
     throw error;
   }
 }
@@ -3944,7 +3837,6 @@ async function getDiscountsReport(
       ranges,
     };
   } catch (error) {
-    console.error("Error obteniendo reporte de descuentos:", error);
     throw error;
   }
 }
@@ -4067,7 +3959,6 @@ async function getDailyCashSummary(date) {
       },
     };
   } catch (error) {
-    console.error("Error obteniendo resumen diario de caja:", error);
     throw error;
   }
 }
@@ -4155,7 +4046,6 @@ async function getUserActivityReport(
       byUser,
     };
   } catch (error) {
-    console.error("Error obteniendo reporte de actividad de usuarios:", error);
     throw error;
   }
 }
@@ -4278,7 +4168,6 @@ async function getInventoryChangesReport(
       byUser,
     };
   } catch (error) {
-    console.error("Error obteniendo reporte de cambios en inventario:", error);
     throw error;
   }
 }
@@ -4365,7 +4254,6 @@ async function getSystemAccessReport(startDate, endDate, userId = null) {
       byDay,
     };
   } catch (error) {
-    console.error("Error obteniendo reporte de accesos al sistema:", error);
     throw error;
   }
 }
@@ -4443,7 +4331,6 @@ async function getPriceChangesReport(startDate, endDate, productId = null) {
       byUser,
     };
   } catch (error) {
-    console.error("Error obteniendo reporte de cambios de precios:", error);
     throw error;
   }
 }
@@ -4538,7 +4425,6 @@ async function getSalesAuditReport(
       byUser,
     };
   } catch (error) {
-    console.error("Error obteniendo reporte de auditoría de ventas:", error);
     throw error;
   }
 }
@@ -4552,7 +4438,6 @@ async function fixNegativeCashMovements() {
 
     return { success: true, changes: result.changes };
   } catch (error) {
-    console.error("Error corrigiendo movimientos:", error);
     throw error;
   }
 }
@@ -4687,7 +4572,6 @@ async function openCashDrawerWithAudit(userId, printerName, reason = "Apertura m
     }
     return success;
   } catch (error) {
-    console.error("Error en openCashDrawerWithAudit:", error);
     throw error;
   }
 }

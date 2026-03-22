@@ -53,7 +53,6 @@ export function PurchasesByPeriodReport({
       const result = await window.api.getSuppliers();
       setSuppliers(result);
     } catch (err) {
-      console.error("Error cargando proveedores:", err);
     }
   };
 
@@ -72,7 +71,6 @@ export function PurchasesByPeriodReport({
       setData(result);
     } catch (err) {
       error("Error cargando reporte");
-      console.error(err);
     } finally {
       setLoading(false);
     }

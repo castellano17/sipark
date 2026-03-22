@@ -39,7 +39,6 @@ export function StockReport({ onBack }: StockReportProps) {
       ].sort();
       setCategories(uniqueCategories);
     } catch (err) {
-      console.error("Error cargando categorías:", err);
     }
   };
 
@@ -56,7 +55,6 @@ export function StockReport({ onBack }: StockReportProps) {
       setData(result);
     } catch (err) {
       error("Error cargando reporte");
-      console.error(err);
     } finally {
       setLoading(false);
     }

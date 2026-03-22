@@ -28,7 +28,6 @@ async function getCompanySettings() {
         paymentMethods: map["payment_methods"] ? JSON.parse(map["payment_methods"]) : null,
       };
     } catch (error) {
-      console.error("⚠️ Error obteniendo configuración, usando valores por defecto:", error.message);
       return {
         businessName: "SIPARK",
         businessAddress: "",
@@ -65,7 +64,6 @@ function drawPDFHeader(doc, companySettings, options = {}) {
       }
     }
   } catch (error) {
-    console.error("Error buscando logo para reporte:", error);
   }
 
   // Draw Header
@@ -291,7 +289,6 @@ async function generateOpeningPDF(cashBoxData) {
       doc.end();
     });
   } catch (error) {
-    console.error("Error generando PDF de apertura:", error);
     throw error;
   }
 }
@@ -465,7 +462,6 @@ async function generateClosingPDF(closeData) {
       finalizePDF(doc, footerOptions);
     });
   } catch (error) {
-    console.error("Error generando PDF de cierre:", error);
     throw error;
   }
 }
@@ -516,7 +512,6 @@ async function generateMembershipPDF(pdfData) {
 
         stream.on("error", (err) => {
           clearTimeout(timeout);
-          console.error("Stream error generating PDF:", err);
           reject(err);
         });
 
@@ -597,12 +592,10 @@ async function generateMembershipPDF(pdfData) {
         finalizePDF(doc, footerOptions);
       } catch (err) {
         clearTimeout(timeout);
-        console.error("Internal error in PDF Promise:", err);
         reject(err);
       }
     });
   } catch (error) {
-    console.error("Error generando PDF de membresía:", error);
     throw error;
   }
 }
@@ -780,7 +773,6 @@ async function generateReservationPDF(reservationData) {
       finalizePDF(doc, footerOptions);
     });
   } catch (error) {
-    console.error("Error generando PDF de reservación:", error);
     throw error;
   }
 }
@@ -1035,7 +1027,6 @@ async function generateQuotationPDF(quotationData) {
       finalizePDF(doc, footerOptions);
     });
   } catch (error) {
-    console.error("Error generando PDF de cotización:", error);
     throw error;
   }
 }
@@ -1173,7 +1164,6 @@ async function generateGenericReport(options) {
       doc.end();
     });
   } catch (error) {
-    console.error("Error generando reporte genérico:", error);
     throw error;
   }
 }
@@ -1329,7 +1319,6 @@ async function generateDailyCashSummaryPDF(data, selectedDate) {
       doc.end();
     });
   } catch (error) {
-    console.error("Error generando PDF de Resumen de Caja:", error);
     throw error;
   }
 }

@@ -29,7 +29,6 @@ function generateBackupFilename() {
 }
 
 async function createLocalBackup(destinationPath = null) {
-  console.warn("⚠️ Backups de PostgreSQL no implementados aún");
   return {
     success: false,
     error: "Backups de PostgreSQL no implementados. Use pg_dump manualmente.",
@@ -66,7 +65,6 @@ function cleanOldBackups(keepCount = 10) {
 }
 
 async function createAutoBackup() {
-  console.warn("⚠️ Backup automático de PostgreSQL no implementado");
   return {
     success: false,
     error: "Backups automáticos no implementados para PostgreSQL",

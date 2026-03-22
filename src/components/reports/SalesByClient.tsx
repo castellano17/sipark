@@ -53,7 +53,6 @@ export default function SalesByClient({ onBack }: SalesByClientProps) {
       );
       setReportData(data);
     } catch (error) {
-      console.error("Error cargando reporte:", error);
     } finally {
       setLoading(false);
     }

@@ -15,6 +15,7 @@ const pdfGenerator = require("./src-electron/pdf-generator.cjs");
 const quotationsApi = require("./src-electron/quotations-api.cjs");
 const reservationsApi = require("./src-electron/reservations-api.cjs");
 const nfcApi = require("./src-electron/nfc-api.cjs");
+const promotionsApi = require("./src-electron/promotions-api.cjs");
 
 // Hot reload en desarrollo
 if (isDev) {
@@ -121,6 +122,57 @@ app.on("activate", () => {
 // ============ IPC HANDLERS ============
 
 function setupIpcHandlers() {
+  // Detectar dispositivos USB conectados (cajón + lectores NFC)
+  ipcMain.handle("api:getConnectedDevices", async () => {
+    const { execFile } = require("child_process");
+    const { promisify } = require("util");
+    const execFileAsync = promisify(execFile);
+
+    let usbOutput = "";
+    try {
+      if (process.platform === "darwin") {
+        // macOS
+        const { stdout } = await execFileAsync("system_profiler", ["SPUSBDataType"], { timeout: 5000 });
+        usbOutput = stdout;
+      } else if (process.platform === "win32") {
+        // Windows
+        const { stdout } = await execFileAsync("wmic", ["path", "Win32_PnPEntity", "get", "Caption,Description,Name"], { timeout: 5000 });
+        usbOutput = stdout;
+      } else {
+        // Linux
+        const { stdout } = await execFileAsync("lsusb", [], { timeout: 5000 });
+        usbOutput = stdout;
+      }
+    } catch (e) {
+      console.warn("Error listando dispositivos USB:", e.message);
+    }
+
+    // Detectar lectores NFC por nombres comunes en la salida
+    const nfcKeywords = ["ACR", "ACS", "NFC", "RFID", "HID Global", "Feitian", "Identiv", "RF IDeas", "uTrust", "OmniKey"];
+    const nfcCount = nfcKeywords.reduce((count, kw) => {
+      const regex = new RegExp(kw, "gi");
+      const matches = (usbOutput.match(regex) || []).length;
+      return count + (matches > 0 ? 1 : 0); // contar dispositivo único por keyword
+    }, 0);
+
+    // Cajón de dinero: si hay una impresora configurada se asume disponible
+    let drawerAvailable = false;
+    try {
+      const printers = mainWindow?.webContents.getPrintersAsync
+        ? await mainWindow.webContents.getPrintersAsync()
+        : mainWindow?.webContents.getPrinters?.() || [];
+      drawerAvailable = Array.isArray(printers) && printers.length > 0;
+    } catch (e) {
+      drawerAvailable = false;
+    }
+
+    return {
+      nfcReaders: Math.min(nfcCount, 5), // máx 5 para evitar falsos positivos
+      drawerAvailable,
+      rawOutput: usbOutput.substring(0, 200), // debug limitado
+    };
+  });
+
   // Clients
   ipcMain.handle("api:getClients", () => api.getClients());
   ipcMain.handle("api:createClient", (event, data) =>
@@ -214,6 +266,25 @@ function setupIpcHandlers() {
   );
   ipcMain.handle("api:getNfcTransactions", (event, clientMembershipId) => 
     nfcApi.getNfcTransactions(clientMembershipId)
+  );
+
+  // Promotions
+  ipcMain.handle("api:createCampaign", (event, data) => promotionsApi.createCampaign(data));
+  ipcMain.handle("api:getCampaigns", (event, status) => promotionsApi.getCampaigns(status));
+  ipcMain.handle("api:getCampaignById", (event, id) => promotionsApi.getCampaignById(id));
+  ipcMain.handle("api:updateCampaignStatus", (event, { id, status }) =>
+    promotionsApi.updateCampaignStatus(id, status)
+  );
+  ipcMain.handle("api:getVoucherByCode", (event, code) => promotionsApi.getVoucherByCode(code));
+  ipcMain.handle("api:redeemVoucher", (event, data) => promotionsApi.redeemVoucher(data));
+  ipcMain.handle("api:getVoucherRedemptions", (event, campaignId) =>
+    promotionsApi.getVoucherRedemptions(campaignId)
+  );
+  ipcMain.handle("api:deactivateVoucher", (event, voucherId) =>
+    promotionsApi.deactivateVoucher(voucherId)
+  );
+  ipcMain.handle("api:getVouchersForPrint", (event, { campaignId, voucherIds }) =>
+    promotionsApi.getVouchersForPrint(campaignId, voucherIds)
   );
 
   // Stats

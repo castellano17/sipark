@@ -56,7 +56,6 @@ export function CashFlowReport({ onBack }: CashFlowReportProps) {
       setData(result);
     } catch (err) {
       error("Error cargando reporte");
-      console.error(err);
     } finally {
       setLoading(false);
     }

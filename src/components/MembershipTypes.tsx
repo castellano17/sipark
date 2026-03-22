@@ -67,7 +67,6 @@ export function MembershipTypes() {
       const data = await (window as any).api.getMemberships();
       setMemberships(data);
     } catch (err) {
-      console.error("Error cargando membresías:", err);
       error("Error al cargar tipos de membresía");
     } finally {
       setLoading(false);
@@ -94,7 +93,6 @@ export function MembershipTypes() {
       resetForm();
       loadMemberships();
     } catch (err) {
-      console.error("Error guardando membresía:", err);
       error("Error al guardar la membresía");
     }
   };
@@ -113,7 +111,6 @@ export function MembershipTypes() {
       success("Membresía eliminada correctamente");
       loadMemberships();
     } catch (err) {
-      console.error("Error eliminando membresía:", err);
       error("Error al eliminar la membresía");
     }
   };

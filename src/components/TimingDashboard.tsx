@@ -90,7 +90,6 @@ export const TimingDashboard: React.FC<TimingDashboardProps> = ({
         errorNotification("Error al finalizar la sesión");
       }
     } catch (err) {
-      console.error("Error finalizando sesión:", err);
       errorNotification("Error al finalizar la sesión");
     }
   };

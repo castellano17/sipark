@@ -204,6 +204,22 @@ type AppApi = {
   chargeNfcEntry: (data: { uid: string; amount: number; userId: number | null }) => Promise<{ success: boolean; clientName: string; newBalance: number }>;
   refundNfcCard: (data: { clientMembershipId: number; amount: number; reason: string; userId: number | null }) => Promise<{ success: boolean; newBalance: number }>;
   getNfcTransactions: (clientMembershipId: number) => Promise<any[]>;
+
+  // Promotions
+  createCampaign: (data: {
+    name: string; description?: string; type: string; benefitValue: number;
+    benefitPackageId?: number; codeCount: number; maxUsesPerCode: number;
+    validFrom?: string; validUntil?: string; targetAudience?: string;
+    minPurchase?: number; createdBy?: number;
+  }) => Promise<{ success: boolean; campaignId: number; codesGenerated: number }>;
+  getCampaigns: (status?: string | null) => Promise<any[]>;
+  getCampaignById: (id: number) => Promise<any>;
+  updateCampaignStatus: (id: number, status: string) => Promise<boolean>;
+  getVoucherByCode: (code: string) => Promise<{ valid: boolean; voucher?: any; reason?: string }>;
+  redeemVoucher: (data: { code: string; saleId?: number | null; clientId?: number | null; redeemedBy?: number | null; benefitApplied?: any; notes?: string }) => Promise<{ success: boolean; voucherId: number }>;
+  getVoucherRedemptions: (campaignId: number) => Promise<any[]>;
+  deactivateVoucher: (voucherId: number) => Promise<boolean>;
+  getVouchersForPrint: (campaignId: number, voucherIds?: number[]) => Promise<any[]>;
 } & Record<string, (...args: any[]) => Promise<any>>;
 
 declare global {

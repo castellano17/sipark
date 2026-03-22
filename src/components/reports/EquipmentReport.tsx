@@ -32,7 +32,6 @@ export function EquipmentReport({ onBack }: EquipmentReportProps) {
       setData(eq);
     } catch (err) {
       error("Error cargando reporte de mobiliario y equipos");
-      console.error(err);
     } finally {
       setLoading(false);
     }

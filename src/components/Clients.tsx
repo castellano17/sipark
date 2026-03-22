@@ -199,7 +199,6 @@ export function Clients() {
       } else {
         error("Error eliminando cliente");
       }
-      console.error("Error al eliminar cliente:", err);
     } finally {
       setShowDeleteConfirm(false);
       setClientToDelete(null);

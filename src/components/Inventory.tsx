@@ -127,7 +127,6 @@ export function Inventory() {
       const data = await window.api.getCategories();
       setDbCategories(data);
     } catch (err) {
-      console.error("Error cargando categorías:", err);
     }
   };
 
@@ -136,7 +135,6 @@ export function Inventory() {
       const data = await window.api.getLowStockProducts(10);
       setLowStockCount(data.length);
     } catch (err) {
-      console.error("Error cargando productos con bajo stock:", err);
     }
   };
 
@@ -145,7 +143,6 @@ export function Inventory() {
       const data = await window.api.getStockAdjustments();
       setAdjustments(data || []);
     } catch (err) {
-      console.error("Error cargando ajustes:", err);
     }
   };
 

@@ -46,7 +46,6 @@ export function InventoryMovementsReport({
       const result = await window.api.getInventoryProducts();
       setProducts(result);
     } catch (err) {
-      console.error("Error cargando productos:", err);
     }
   };
 
@@ -65,7 +64,6 @@ export function InventoryMovementsReport({
       setData(result);
     } catch (err) {
       error("Error cargando reporte");
-      console.error(err);
     } finally {
       setLoading(false);
     }

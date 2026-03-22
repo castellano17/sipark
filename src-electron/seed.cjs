@@ -11,7 +11,6 @@ async function seedDatabase() {
     }
     // Base de datos lista.
   } catch (error) {
-    console.error("❌ Error inicializando configuración:", error);
   }
 }
 

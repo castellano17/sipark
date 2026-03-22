@@ -33,7 +33,6 @@ export default function ActiveMemberships({ onBack }: ActiveMembershipsProps) {
       const data = await (window.api as any).getActiveMemberships(statusFilter);
       setReportData(data);
     } catch (error) {
-      console.error("Error cargando reporte:", error);
     } finally {
       setLoading(false);
     }

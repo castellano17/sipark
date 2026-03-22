@@ -97,7 +97,6 @@ export const InvoiceConfig: React.FC = () => {
         setSettings(JSON.parse(savedSettings));
       }
     } catch (err) {
-      console.error("Error cargando configuración:", err);
     }
   };
 
@@ -108,7 +107,6 @@ export const InvoiceConfig: React.FC = () => {
         setLogoPreview(logo);
       }
     } catch (err) {
-      console.error("Error cargando logo:", err);
     }
   };
 

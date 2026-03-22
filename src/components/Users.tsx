@@ -105,14 +105,19 @@ export function Users() {
   ];
 
   const modules = [
-    { id: "dashboard", name: "Dashboard" },
-    { id: "operations", name: "Operaciones" },
-    { id: "pos", name: "Punto de Venta" },
-    { id: "clients", name: "Clientes" },
-    { id: "memberships", name: "Membresías" },
-    { id: "inventory", name: "Inventario" },
-    { id: "reports", name: "Reportes" },
-    { id: "settings", name: "Configuración" },
+    { id: "dashboard",        name: "Dashboard" },
+    { id: "operations",       name: "Operaciones" },
+    { id: "pos",              name: "Punto de Venta",   hasDrawer: true },
+    { id: "clients",          name: "Clientes" },
+    { id: "memberships",      name: "Membresías" },
+    { id: "quotations",       name: "Cotizaciones" },
+    { id: "reservations",     name: "Reservaciones" },
+    { id: "promotions",       name: "Promociones" },
+    { id: "inventory",        name: "Inventario" },
+    { id: "internal",         name: "Gestión Interna" },
+    { id: "reports",          name: "Reportes" },
+    { id: "users",            name: "Usuarios" },
+    { id: "settings",         name: "Configuración" },
   ];
 
   useEffect(() => {
@@ -318,7 +323,6 @@ export function Users() {
       loadUsers(); // Recargar usuarios para actualizar la lista
     } catch (err: any) {
       error(err.message || "Error guardando permisos");
-      console.error("Error guardando permisos:", err);
     }
   };
 
@@ -767,27 +771,33 @@ export function Users() {
                       <th className="px-4 py-3 text-left text-sm font-semibold">
                         Módulo
                       </th>
-                      <th className="px-4 py-3 text-center text-sm font-semibold">
-                        Ver
-                      </th>
-                      <th className="px-4 py-3 text-center text-sm font-semibold">
-                        Crear
-                      </th>
-                      <th className="px-4 py-3 text-center text-sm font-semibold">
-                        Editar
-                      </th>
-                      <th className="px-4 py-3 text-center text-sm font-semibold">
-                        Eliminar
-                      </th>
-                      <th className="px-4 py-3 text-center text-sm font-semibold">
-                        Abrir Cajón
-                      </th>
+                      <th className="px-4 py-3 text-center text-sm font-semibold">Ver</th>
+                      <th className="px-4 py-3 text-center text-sm font-semibold">Crear</th>
+                      <th className="px-4 py-3 text-center text-sm font-semibold">Editar</th>
+                      <th className="px-4 py-3 text-center text-sm font-semibold">Eliminar</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y">
                     {modules.map((module, index) => (
                       <tr key={module.id} className="hover:bg-gray-50">
-                        <td className="px-4 py-3 font-medium">{module.name}</td>
+                        <td className="px-4 py-3 font-medium">
+                          <div>{module.name}</div>
+                          {(module as any).hasDrawer && (
+                            <label className="flex items-center gap-2 mt-2 text-xs text-slate-600 font-normal cursor-pointer select-none">
+                              <input
+                                type="checkbox"
+                                checked={permissions[index]?.can_open_drawer || false}
+                                onChange={(e) => {
+                                  const newPerms = [...permissions];
+                                  newPerms[index].can_open_drawer = e.target.checked;
+                                  setPermissions(newPerms);
+                                }}
+                                className="w-3.5 h-3.5 cursor-pointer accent-amber-500"
+                              />
+                              <span className="text-amber-700 font-medium">💰 Permiso: Abrir Cajón</span>
+                            </label>
+                          )}
+                        </td>
                         <td className="px-4 py-3 text-center">
                           <input
                             type="checkbox"
@@ -831,18 +841,6 @@ export function Users() {
                             onChange={(e) => {
                               const newPerms = [...permissions];
                               newPerms[index].can_delete = e.target.checked;
-                              setPermissions(newPerms);
-                            }}
-                            className="w-4 h-4 cursor-pointer"
-                          />
-                        </td>
-                        <td className="px-4 py-3 text-center">
-                          <input
-                            type="checkbox"
-                            checked={permissions[index]?.can_open_drawer || false}
-                            onChange={(e) => {
-                              const newPerms = [...permissions];
-                              newPerms[index].can_open_drawer = e.target.checked;
                               setPermissions(newPerms);
                             }}
                             className="w-4 h-4 cursor-pointer"

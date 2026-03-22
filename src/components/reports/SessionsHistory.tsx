@@ -41,7 +41,6 @@ export default function SessionsHistory({ onBack }: SessionsHistoryProps) {
       );
       setReportData(data);
     } catch (error) {
-      console.error("Error cargando reporte:", error);
     } finally {
       setLoading(false);
     }

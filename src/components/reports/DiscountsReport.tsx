@@ -65,7 +65,6 @@ export default function DiscountsReport({ onBack }: DiscountsReportProps) {
       );
       setReportData(data);
     } catch (error) {
-      console.error("Error cargando reporte:", error);
     } finally {
       setLoading(false);
     }

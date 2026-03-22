@@ -51,7 +51,6 @@ async function saveLogo(type, base64Data, extension) {
 
     return filePath;
   } catch (error) {
-    console.error(`Error guardando logo ${type}:`, error);
     throw error;
   }
 }
@@ -79,7 +78,6 @@ async function getLogo(type) {
 
     return null;
   } catch (error) {
-    console.error(`Error obteniendo logo ${type}:`, error);
     return null;
   }
 }
@@ -105,7 +103,6 @@ async function deleteLogo(type) {
 
     return false;
   } catch (error) {
-    console.error(`Error eliminando logo ${type}:`, error);
     throw error;
   }
 }

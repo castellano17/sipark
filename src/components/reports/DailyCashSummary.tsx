@@ -34,7 +34,6 @@ export function DailyCashSummary({ onBack }: DailyCashSummaryProps) {
       );
       setData(result);
     } catch (err) {
-      console.error("Error cargando reporte:", err);
       error("Error al cargar el resumen diario de caja");
     } finally {
       setLoading(false);
@@ -111,7 +110,6 @@ export function DailyCashSummary({ onBack }: DailyCashSummaryProps) {
 
       success("Ticket enviado a impresora");
     } catch (err) {
-      console.error("Error imprimiendo:", err);
       error("Error al imprimir");
     }
   };
@@ -124,7 +122,6 @@ export function DailyCashSummary({ onBack }: DailyCashSummaryProps) {
       });
       success("PDF generado exitosamente");
     } catch (err) {
-      console.error("Error generando PDF:", err);
       error("Error al generar PDF");
     }
   };

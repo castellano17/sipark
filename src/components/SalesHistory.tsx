@@ -60,7 +60,6 @@ export function SalesHistory() {
       setFilteredSales(data);
     } catch (err) {
       error("Error cargando ventas");
-      console.error("Error loading sales:", err);
     }
   };
 

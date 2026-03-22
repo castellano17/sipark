@@ -49,7 +49,6 @@ export function SalesAuditReport({ onBack }: SalesAuditReportProps) {
       const result = await (window as any).api.getUsers();
       setUsers(result || []);
     } catch (err) {
-      console.error("Error cargando usuarios:", err);
     }
   };
 
@@ -64,7 +63,6 @@ export function SalesAuditReport({ onBack }: SalesAuditReportProps) {
       );
       setData(result);
     } catch (err) {
-      console.error("Error cargando reporte:", err);
       error("Error al cargar el reporte de auditoría de ventas");
     } finally {
       setLoading(false);

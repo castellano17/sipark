@@ -554,6 +554,17 @@ contextBridge.exposeInMainWorld("api", {
   getNfcTransactions: (clientMembershipId) => 
     ipcRenderer.invoke("api:getNfcTransactions", clientMembershipId),
 
+  // Promotions
+  createCampaign: (data) => ipcRenderer.invoke("api:createCampaign", data),
+  getCampaigns: (status) => ipcRenderer.invoke("api:getCampaigns", status),
+  getCampaignById: (id) => ipcRenderer.invoke("api:getCampaignById", id),
+  updateCampaignStatus: (id, status) => ipcRenderer.invoke("api:updateCampaignStatus", { id, status }),
+  getVoucherByCode: (code) => ipcRenderer.invoke("api:getVoucherByCode", code),
+  redeemVoucher: (data) => ipcRenderer.invoke("api:redeemVoucher", data),
+  getVoucherRedemptions: (campaignId) => ipcRenderer.invoke("api:getVoucherRedemptions", campaignId),
+  deactivateVoucher: (voucherId) => ipcRenderer.invoke("api:deactivateVoucher", voucherId),
+  getVouchersForPrint: (campaignId, voucherIds) => ipcRenderer.invoke("api:getVouchersForPrint", { campaignId, voucherIds }),
+
   // File Handlers (Logos)
   saveLogo: (type, base64Data, extension) =>
     ipcRenderer.invoke("file:saveLogo", { type, base64Data, extension }),

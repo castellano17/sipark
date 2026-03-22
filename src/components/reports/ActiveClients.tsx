@@ -24,7 +24,6 @@ export default function ActiveClients({ onBack }: ActiveClientsProps) {
       const data = await (window.api as any).getActiveClients(days);
       setReportData(data);
     } catch (error) {
-      console.error("Error cargando reporte:", error);
     } finally {
       setLoading(false);
     }

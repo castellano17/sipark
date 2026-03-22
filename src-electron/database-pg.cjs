@@ -41,7 +41,6 @@ function getConfig() {
       "utf8",
     );
   } catch (error) {
-    console.warn("⚠️ No se pudo crear db-config.json:", error.message);
   }
 
   return defaultConfig;
@@ -62,7 +61,6 @@ async function initializeDatabase() {
 
     return pool;
   } catch (error) {
-    console.error("❌ Error inicializando PostgreSQL:", error.message);
     throw error;
   }
 }
@@ -363,6 +361,55 @@ async function createTables() {
 
     `CREATE INDEX IF NOT EXISTS idx_nfc_cards_uid ON nfc_cards(uid)`,
 
+    `CREATE TABLE IF NOT EXISTS promotion_campaigns (
+      id SERIAL PRIMARY KEY,
+      name VARCHAR(255) NOT NULL,
+      description TEXT,
+      type VARCHAR(50) NOT NULL DEFAULT 'hours',
+      benefit_value DECIMAL(10,2) NOT NULL DEFAULT 0,
+      benefit_package_id INTEGER,
+      code_count INTEGER NOT NULL DEFAULT 1,
+      max_uses_per_code INTEGER NOT NULL DEFAULT 1,
+      valid_from DATE,
+      valid_until DATE,
+      target_audience VARCHAR(50) DEFAULT 'all',
+      min_purchase DECIMAL(10,2) DEFAULT 0,
+      status VARCHAR(20) DEFAULT 'active',
+      created_by INTEGER,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (created_by) REFERENCES users(id)
+    )`,
+
+    `CREATE TABLE IF NOT EXISTS promotion_vouchers (
+      id SERIAL PRIMARY KEY,
+      campaign_id INTEGER NOT NULL,
+      code VARCHAR(30) UNIQUE NOT NULL,
+      barcode_data TEXT,
+      qr_data TEXT,
+      times_used INTEGER DEFAULT 0,
+      max_uses INTEGER NOT NULL DEFAULT 1,
+      is_active BOOLEAN DEFAULT TRUE,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (campaign_id) REFERENCES promotion_campaigns(id)
+    )`,
+
+    `CREATE INDEX IF NOT EXISTS idx_promotion_vouchers_code ON promotion_vouchers(code)`,
+
+    `CREATE TABLE IF NOT EXISTS voucher_redemptions (
+      id SERIAL PRIMARY KEY,
+      voucher_id INTEGER NOT NULL,
+      redeemed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      client_id INTEGER,
+      redeemed_by INTEGER,
+      sale_id INTEGER,
+      benefit_applied JSONB,
+      notes TEXT,
+      FOREIGN KEY (voucher_id) REFERENCES promotion_vouchers(id),
+      FOREIGN KEY (client_id) REFERENCES clients(id),
+      FOREIGN KEY (redeemed_by) REFERENCES users(id),
+      FOREIGN KEY (sale_id) REFERENCES sales(id)
+    )`,
+
     `CREATE TABLE IF NOT EXISTS nfc_transactions (
       id SERIAL PRIMARY KEY,
       client_membership_id INTEGER NOT NULL,
@@ -572,7 +619,6 @@ async function createTables() {
     try {
       await pool.query(sql);
     } catch (error) {
-      console.error("Error creando tabla:", error.message);
       throw error;
     }
   }
@@ -603,7 +649,6 @@ async function createTables() {
     try {
       await pool.query(sql);
     } catch (error) {
-      console.warn("Advertencia creando índice:", error.message);
     }
   }
 
@@ -716,7 +761,6 @@ async function createTables() {
         END $$;
     `);
   } catch (error) {
-    console.warn("⚠️ Advertencia al aplicar migraciones:", error.message);
   }
 }
 
@@ -801,8 +845,6 @@ async function runAsync(sql, params = []) {
       rows: result.rows,
     };
   } catch (error) {
-    console.error("❌ DB: Error en runAsync:", error.message);
-    console.error("❌ DB: Stack:", error.stack);
     throw error;
   }
 }
@@ -815,7 +857,6 @@ async function getAsync(sql, params = []) {
     const result = await pool.query(pgSql, params);
     return result.rows[0] || null;
   } catch (error) {
-    console.error("Error en getAsync:", error.message);
     throw error;
   }
 }
@@ -828,7 +869,6 @@ async function allAsync(sql, params = []) {
     const result = await pool.query(pgSql, params);
     return result.rows || [];
   } catch (error) {
-    console.error("Error en allAsync:", error.message);
     throw error;
   }
 }

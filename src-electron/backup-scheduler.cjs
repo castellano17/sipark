@@ -70,7 +70,6 @@ async function checkAndRunBackup() {
           await sendBackupByEmail(emailConfig);
         }
       } catch (err) {
-        console.error("Error enviando respaldo por email:", err);
       }
     }
 
@@ -84,13 +83,11 @@ async function checkAndRunBackup() {
           await uploadToGoogleDrive(gdriveConfig, null);
         }
       } catch (err) {
-        console.error("Error subiendo a Google Drive:", err);
       }
     }
 
     lastBackupTime = now;
   } catch (error) {
-    console.error("❌ Error en respaldo automático:", error);
   }
 }
 

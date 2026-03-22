@@ -69,7 +69,6 @@ export default function SalesComparison({ onBack }: SalesComparisonProps) {
       );
       setReportData(data);
     } catch (error) {
-      console.error("Error cargando reporte:", error);
     } finally {
       setLoading(false);
     }

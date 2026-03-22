@@ -81,7 +81,6 @@ async function sendBackupByEmail(config) {
       sentTo: config.to,
     };
   } catch (error) {
-    console.error("❌ Error enviando respaldo por email:", error);
     throw error;
   }
 }

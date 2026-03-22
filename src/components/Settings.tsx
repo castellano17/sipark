@@ -121,7 +121,6 @@ export const Settings: React.FC = () => {
       setDbConnected(result.connected);
       setDbMessage(result.message);
     } catch (err) {
-      console.error("Error verificando BD:", err);
       setDbConnected(false);
       setDbMessage("Error de conexión");
     }
@@ -132,7 +131,6 @@ export const Settings: React.FC = () => {
       const status = await (window as any).api.getSchedulerStatus();
       setSchedulerStatus(status);
     } catch (err) {
-      console.error("Error cargando estado del scheduler:", err);
     }
   };
 
@@ -179,7 +177,6 @@ export const Settings: React.FC = () => {
                   setBankAccounts([]);
                 }
               } catch (e) {
-                console.error("Error parseando payment_methods:", e);
                 setBankAccounts([]);
               }
               break;
@@ -231,7 +228,6 @@ export const Settings: React.FC = () => {
         });
       }
     } catch (err) {
-      console.error("Error cargando configuración:", err);
     } finally {
       setLoading(false);
     }
@@ -373,7 +369,6 @@ export const Settings: React.FC = () => {
 
       success("Configuración de empresa guardada correctamente");
     } catch (err) {
-      console.error("Error guardando configuración:", err);
       errorNotification("Error al guardar la configuración");
     } finally {
       setLoading(false);
@@ -388,7 +383,6 @@ export const Settings: React.FC = () => {
       await setSetting("nfc_entry_price", nfcEntryPrice.toString());
       success("Configuración de operaciones guardada correctamente");
     } catch (err) {
-      console.error("Error guardando configuración:", err);
       errorNotification("Error al guardar la configuración");
     } finally {
       setLoading(false);
@@ -403,7 +397,6 @@ export const Settings: React.FC = () => {
       await setSetting("invoice_next_number", invoiceNextNumber);
       success("Configuración contable guardada correctamente");
     } catch (err) {
-      console.error("Error guardando configuración:", err);
       errorNotification("Error al guardar la configuración");
     } finally {
       setLoading(false);
@@ -435,7 +428,6 @@ export const Settings: React.FC = () => {
       await cargarEstadoScheduler();
       success("Configuración de respaldo automático guardada");
     } catch (err) {
-      console.error("Error guardando configuración:", err);
       errorNotification("Error al guardar la configuración");
     } finally {
       setLoading(false);
@@ -981,7 +973,6 @@ export const Settings: React.FC = () => {
                           // Usuario canceló
                         }
                       } catch (err) {
-                        console.error("Error creando respaldo:", err);
                         errorNotification("Error al crear respaldo");
                       } finally {
                         setLoading(false);
@@ -1009,7 +1000,6 @@ export const Settings: React.FC = () => {
                           // Usuario canceló
                         }
                       } catch (err) {
-                        console.error("Error restaurando:", err);
                         errorNotification("Error al restaurar respaldo");
                       } finally {
                         setLoading(false);
@@ -1272,7 +1262,6 @@ export const Settings: React.FC = () => {
                             "Base de datos limpiada exitosamente. Reinicia la aplicación.",
                           );
                         } catch (err) {
-                          console.error("Error limpiando BD:", err);
                           errorNotification(
                             "Error al limpiar la base de datos",
                           );

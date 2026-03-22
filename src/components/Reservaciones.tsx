@@ -128,7 +128,6 @@ export const Reservaciones: React.FC = () => {
         setReservations(result.data || []);
       }
     } catch (error) {
-      console.error("Error cargando reservaciones:", error);
     }
   };
 
@@ -141,7 +140,6 @@ export const Reservaciones: React.FC = () => {
         setPackages(pkgs);
       }
     } catch (error) {
-      console.error("Error cargando paquetes:", error);
     }
   };
 
@@ -153,7 +151,6 @@ export const Reservaciones: React.FC = () => {
         setClients(result);
       }
     } catch (error) {
-      console.error("Error cargando clientes:", error);
     }
   };
 
@@ -164,7 +161,6 @@ export const Reservaciones: React.FC = () => {
         setSelectedReservation(result.data);
       }
     } catch (error) {
-      console.error("Error cargando reservación:", error);
     }
   };
 
@@ -261,7 +257,6 @@ export const Reservaciones: React.FC = () => {
       await window.api.generateReservationPDF(reservation);
       enqueueSnackbar("PDF generado exitosamente", { variant: "success" });
     } catch (error) {
-      console.error("Error generando PDF:", error);
       enqueueSnackbar("Error al generar PDF", { variant: "error" });
     }
   };
@@ -310,7 +305,6 @@ export const Reservaciones: React.FC = () => {
         });
       }
     } catch (error) {
-      console.error("Error registrando pago:", error);
       enqueueSnackbar(`Error: ${error.message}`, { variant: "error" });
     }
   };
@@ -356,7 +350,6 @@ export const Reservaciones: React.FC = () => {
         enqueueSnackbar("Error al completar evento", { variant: "error" });
       }
     } catch (error) {
-      console.error("Error completando evento:", error);
       enqueueSnackbar("Error al completar evento", { variant: "error" });
     }
   };

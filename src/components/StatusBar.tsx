@@ -106,6 +106,42 @@ export const StatusBar: React.FC<StatusBarProps> = ({
         </span>
       </div>
 
+      {/* Cash Drawer Status */}
+      <div className="flex items-center gap-2 whitespace-nowrap">
+        <div
+          className={`w-2 h-2 rounded-full ${
+            status.drawer === "loading"
+              ? "bg-slate-300 animate-pulse"
+              : status.drawer === "connected"
+              ? "bg-emerald-500"
+              : "bg-amber-500"
+          }`}
+        />
+        <span className="text-slate-700">
+          Cajón:{" "}
+          {status.drawer === "loading"
+            ? "..."
+            : status.drawer === "connected"
+            ? "OK"
+            : "Sin impresora"}
+        </span>
+      </div>
+
+      {/* NFC Reader Status */}
+      <div className="flex items-center gap-2 whitespace-nowrap">
+        <div
+          className={`w-2 h-2 rounded-full ${
+            status.nfcReaders > 0 ? "bg-emerald-500" : "bg-amber-500"
+          }`}
+        />
+        <span className="text-slate-700">
+          NFC:{" "}
+          {status.nfcReaders > 0
+            ? `${status.nfcReaders} lector${status.nfcReaders > 1 ? "es" : ""}`
+            : "No detectado"}
+        </span>
+      </div>
+
       {/* Separator */}
       <div className="h-4 w-px bg-slate-300" />
 

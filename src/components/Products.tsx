@@ -79,7 +79,6 @@ export function Products() {
       const data = await window.api.getCategories();
       setCategories(data);
     } catch (err) {
-      console.error("Error cargando categorías:", err);
     }
   };
 

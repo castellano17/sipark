@@ -46,7 +46,6 @@ function getPrinters() {
 
     return [];
   } catch (error) {
-    console.error("Error al obtener impresoras:", error.message);
     return [];
   }
 }
@@ -90,7 +89,6 @@ function getDefaultPrinter() {
 
     return null;
   } catch (error) {
-    console.error("Error al obtener impresora predeterminada:", error.message);
     return null;
   }
 }
@@ -155,7 +153,6 @@ async function printTestTicket(printerName) {
 
     return true;
   } catch (error) {
-    console.error("Error al imprimir ticket:", error.message);
     return false;
   }
 }
@@ -192,7 +189,6 @@ async function printTicket(printerName, content) {
 
     return true;
   } catch (error) {
-    console.error("Error al imprimir texto:", error.message);
     return false;
   }
 }
@@ -233,7 +229,6 @@ async function openCashDrawer(printerName) {
 
     return true;
   } catch (error) {
-    console.error("Error al abrir cajón:", error.message);
     return false;
   }
 }

@@ -100,7 +100,6 @@ export function RenewMembership() {
       const data = await (window as any).api.getClients();
       setClients(data);
     } catch (err) {
-      console.error("Error cargando clientes:", err);
     }
   };
 
@@ -109,7 +108,6 @@ export function RenewMembership() {
       const data = await (window as any).api.getMemberships();
       setMemberships(data.filter((m: any) => m.is_active));
     } catch (err) {
-      console.error("Error cargando membresías:", err);
     }
   };
 
@@ -145,7 +143,6 @@ export function RenewMembership() {
 
       setClientMemberships(membershipsWithStatus);
     } catch (err) {
-      console.error("Error cargando membresías del cliente:", err);
       error("Error al cargar membresías del cliente");
     }
   };
@@ -314,7 +311,6 @@ export function RenewMembership() {
       try {
         await printMembershipTicket(membershipData);
       } catch (printErr) {
-        console.warn("No se pudo imprimir automáticamente:", printErr);
       }
 
       success("Membresía renovada exitosamente");
@@ -333,7 +329,6 @@ export function RenewMembership() {
       setAcquisitionDate(new Date().toLocaleDateString("sv-SE"));
       setTotalHours("");
     } catch (err: any) {
-      console.error("Error renovando membresía:", err);
       error("Error al renovar membresía: " + (err.message || "Error desconocido"));
     } finally {
       setLoading(false);

@@ -45,7 +45,6 @@ export function SystemAccessReport({ onBack }: SystemAccessReportProps) {
       const result = await (window as any).api.getUsers();
       setUsers(result || []);
     } catch (err) {
-      console.error("Error cargando usuarios:", err);
     }
   };
 
@@ -59,7 +58,6 @@ export function SystemAccessReport({ onBack }: SystemAccessReportProps) {
       );
       setData(result);
     } catch (err) {
-      console.error("Error cargando reporte:", err);
       error("Error al cargar el reporte de accesos");
     } finally {
       setLoading(false);

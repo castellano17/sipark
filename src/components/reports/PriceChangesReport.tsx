@@ -47,7 +47,6 @@ export function PriceChangesReport({ onBack }: PriceChangesReportProps) {
       const result = await (window as any).api.getInventoryProducts();
       setProducts(result || []);
     } catch (err) {
-      console.error("Error cargando productos:", err);
     }
   };
 
@@ -61,7 +60,6 @@ export function PriceChangesReport({ onBack }: PriceChangesReportProps) {
       );
       setData(result);
     } catch (err) {
-      console.error("Error cargando reporte:", err);
       error("Error al cargar el reporte de cambios de precios");
     } finally {
       setLoading(false);

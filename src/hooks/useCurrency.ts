@@ -44,7 +44,6 @@ export function useCurrency() {
         setExchangeRate(parseFloat(rate));
       }
     } catch (error) {
-      console.error("Error cargando configuración de moneda:", error);
     } finally {
       setLoading(false);
     }

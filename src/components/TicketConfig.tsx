@@ -84,7 +84,6 @@ export const TicketConfig: React.FC = () => {
         setPrinterMode(mode as "test" | "real");
       }
     } catch (err) {
-      console.error("Error cargando modo de impresora:", err);
     }
   };
 
@@ -97,7 +96,6 @@ export const TicketConfig: React.FC = () => {
         setSettings(JSON.parse(savedSettings));
       }
     } catch (err) {
-      console.error("Error cargando configuración:", err);
     }
   };
 
@@ -108,7 +106,6 @@ export const TicketConfig: React.FC = () => {
         setLogoPreview(logo);
       }
     } catch (err) {
-      console.error("Error cargando logo:", err);
     }
   };
 

@@ -21,7 +21,7 @@ async function getNfcCardByUid(uid) {
     `;
     return await getAsync(query, [uid]);
   } catch (error) {
-    console.error("Error obteniendo tarjeta NFC por UID:", error);
+    throw error;
     throw error;
   }
 }
@@ -50,7 +50,7 @@ async function assignNfcCard(clientMembershipId, uid, clientId) {
 
     return { success: true, cardId: newCardId };
   } catch (error) {
-    console.error("Error al asignar tarjeta NFC:", error);
+    throw error;
     throw error;
   }
 }
@@ -95,7 +95,7 @@ async function rechargeNfcCard(clientMembershipId, amount, saleId, userId) {
 
     return { success: true, newBalance };
   } catch (error) {
-    console.error("Error al recargar saldo NFC:", error);
+    throw error;
     throw error;
   }
 }
@@ -150,7 +150,7 @@ async function chargeNfcEntry(uid, amount, userId) {
       newBalance 
     };
   } catch (error) {
-    console.error("Error al cobrar entrada con NFC:", error);
+    throw error;
     throw error;
   }
 }
@@ -193,7 +193,7 @@ async function refundNfcCard(clientMembershipId, amount, reason, userId) {
 
     return { success: true, newBalance };
   } catch (error) {
-    console.error("Error en reembolso NFC:", error);
+    throw error;
     throw error;
   }
 }
@@ -210,7 +210,7 @@ async function getNfcTransactions(clientMembershipId) {
       [clientMembershipId]
     );
   } catch (error) {
-    console.error("Error obteniendo transacciones de tarjeta:", error);
+    throw error;
     throw error;
   }
 }

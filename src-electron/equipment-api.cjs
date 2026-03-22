@@ -7,7 +7,6 @@ async function getEquipmentCategories() {
     const sql = `SELECT * FROM equipment_categories ORDER BY name ASC`;
     return await allAsync(sql);
   } catch (error) {
-    console.error("Error obteniendo categorías de equipo:", error);
     throw error;
   }
 }
@@ -18,7 +17,6 @@ async function createEquipmentCategory(name, description = '') {
     const result = await runAsync(sql, [name, description]);
     return result;
   } catch (error) {
-    console.error("Error creando categoría de equipo:", error);
     throw error;
   }
 }
@@ -29,7 +27,6 @@ async function updateEquipmentCategory(id, name, description = '') {
     const result = await runAsync(sql, [name, description, id]);
     return result;
   } catch (error) {
-    console.error("Error actualizando categoría de equipo:", error);
     throw error;
   }
 }
@@ -40,7 +37,6 @@ async function deleteEquipmentCategory(id) {
     const result = await runAsync(sql, [id]);
     return result;
   } catch (error) {
-    console.error("Error eliminando categoría de equipo:", error);
     throw error;
   }
 }
@@ -57,7 +53,6 @@ async function getEquipment() {
     `;
     return await allAsync(sql);
   } catch (error) {
-    console.error("Error obteniendo equipos:", error);
     throw error;
   }
 }
@@ -79,7 +74,6 @@ async function createEquipment(name, category_id, quantity, status, location, ba
     ]);
     return result;
   } catch (error) {
-    console.error("Error creando equipo:", error);
     throw error;
   }
 }
@@ -103,7 +97,6 @@ async function updateEquipment(id, name, category_id, quantity, status, location
     ]);
     return result;
   } catch (error) {
-    console.error("Error actualizando equipo:", error);
     throw error;
   }
 }
@@ -114,7 +107,6 @@ async function deleteEquipment(id) {
     const result = await runAsync(sql, [id]);
     return result;
   } catch (error) {
-    console.error("Error eliminando equipo:", error);
     throw error;
   }
 }
@@ -150,7 +142,6 @@ async function adjustEquipmentStock(equipment_id, adjustment_type, quantity, rea
 
     return result;
   } catch (error) {
-    console.error("Error ajustando inventario de equipo:", error);
     throw error;
   }
 }
@@ -166,7 +157,6 @@ async function getEquipmentAdjustments(equipment_id) {
     `;
     return await allAsync(sql, [equipment_id]);
   } catch (error) {
-    console.error("Error obteniendo historial de equipo:", error);
     throw error;
   }
 }

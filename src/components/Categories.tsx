@@ -36,7 +36,6 @@ export function Categories() {
       const data = await window.api.getCategories();
       setCategories(data);
     } catch (err) {
-      console.error("Error cargando categorías:", err);
       error("Error cargando categorías");
     }
   };
@@ -70,7 +69,6 @@ export function Categories() {
       handleCloseModal();
       loadCategories();
     } catch (err) {
-      console.error("Error guardando categoría:", err);
       error("Error guardando categoría");
     }
   };
@@ -93,7 +91,6 @@ export function Categories() {
       success("Categoría eliminada");
       loadCategories();
     } catch (err) {
-      console.error("Error eliminando categoría:", err);
       error("Error eliminando categoría");
     }
   };

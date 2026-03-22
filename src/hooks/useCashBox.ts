@@ -53,7 +53,6 @@ export function useCashBox() {
   const handleError = useCallback((err: any) => {
     const message = err instanceof Error ? err.message : "Error desconocido";
     setError(message);
-    console.error("CashBox error:", message);
   }, []);
 
   const openCashBox = useCallback(

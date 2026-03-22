@@ -49,7 +49,6 @@ export function usePrinter() {
         setPrinterStatus("disconnected");
       }
     } catch (error) {
-      console.error("Error al cargar impresoras:", error);
       setPrinterStatus("disconnected");
     } finally {
       setIsLoading(false);
@@ -61,7 +60,6 @@ export function usePrinter() {
       const result = await window.api.printTestTicket(printerName);
       return result;
     } catch (error) {
-      console.error("Error al imprimir ticket de prueba:", error);
       return false;
     }
   };
@@ -80,7 +78,6 @@ export function usePrinter() {
         reason,
       });
     } catch (error) {
-      console.error("Error al abrir cajón de dinero:", error);
       return false;
     }
   };
@@ -104,7 +101,6 @@ export function usePrinter() {
   }) => {
     try {
       if (!ticketPrinter) {
-        console.warn("No hay impresora de tickets seleccionada");
         return false;
       }
 
@@ -192,7 +188,6 @@ export function usePrinter() {
         try {
           await (window as any).api.printTicket(ticketPrinter, text);
         } catch (err) {
-          console.warn("Error al enviar a impresora, mostrando en consola:", err);
         }
       } else {
         // Modo prueba: solo consola
@@ -205,7 +200,6 @@ export function usePrinter() {
 
       return true;
     } catch (error) {
-      console.error("Error al imprimir ticket:", error);
       return false;
     }
   };
@@ -213,7 +207,6 @@ export function usePrinter() {
   const printMembershipTicket = async (membership: any) => {
     try {
       if (!ticketPrinter) {
-        console.warn("No hay impresora de tickets seleccionada");
         return false;
       }
 
@@ -248,7 +241,6 @@ export function usePrinter() {
       try {
         await (window as any).api.printTicket(ticketPrinter, ticketText);
       } catch (err) {
-        console.warn("Error al enviar a impresora, mostrando en consola:", err);
       }
 
       // Abrir el cajón al finalizar la membresía
@@ -256,7 +248,6 @@ export function usePrinter() {
 
       return true;
     } catch (error) {
-      console.error("Error al imprimir ticket:", error);
       return false;
     }
   };
@@ -285,7 +276,6 @@ export function usePrinter() {
       await (window as any).api.generateMembershipPDF(pdfData);
       return true;
     } catch (error: any) {
-      console.error("Error al generar PDF de la factura:", error);
       throw error; // Re-lanzar para que el modal/botón maneje el error
     }
   };

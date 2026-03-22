@@ -99,7 +99,6 @@ export function ExecutiveDashboard({ onBack }: ExecutiveDashboardProps) {
       }
     } catch (err) {
       error("Error cargando dashboard");
-      console.error("Error loading dashboard:", err);
     } finally {
       setLoading(false);
       setRefreshing(false);

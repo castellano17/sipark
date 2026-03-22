@@ -132,7 +132,6 @@ export function CashManagement() {
       // Generado con éxito
     } catch (error) {
       showError("Error generando PDF de apertura");
-      console.error(error);
     }
   };
 
@@ -237,7 +236,6 @@ export function CashManagement() {
       // Generado con éxito
     } catch (error) {
       showError("Error generando PDF de cuadre");
-      console.error(error);
     }
   };
 
@@ -342,7 +340,7 @@ export function CashManagement() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Gestión de Caja</h1>
         <div className="flex items-center gap-2">
-          {canOpenDrawer("operations") && (
+          {canOpenDrawer("pos") && (
             <Button
               onClick={handleManualOpenDrawer}
               variant="outline"

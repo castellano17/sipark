@@ -32,7 +32,6 @@ export function SuppliesReport({ onBack }: SuppliesReportProps) {
       setData(supp);
     } catch (err) {
       error("Error cargando reporte de insumos");
-      console.error(err);
     } finally {
       setLoading(false);
     }

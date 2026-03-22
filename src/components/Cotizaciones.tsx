@@ -97,7 +97,6 @@ export const Cotizaciones: React.FC = () => {
         setQuotations(result.data || []);
       }
     } catch (error) {
-      console.error("Error cargando cotizaciones:", error);
     }
   };
 
@@ -108,7 +107,6 @@ export const Cotizaciones: React.FC = () => {
         setProducts(result);
       }
     } catch (error) {
-      console.error("Error cargando productos:", error);
     }
   };
 
@@ -284,7 +282,6 @@ export const Cotizaciones: React.FC = () => {
         enqueueSnackbar("PDF generado exitosamente", { variant: "success" });
       }
     } catch (error) {
-      console.error("Error generando PDF:", error);
       enqueueSnackbar("Error al generar PDF", { variant: "error" });
     }
   };
@@ -327,7 +324,6 @@ export const Cotizaciones: React.FC = () => {
           enqueueSnackbar("Error al obtener detalles de la cotización", { variant: "error" });
         }
       } catch (error) {
-        console.error("Error al preparar aprobación:", error);
         enqueueSnackbar("Error al procesar la cotización", { variant: "error" });
       }
       return;
@@ -386,7 +382,6 @@ export const Cotizaciones: React.FC = () => {
           }
         }
       } catch (clientErr) {
-        console.warn("Error vinculando cliente, usando Cliente General (ID 1):", clientErr);
         finalClientId = 1;
       }
 
@@ -425,7 +420,6 @@ export const Cotizaciones: React.FC = () => {
         enqueueSnackbar("Reserva creada pero falló actualizar la cotización", { variant: "warning" });
       }
     } catch (error) {
-      console.error("Error en aprobación:", error);
       enqueueSnackbar("Error en el proceso de aprobación", { variant: "error" });
     }
   };

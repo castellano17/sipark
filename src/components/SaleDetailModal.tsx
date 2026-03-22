@@ -52,7 +52,6 @@ export function SaleDetailModal({ saleId, onClose }: SaleDetailModalProps) {
       setSale(data);
     } catch (err) {
       error("Error cargando detalle de venta");
-      console.error("Error loading sale detail:", err);
     } finally {
       setLoading(false);
     }

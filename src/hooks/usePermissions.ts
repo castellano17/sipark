@@ -10,7 +10,6 @@ export function usePermissions() {
       try {
         setCurrentUser(JSON.parse(savedUser));
       } catch (err) {
-        console.error("Error parsing user:", err);
       }
     }
   }, []);
@@ -53,7 +52,6 @@ export function usePermissions() {
   const canDelete = (module: string) => hasPermission(module, "delete");
   const canOpenDrawer = (module: string) => {
     const perm = hasPermission(module, "open_drawer");
-    console.log(`[DEBUG] canOpenDrawer("${module}") result:`, perm, "for user:", currentUser?.username, "role:", currentUser?.role);
     return perm;
   };
 

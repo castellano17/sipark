@@ -54,7 +54,6 @@ export function PurchaseOrdersHistoryReport({
       );
       setData(result);
     } catch (err) {
-      console.error("Error cargando reporte:", err);
       error("Error al cargar el reporte");
     } finally {
       setLoading(false);

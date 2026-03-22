@@ -46,7 +46,6 @@ export function UserActivityReport({ onBack }: UserActivityReportProps) {
       const result = await (window as any).api.getUsers();
       setUsers(result || []);
     } catch (err) {
-      console.error("Error cargando usuarios:", err);
     }
   };
 
@@ -61,7 +60,6 @@ export function UserActivityReport({ onBack }: UserActivityReportProps) {
       );
       setData(result);
     } catch (err) {
-      console.error("Error cargando reporte:", err);
       error("Error al cargar el reporte de actividad");
     } finally {
       setLoading(false);

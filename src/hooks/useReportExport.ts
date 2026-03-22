@@ -78,7 +78,6 @@ export function useReportExport() {
       XLSX.writeFile(workbook, `${options.filename}.xlsx`);
       success("Reporte exportado a Excel");
     } catch (err) {
-      console.error("Error exportando a Excel:", err);
       error("Error al exportar a Excel");
     }
   };
@@ -93,7 +92,6 @@ export function useReportExport() {
       await (window as any).api.exportPDF(options);
       success("Reporte exportado a PDF");
     } catch (err) {
-      console.error("Error exportando a PDF:", err);
       error("Error al exportar a PDF");
     }
   };
@@ -239,7 +237,6 @@ export function useReportExport() {
         }, 250);
       }
     } catch (err) {
-      console.error("Error imprimiendo reporte:", err);
       error("Error al imprimir reporte");
     }
   };

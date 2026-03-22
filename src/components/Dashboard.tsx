@@ -100,7 +100,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
           return createdAtStr.startsWith(todayStr);
         }).length;
       } catch (err) {
-        console.error("Error cargando clientes hoy:", err);
       }
 
       setStats({
@@ -120,7 +119,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
       // Cargar reservaciones de la semana
       loadWeekReservations();
     } catch (error) {
-      console.error("Error cargando datos del dashboard:", error);
     }
   };
 
@@ -148,7 +146,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
       setActiveMemberships(weekMemberships);
     } catch (error) {
-      console.error("Error cargando membresías activas:", error);
       setActiveMemberships([]);
     }
   };
@@ -178,7 +175,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
       setMonthMemberships({ active, expired, expiring });
     } catch (error) {
-      console.error("Error cargando estadísticas de membresías:", error);
       setMonthMemberships({ active: 0, expired: 0, expiring: 0 });
     }
   };
@@ -253,7 +249,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
         filterReservationsByDate(selectedDate, reservations);
       }
     } catch (error) {
-      console.error("Error cargando reservaciones:", error);
     }
   };
 

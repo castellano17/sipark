@@ -79,7 +79,6 @@ export function ClientMembershipsManager() {
       const data = await (window as any).api.getActiveMemberships("all");
       setMemberships(data.memberships || []);
     } catch (err) {
-      console.error("Error cargando membresías:", err);
       error("Error al cargar membresías");
     } finally {
       setLoading(false);
@@ -150,7 +149,6 @@ export function ClientMembershipsManager() {
         success("Factura PDF generada");
       }
     } catch (err: any) {
-      console.error("Error:", err);
       error(
         type === "ticket" ? "Error al imprimir ticket" : "Error al generar PDF: " + (err.message || "Error desconocido"),
       );
@@ -176,7 +174,6 @@ export function ClientMembershipsManager() {
       setCancelDialog({ open: false, membershipId: null });
       loadMemberships();
     } catch (err) {
-      console.error("Error cancelando membresía:", err);
       error("Error al cancelar membresía");
     }
   };

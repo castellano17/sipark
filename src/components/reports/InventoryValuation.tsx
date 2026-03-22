@@ -30,7 +30,6 @@ export default function InventoryValuation({
       const cats = await window.api.getCategories();
       setCategories(cats);
     } catch (error) {
-      console.error("Error cargando categorías:", error);
     }
   };
 
@@ -42,7 +41,6 @@ export default function InventoryValuation({
       );
       setReportData(data);
     } catch (error) {
-      console.error("Error cargando reporte:", error);
     } finally {
       setLoading(false);
     }

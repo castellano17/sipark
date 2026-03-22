@@ -26,6 +26,7 @@ import { Reservaciones } from "./Reservaciones";
 import { Cotizaciones } from "./Cotizaciones";
 import { SuppliesInventory } from "./SuppliesInventory";
 import { EquipmentInventory } from "./EquipmentInventory";
+import Promotions from "./Promotions";
 import { SystemStatus, SystemUser } from "@/types";
 
 interface MainLayoutProps {
@@ -40,44 +41,59 @@ export default function MainLayout({ currentUser, onLogout }: MainLayoutProps) {
     database: "loading",
     printer: "loading",
     cashBox: "loading",
+    drawer: "loading",
+    nfcReaders: 0,
     currentTime: new Date(),
     isOnline: true,
   });
 
+  // Verificar estado de la base de datos y caja cada 5 segundos
   useEffect(() => {
     checkSystemStatus();
-    const interval = setInterval(checkSystemStatus, 5000); // Verificar cada 5 segundos
+    const interval = setInterval(checkSystemStatus, 5000);
     return () => clearInterval(interval);
   }, []);
 
+  // Verificar dispositivos USB cada 15 segundos (más lento para no saturar el sistema)
+  useEffect(() => {
+    checkDeviceStatus();
+    const interval = setInterval(checkDeviceStatus, 15000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const checkDeviceStatus = async () => {
+    try {
+      const devices = await (window as any).api.getConnectedDevices();
+      setSystemStatus((prev) => ({
+        ...prev,
+        drawer: devices.drawerAvailable ? "connected" : "disconnected",
+        nfcReaders: devices.nfcReaders || 0,
+      }));
+    } catch {
+      setSystemStatus((prev) => ({ ...prev, drawer: "disconnected", nfcReaders: 0 }));
+    }
+  };
+
   const checkSystemStatus = async () => {
     try {
-      // Verificar estado de la base de datos
       const dbStatus = await window.api.checkDatabaseConnection();
-
-      // Verificar estado de la caja
       const activeCashBox = await (window as any).api.getActiveCashBox();
-
-      // Verificar impresora
-      let printerStatus: "connected" | "disconnected" | "error" =
-        "disconnected";
+      let printerStatus: "connected" | "disconnected" | "error" = "disconnected";
       try {
         const printers = await window.api.getPrinters();
-        printerStatus =
-          printers && printers.length > 0 ? "connected" : "disconnected";
+        printerStatus = printers && printers.length > 0 ? "connected" : "disconnected";
       } catch {
         printerStatus = "disconnected";
       }
-
-      setSystemStatus({
+      setSystemStatus((prev) => ({
+        ...prev,
         database: dbStatus.connected ? "connected" : "error",
         printer: printerStatus,
         cashBox: activeCashBox ? "open" : "closed",
         currentTime: new Date(),
         isOnline: navigator.onLine,
-      });
+      }));
     } catch (error) {
-      console.error("Error checking system status:", error);
     }
   };
 
@@ -109,7 +125,6 @@ export default function MainLayout({ currentUser, onLogout }: MainLayoutProps) {
         setCurrentPath("/pos");
       }
     } catch (error) {
-      console.error("Error en checkout:", error);
     }
   };
 
@@ -194,6 +209,8 @@ export default function MainLayout({ currentUser, onLogout }: MainLayoutProps) {
         return <EquipmentInventory />;
       case "/reportes":
         return <Reports />;
+      case "/promociones":
+        return <Promotions />;
       case "/usuarios":
         return <UsersComponent />;
       case "/configuracion":
