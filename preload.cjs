@@ -311,6 +311,8 @@ contextBridge.exposeInMainWorld("api", {
     ipcRenderer.invoke("api:openCashDrawer", printerName),
   printTicket: (printerName, content) =>
     ipcRenderer.invoke("api:printTicket", printerName, content),
+  printHtmlSilent: (htmlContent) =>
+    ipcRenderer.invoke("api:printHtmlSilent", htmlContent),
 
   // Cash Box
   openCashBox: (openingAmount, openedBy) =>
@@ -564,6 +566,7 @@ contextBridge.exposeInMainWorld("api", {
   getVoucherRedemptions: (campaignId) => ipcRenderer.invoke("api:getVoucherRedemptions", campaignId),
   deactivateVoucher: (voucherId) => ipcRenderer.invoke("api:deactivateVoucher", voucherId),
   getVouchersForPrint: (campaignId, voucherIds) => ipcRenderer.invoke("api:getVouchersForPrint", { campaignId, voucherIds }),
+  getBusinessSettings: () => ipcRenderer.invoke("api:getBusinessSettings"),
 
   // File Handlers (Logos)
   saveLogo: (type, base64Data, extension) =>

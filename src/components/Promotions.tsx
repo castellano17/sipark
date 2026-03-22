@@ -41,13 +41,21 @@ const TYPE_COLORS: Record<CampaignType, string> = {
   free_package: "bg-orange-100 text-orange-700",
 };
 
-const getBenefitLabel = (type: CampaignType, value: number) => {
+// Convierte cualquier valor de fecha a string (PostgreSQL puede devolver Date objects)
+const fmtDate = (d: any): string => {
+  if (!d) return "";
+  if (d instanceof Date) return d.toLocaleDateString("es-NI");
+  return String(d);
+};
+
+const getBenefitLabel = (type: CampaignType, value: any) => {
+  const numValue = parseFloat(value) || 0;
   switch (type) {
-    case "hours": return `${value} hora${value !== 1 ? "s" : ""} gratis`;
-    case "discount_pct": return `${value}% de descuento`;
-    case "discount_fixed": return `C$${value.toFixed(2)} de descuento`;
+    case "hours": return `${numValue} hora${numValue !== 1 ? "s" : ""} gratis`;
+    case "discount_pct": return `${numValue}% de descuento`;
+    case "discount_fixed": return `C$${numValue.toFixed(2)} de descuento`;
     case "free_package": return `Paquete gratis`;
-    default: return `${value}`;
+    default: return `${numValue}`;
   }
 };
 
@@ -172,22 +180,33 @@ export default function Promotions() {
     }
   };
 
-  const handlePrint = async (campaignId: number) => {
+  const handlePrint = async (campaignId: number, printMode: "normal" | "pdf" | "ticket" = "normal") => {
     setLoading(true);
     try {
-      const vouchers = await api.getVouchersForPrint(campaignId);
+      const [vouchers, business] = await Promise.all([
+        api.getVouchersForPrint(campaignId),
+        api.getBusinessSettings().catch(() => ({ name: "SIPARK", phone: "", address: "" })),
+      ]);
       if (!vouchers || vouchers.length === 0) {
         showNotification("warning", "No hay vouchers para imprimir");
         return;
       }
-      // Abrir ventana de impresión con los vouchers
+      const html = buildPrintHTML(vouchers, business, printMode);
+
+      if (printMode === "ticket") {
+        const success = await (window as any).api.printHtmlSilent(html);
+        if (!success) {
+          showNotification("error", "No se pudo imprimir de forma silenciosa en la impresora de tickets.");
+        }
+        return;
+      }
+
       const printWindow = window.open("", "_blank");
       if (!printWindow) { showNotification("error", "No se pudo abrir ventana de impresión"); return; }
-      const html = buildPrintHTML(vouchers);
       printWindow.document.write(html);
       printWindow.document.close();
       printWindow.focus();
-      setTimeout(() => printWindow.print(), 500);
+      setTimeout(() => printWindow.print(), 600);
     } catch (e: any) {
       showNotification("error", "Error preparando impresión: " + e.message);
     } finally {
@@ -195,39 +214,96 @@ export default function Promotions() {
     }
   };
 
-  const buildPrintHTML = (vouchers: any[]) => {
-    const rows = vouchers.map(v => `
-      <div class="voucher">
-        <div class="voucher-header">
-          <h2>${v.campaign_name}</h2>
-          <p class="benefit">${getBenefitLabel(v.type as CampaignType, parseFloat(v.benefit_value))}</p>
-        </div>
-        <div class="voucher-images">
-          ${v.qr_data ? `<img src="${v.qr_data}" class="qr" alt="QR"/>` : ""}
-          ${v.barcode_data ? `<img src="${v.barcode_data}" class="barcode" alt="Barcode"/>` : ""}
-        </div>
-        <div class="voucher-code">${v.code}</div>
-        ${v.campaign_description ? `<p class="desc">${v.campaign_description}</p>` : ""}
-        ${v.valid_until ? `<p class="valid">Válido hasta: ${v.valid_until}</p>` : ""}
-        <p class="uses">Usos: ${v.max_uses === 1 ? "1 uso" : `${v.max_uses} usos`}</p>
-      </div>
-    `).join("");
+  // Formatea fecha string 'YYYY-MM-DD' a 'DD de mes de YYYY' en español
+  const formatDateES = (d: any): string => {
+    if (!d) return "";
+    try {
+      const dt = d instanceof Date ? d : new Date(String(d) + "T12:00:00");
+      return dt.toLocaleDateString("es-NI", { day: "numeric", month: "long", year: "numeric", timeZone: "America/Managua" });
+    } catch { return String(d); }
+  };
 
-    return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Vouchers</title>
+  const buildPrintHTML = (vouchers: any[], business: any, printMode: string) => {
+    const isTicket = printMode === "ticket";
+    const voucherWidth = isTicket ? "72mm" : "380px";
+    const businessHeader = `
+      <div class="biz-header">
+        <h1 class="biz-name">${business.name || "SIPARK"}</h1>
+        ${business.address ? `<p class="biz-info">${business.address}</p>` : ""}
+        ${business.phone ? `<p class="biz-info">Tel: ${business.phone}</p>` : ""}
+        <hr class="biz-divider"/>
+      </div>
+    `;
+    const rows = vouchers.map(v => {
+      const benefit = getBenefitLabel(v.type as CampaignType, parseFloat(v.benefit_value));
+      const validUntilStr = v.valid_until ? `Válido hasta: ${formatDateES(v.valid_until)}` : "";
+      // Barcode: decodificar SVG base64 e insertar INLINE (img+data:svg no renderiza en popup)
+      let barcodeHtml = `<p class="no-img">Sin código de barras</p>`;
+      if (v.barcode_data) {
+        if (v.barcode_data.startsWith("data:image/svg+xml;base64,")) {
+          try {
+            const svgContent = atob(v.barcode_data.split(",")[1]);
+            barcodeHtml = `<div class="barcode-svg">${svgContent}</div>`;
+          } catch { barcodeHtml = `<img src="${v.barcode_data}" class="barcode" alt="Barcode" />`; }
+        } else {
+          barcodeHtml = `<img src="${v.barcode_data}" class="barcode" alt="Barcode" />`;
+        }
+      }
+      const qrImg = v.qr_data ? `<img src="${v.qr_data}" class="qr" alt="QR" />` : "";
+
+      return `
+        <div class="voucher" style="max-width:${voucherWidth}">
+          ${businessHeader}
+          <h2 class="campaign-name">${v.campaign_name}</h2>
+          <p class="benefit">${benefit}</p>
+          <div class="voucher-images">
+            ${qrImg}
+            <div class="barcode-wrap">${barcodeHtml}</div>
+          </div>
+          <div class="voucher-code">${v.code}</div>
+          ${v.campaign_description ? `<p class="desc">${v.campaign_description}</p>` : ""}
+          ${validUntilStr ? `<p class="valid">${validUntilStr}</p>` : ""}
+          <p class="uses">Usos: ${v.max_uses === 1 ? "1 uso" : `${v.max_uses} usos`}</p>
+          <p class="footer">Nicaragua — Hora de Managua (GMT-6)</p>
+        </div>
+      `;
+    }).join("");
+
+    const ticketCss = isTicket ? `
+      body{width:72mm;margin:0;padding:0}
+      .voucher{width:72mm;margin:0;border:none;border-radius:0;border-top:1px dashed #000;padding:8px}
+      .qr{width:60mm;height:60mm}
+      .barcode{width:60mm;height:40px}
+      .benefit{font-size:14px}
+      .voucher-code{font-size:14px;letter-spacing:2px}
+    ` : "";
+
+    return `<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><title>Vouchers — ${business.name || "SIPARK"}</title>
       <style>
-        body{font-family:Arial,sans-serif;margin:0;padding:20px;background:#fff}
-        .voucher{border:2px dashed #666;border-radius:12px;padding:16px;margin:12px auto;max-width:380px;text-align:center;page-break-inside:avoid}
-        .voucher-header h2{margin:0 0 4px;font-size:16px;color:#1a1a2e}
+        *{box-sizing:border-box}
+        body{font-family:Arial,sans-serif;margin:0;padding:16px;background:#fff;color:#111}
+        .biz-header{text-align:center;margin-bottom:8px}
+        .biz-name{font-size:16px;font-weight:bold;margin:0 0 2px}
+        .biz-info{font-size:11px;color:#444;margin:1px 0}
+        .biz-divider{border:none;border-top:1px solid #999;margin:6px 0}
+        .voucher{border:2px dashed #666;border-radius:12px;padding:16px;margin:12px auto;text-align:center;page-break-inside:avoid}
+        h2.campaign-name{margin:0 0 4px;font-size:15px;color:#1a1a2e}
         .benefit{font-size:20px;font-weight:bold;color:#4f46e5;margin:4px 0}
-        .voucher-images{display:flex;justify-content:center;align-items:center;gap:12px;margin:12px 0}
-        .qr{width:120px;height:120px}
-        .barcode{width:200px;height:60px}
+        .voucher-images{display:flex;justify-content:center;align-items:center;gap:12px;margin:10px 0;flex-wrap:wrap}
+        .qr{width:110px;height:110px;object-fit:contain}
+        .barcode-wrap{display:flex;align-items:center;justify-content:center}
+        .barcode{max-width:200px;height:60px;object-fit:contain}
+        .barcode-svg{max-width:220px;height:70px;overflow:hidden}
+        .barcode-svg svg{width:100%;height:100%}
+        .no-img{font-size:10px;color:#999}
         .voucher-code{font-family:monospace;font-size:18px;font-weight:bold;letter-spacing:3px;color:#333;margin:6px 0}
-        .desc{font-size:12px;color:#666;margin:4px 0}
-        .valid,.uses{font-size:11px;color:#888;margin:2px 0}
-        @media print{body{padding:5px}@page{margin:10mm}}
-      </style>
-    </head><body>${rows}</body></html>`;
+        .desc{font-size:11px;color:#666;margin:3px 0}
+        .valid{font-size:11px;color:#555;margin:2px 0;font-weight:bold}
+        .uses{font-size:10px;color:#888;margin:2px 0}
+        .footer{font-size:9px;color:#aaa;margin:4px 0 0}
+        @media print{body{padding:4px}@page{margin:8mm}}
+        ${ticketCss}
+      </style></head><body>${rows}</body></html>`;
   };
 
   const handleRedeemCheck = async () => {
@@ -331,13 +407,20 @@ export default function Promotions() {
                     <div className="flex items-center gap-4 mt-2 text-xs text-slate-500 flex-wrap">
                       <span className="flex items-center gap-1"><Tag className="w-3 h-3" />{getBenefitLabel(c.type, c.benefit_value)}</span>
                       <span>{c.total_vouchers} vouchers</span>
-                      <span>{c.total_redemptions || 0} canjeados</span>
-                      {c.valid_until && <span className="flex items-center gap-1"><Clock className="w-3 h-3" />Hasta: {c.valid_until}</span>}
+                      <span className={c.total_redemptions >= (c.total_vouchers * (c.max_uses_per_code || 1)) ? "text-red-600 font-bold" : ""}>
+                        {c.total_redemptions >= (c.total_vouchers * (c.max_uses_per_code || 1))
+                          ? "Todos Canjeados"
+                          : `Canjeados: ${c.total_redemptions || 0} / ${c.total_vouchers * (c.max_uses_per_code || 1)}`}
+                      </span>
+                      {c.valid_until && <span className="flex items-center gap-1"><Clock className="w-3 h-3" />Hasta: {fmtDate(c.valid_until)}</span>}
                     </div>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
-                    <Button variant="outline" size="sm" onClick={() => handlePrint(c.id)} title="Imprimir vouchers">
+                    <Button variant="outline" size="sm" onClick={() => handlePrint(c.id, 'normal')} title="Imprimir vouchers (Normal/PDF)">
                       <Printer className="w-4 h-4" />
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => handlePrint(c.id, 'ticket')} title="Imprimir ticket térmico" className="text-xs px-2">
+                      🖨️ Ticket
                     </Button>
                     <Button variant="outline" size="sm" onClick={() => handleLoadVouchers(c.id)} title="Ver vouchers">
                       <Eye className="w-4 h-4" />
@@ -410,7 +493,7 @@ export default function Promotions() {
                               <span className="font-mono font-bold">{r.code}</span>
                               <span>{r.client_name || "Cliente no registrado"}</span>
                               <span>{r.redeemed_by_name}</span>
-                              <span>{new Date(r.redeemed_at).toLocaleString("es-NI")}</span>
+                              <span>{r.redeemed_at ? new Date(r.redeemed_at).toLocaleString("es-NI") : ""}</span>
                             </div>
                           ))}
                         </div>
@@ -549,7 +632,7 @@ export default function Promotions() {
                         <p><span className="text-slate-500">Campaña:</span> {redeemResult.voucher.campaign_name}</p>
                         <p><span className="text-slate-500">Beneficio:</span> <strong>{getBenefitLabel(redeemResult.voucher.type, parseFloat(redeemResult.voucher.benefit_value))}</strong></p>
                         <p><span className="text-slate-500">Usos restantes:</span> {redeemResult.voucher.max_uses - redeemResult.voucher.times_used}</p>
-                        {redeemResult.voucher.valid_until && <p><span className="text-slate-500">Vence:</span> {redeemResult.voucher.valid_until}</p>}
+                        {redeemResult.voucher.valid_until && <p><span className="text-slate-500">Vence:</span> {fmtDate(redeemResult.voucher.valid_until)}</p>}
                       </div>
                       <p className="text-xs text-emerald-600 mt-3 flex items-center gap-1">
                         <AlertTriangle className="w-3 h-3" />Para canjear, escanea el código de barras directamente en el POS

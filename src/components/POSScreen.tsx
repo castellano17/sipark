@@ -212,18 +212,23 @@ export function POSScreen({
   const handleBarcodeSearch = async (barcode: string) => {
     if (!barcode.trim()) return;
 
-    const VOUCHER_PREFIX = "SIPARK-VOUCHER:";
+    const VOUCHER_OLD = "SIPARK-VOUCHER:";
+    const VOUCHER_NEW = "SIPARK-VOUCHER-";
     const cleanBarcode = barcode.trim();
 
     // ── Voucher de promoción ──
-    if (cleanBarcode.toUpperCase().startsWith(VOUCHER_PREFIX) || cleanBarcode.length >= 8) {
-      const codeCandidate = cleanBarcode.replace(VOUCHER_PREFIX, "").trim();
+    if (cleanBarcode.toUpperCase().startsWith(VOUCHER_OLD) || cleanBarcode.toUpperCase().startsWith(VOUCHER_NEW) || cleanBarcode.length >= 8) {
+      const codeCandidate = cleanBarcode.replace(/^SIPARK-VOUCHER[:-]/i, "").trim();
       try {
         const result = await (window as any).api.getVoucherByCode(codeCandidate);
         if (result?.valid && result?.voucher) {
           setVoucherInfo(result.voucher);
           setPendingVoucherCode(codeCandidate);
           setShowVoucherModal(true);
+          setBarcodeInput("");
+          return;
+        } else if (result?.valid === false && result?.reason !== "Voucher no encontrado") {
+          error(result.reason);
           setBarcodeInput("");
           return;
         }
@@ -255,7 +260,7 @@ export function POSScreen({
     const voucherItem: SaleItem = {
       id: crypto.randomUUID(),
       product_id: -98,                          // ID especial voucher
-      product_name: `🎟 Voucher: ${voucherInfo.campaign_name} (${benefitLabel})`,
+      product_name: `🎟 Voucher [${pendingVoucherCode}]: ${voucherInfo.campaign_name} (${benefitLabel})`,
       product_type: "service",
       quantity: 1,
       unit_price: 0,

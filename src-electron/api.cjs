@@ -1140,11 +1140,10 @@ async function createSaleWithItems(saleData) {
       cash_box_id,
     } = saleData;
 
-
     // Crear venta
     const saleSql = `
       INSERT INTO sales (client_id, client_name, subtotal, discount, total, payment_method, cash_box_id, timestamp)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
       RETURNING id
     `;
     const saleResult = await runAsync(saleSql, [
@@ -1158,17 +1157,19 @@ async function createSaleWithItems(saleData) {
       getLocalTimestamp(),
     ]);
 
-    const saleId = saleResult.lastID;
+    const saleId = saleResult.rows[0].id;
 
     // Crear items de venta
     for (const item of items) {
+      // product_id negativo (voucher=-98, NFC=-99, etc.) → NULL para respetar FK
+      const productId = (item.product_id && item.product_id > 0) ? item.product_id : null;
       const itemSql = `
         INSERT INTO sale_items (sale_id, product_id, product_name, quantity, unit_price, subtotal)
-        VALUES (?, ?, ?, ?, ?, ?)
+        VALUES ($1, $2, $3, $4, $5, $6)
       `;
       await runAsync(itemSql, [
         saleId,
-        item.product_id || null, // Permitir NULL para membresías
+        productId,
         item.product_name,
         item.quantity,
         item.unit_price,
@@ -1176,13 +1177,10 @@ async function createSaleWithItems(saleData) {
       ]);
 
       // Actualizar stock solo si hay product_id y es producto físico
-      if (
-        item.product_id &&
-        ["snack", "drink", "food"].includes(item.product_type)
-      ) {
+      if (productId && ["snack", "drink", "food"].includes(item.product_type)) {
         await runAsync(
-          "UPDATE products_services SET stock = stock - ? WHERE id = ?",
-          [item.quantity, item.product_id],
+          "UPDATE products_services SET stock = stock - $1 WHERE id = $2",
+          [item.quantity, productId]
         );
       }
     }
@@ -1192,6 +1190,7 @@ async function createSaleWithItems(saleData) {
     throw error;
   }
 }
+
 
 async function getSaleWithItems(saleId) {
   try {

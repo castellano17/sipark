@@ -286,6 +286,8 @@ function setupIpcHandlers() {
   ipcMain.handle("api:getVouchersForPrint", (event, { campaignId, voucherIds }) =>
     promotionsApi.getVouchersForPrint(campaignId, voucherIds)
   );
+  ipcMain.handle("api:getBusinessSettings", () => promotionsApi.getBusinessSettings());
+
 
   // Stats
   ipcMain.handle("api:getDailyStats", () => api.getDailyStats());
@@ -504,6 +506,31 @@ function setupIpcHandlers() {
   ipcMain.handle("api:printTicket", (event, printerName, content) =>
     printerModule.printTicket(printerName, content),
   );
+  ipcMain.handle("api:printHtmlSilent", async (event, htmlContent) => {
+    try {
+      const ticketPrinter = await api.getSetting("ticket_printer");
+      if (!ticketPrinter) return false;
+
+      const win = new BrowserWindow({ show: false, width: 300, height: 600 });
+      await win.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(htmlContent)}`);
+
+      return new Promise((resolve) => {
+        setTimeout(() => {
+          win.webContents.print({
+            silent: true,
+            deviceName: ticketPrinter,
+            margins: { marginType: 'custom', top: 0, bottom: 0, left: 0, right: 0 }
+          }, (success) => {
+            win.close();
+            resolve(success);
+          });
+        }, 800);
+      });
+    } catch (e) {
+      console.error(e);
+      return false;
+    }
+  });
   ipcMain.handle("api:openCashDrawer", (event, data) =>
     api.openCashDrawerWithAudit(data.userId, data.printerName, data.reason),
   );
