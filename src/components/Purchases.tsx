@@ -6,6 +6,8 @@ import {
   FileText,
   Truck,
   Package,
+  FileDown,
+  Printer,
 } from "lucide-react";
 import { Card } from "./ui/card";
 import { Button } from "./ui/button";
@@ -14,6 +16,7 @@ import { Dialog } from "./ui/dialog";
 import { PurchaseDetailModal } from "./PurchaseDetailModal";
 import { useNotification } from "../hooks/useNotification";
 import { useCurrency } from "../hooks/useCurrency";
+import { useReportExport } from "../hooks/useReportExport";
 
 interface PurchaseOrder {
   id: number;
@@ -59,6 +62,8 @@ export function Purchases() {
   );
   const { success, error } = useNotification();
   const { formatCurrency } = useCurrency();
+  const { exportToExcel, exportToPDF, printReport } = useReportExport();
+  const [searchTerm, setSearchTerm] = useState("");
 
   // Helper para obtener fecha local en formato YYYY-MM-DD
   const getLocalDateString = () => {
@@ -259,6 +264,25 @@ export function Purchases() {
     return date.toLocaleDateString("es-ES");
   };
 
+  const filteredPurchases = purchases.filter((p) =>
+    p.invoice_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    p.supplier_name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const reportConfig = {
+    title: "Registro de Compras",
+    subtitle: `Búsqueda: ${searchTerm || "Todas"}`,
+    filename: `compras-${new Date().toISOString().split("T")[0]}`,
+    columns: [
+      { header: "Factura", key: "invoice_number", width: 25 },
+      { header: "Proveedor", key: "supplier_name", width: 40 },
+      { header: "Fecha", key: "invoice_date", width: 20, format: "date" as const },
+      { header: "Items", key: "total_items", width: 12, format: "number" as const },
+      { header: "Total", key: "total_amount", width: 20, format: "currency" as const },
+    ],
+    data: filteredPurchases,
+  };
+
   const totalAmount = items.reduce((sum, item) => sum + item.subtotal, 0);
 
   return (
@@ -271,14 +295,55 @@ export function Purchases() {
               Registro de compras a proveedores
             </p>
           </div>
-          <Button onClick={() => setShowModal(true)} className="gap-2">
-            <Plus className="w-4 h-4" />
-            Nueva Compra
-          </Button>
+          <div className="flex gap-2">
+            <div className="flex bg-white border rounded-lg p-1 mr-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => exportToExcel(reportConfig)}
+                className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                title="Exportar a Excel"
+              >
+                <FileDown className="w-4 h-4 mr-1" />
+                Excel
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => exportToPDF(reportConfig)}
+                className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                title="Exportar a PDF"
+              >
+                <FileText className="w-4 h-4 mr-1" />
+                PDF
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => printReport(reportConfig)}
+                className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                title="Imprimir"
+              >
+                <Printer className="w-4 h-4 mr-1" />
+                Imprimir
+              </Button>
+            </div>
+            <Button onClick={() => setShowModal(true)} className="gap-2">
+              <Plus className="w-4 h-4" />
+              Nueva Compra
+            </Button>
+          </div>
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto p-6">
+        <div className="mb-4">
+          <Input
+            placeholder="Buscar por factura o proveedor..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full"
+          />
+        </div>
         <Card>
           <table className="w-full">
             <thead className="bg-gray-50 border-b">
@@ -304,7 +369,7 @@ export function Purchases() {
               </tr>
             </thead>
             <tbody className="divide-y">
-              {purchases.map((purchase) => (
+              {filteredPurchases.map((purchase) => (
                 <tr key={purchase.id} className="hover:bg-gray-50">
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
@@ -354,7 +419,6 @@ export function Purchases() {
             </div>
           )}
         </Card>
-      </div>
 
       {/* Modal Nueva Compra */}
       {showModal && (

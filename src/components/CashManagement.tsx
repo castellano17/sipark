@@ -14,6 +14,8 @@ import {
 import { useNotification } from "../hooks/useNotification";
 import { useCurrency } from "../hooks/useCurrency";
 import { useCashBox } from "../hooks/useCashBox";
+import { usePermissions } from "../hooks/usePermissions";
+import { usePrinter } from "../hooks/usePrinter";
 
 interface CashMovement {
   id: number;
@@ -34,8 +36,11 @@ export function CashManagement() {
     getCashBoxMovements,
     getCashBoxSales,
   } = useCashBox();
+  const { canOpenDrawer } = usePermissions();
+  const { openDrawer } = usePrinter();
 
   const [activeCashBox, setActiveCashBox] = useState<any>(null);
+  const [isCheckingStatus, setIsCheckingStatus] = useState(true);
   const [openingAmount, setOpeningAmount] = useState("");
   const [closingAmount, setClosingAmount] = useState("");
   const [closingNotes, setClosingNotes] = useState("");
@@ -55,15 +60,19 @@ export function CashManagement() {
   }, []);
 
   const loadCashBoxData = async () => {
-    const cashBox = await getActiveCashBox();
-    setActiveCashBox(cashBox);
+    try {
+      const cashBox = await getActiveCashBox();
+      setActiveCashBox(cashBox);
 
-    if (cashBox) {
-      const movs = await getCashBoxMovements(cashBox.id);
-      setMovements(movs);
+      if (cashBox) {
+        const movs = await getCashBoxMovements(cashBox.id);
+        setMovements(movs);
 
-      const salesData = await getCashBoxSales(cashBox.id);
-      setSales(salesData);
+        const salesData = await getCashBoxSales(cashBox.id);
+        setSales(salesData);
+      }
+    } finally {
+      setIsCheckingStatus(false);
     }
   };
 
@@ -118,7 +127,7 @@ export function CashManagement() {
     if (!pendingCashBoxId || !activeCashBox) return;
 
     try {
-      const filepath = await window.api.generateOpeningPDF(activeCashBox);
+      await (window as any).api.generateOpeningPDF(activeCashBox);
       success("PDF de apertura generado y abierto");
       // Generado con éxito
     } catch (error) {
@@ -223,7 +232,7 @@ export function CashManagement() {
         ...closeData,
         notes: savedClosingNotes, // Usar las notas guardadas
       };
-      const filepath = await window.api.generateClosingPDF(dataWithNotes);
+      await (window as any).api.generateClosingPDF(dataWithNotes);
       success("PDF de cuadre generado y abierto");
       // Generado con éxito
     } catch (error) {
@@ -314,22 +323,47 @@ export function CashManagement() {
     ? parseFloat(String(activeCashBox.opening_amount)) + totalSales - totalExpenses
     : 0;
 
+  const handleManualOpenDrawer = async () => {
+    try {
+      const result = await openDrawer("Apertura manual desde gestión de caja");
+      if (result) {
+        success("Cajón abierto exitosamente");
+      } else {
+        showError("No se pudo abrir el cajón. Verifique la impresora.");
+      }
+    } catch (err) {
+      showError("Error al abrir el cajón");
+    }
+  };
+
   return (
     <div className="h-full flex flex-col p-4 gap-4">
       {/* Header */}
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Gestión de Caja</h1>
         <div className="flex items-center gap-2">
-          {activeCashBox ? (
-            <div className="flex items-center gap-2 text-green-600">
-              <Unlock className="w-5 h-5" />
-              <span className="font-semibold">Caja Abierta</span>
-            </div>
-          ) : (
-            <div className="flex items-center gap-2 text-red-600">
-              <Lock className="w-5 h-5" />
-              <span className="font-semibold">Caja Cerrada</span>
-            </div>
+          {canOpenDrawer("operations") && (
+            <Button
+              onClick={handleManualOpenDrawer}
+              variant="outline"
+              className="gap-2 border-orange-200 hover:border-orange-300 hover:bg-orange-50 text-orange-700 font-medium"
+            >
+              <Unlock className="w-4 h-4" />
+              Abrir Cajón
+            </Button>
+          )}
+          {!isCheckingStatus && (
+            activeCashBox ? (
+              <div className="flex items-center gap-2 text-green-600">
+                <Unlock className="w-5 h-5" />
+                <span className="font-semibold">Caja Abierta</span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 text-red-600">
+                <Lock className="w-5 h-5" />
+                <span className="font-semibold">Caja Cerrada</span>
+              </div>
+            )
           )}
         </div>
       </div>

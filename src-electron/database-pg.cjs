@@ -95,8 +95,6 @@ async function createTables() {
       name VARCHAR(255) NOT NULL,
       parent_name VARCHAR(255),
       phone VARCHAR(50) NOT NULL,
-      emergency_phone VARCHAR(50),
-      email VARCHAR(255),
       child_name VARCHAR(255),
       child_age INTEGER,
       allergies TEXT,
@@ -150,6 +148,7 @@ async function createTables() {
     `CREATE TABLE IF NOT EXISTS sales (
       id SERIAL PRIMARY KEY,
       client_id INTEGER,
+      client_name VARCHAR(255),
       total DECIMAL(10,2) NOT NULL,
       subtotal DECIMAL(10,2) NOT NULL,
       discount DECIMAL(10,2) DEFAULT 0,
@@ -205,6 +204,7 @@ async function createTables() {
     `CREATE TABLE IF NOT EXISTS categories (
       id SERIAL PRIMARY KEY,
       name VARCHAR(100) NOT NULL UNIQUE,
+      type VARCHAR(50) DEFAULT 'food',
       description TEXT,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )`,
@@ -254,6 +254,7 @@ async function createTables() {
       can_create BOOLEAN DEFAULT FALSE,
       can_edit BOOLEAN DEFAULT FALSE,
       can_delete BOOLEAN DEFAULT FALSE,
+      can_open_drawer BOOLEAN DEFAULT FALSE,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
       UNIQUE(user_id, module)
@@ -370,6 +371,7 @@ async function createTables() {
       name VARCHAR(255) NOT NULL,
       description TEXT,
       category VARCHAR(100),
+      requires_quantity BOOLEAN DEFAULT false,
       is_active BOOLEAN DEFAULT true,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )`,
@@ -386,6 +388,7 @@ async function createTables() {
       id SERIAL PRIMARY KEY,
       package_id INTEGER NOT NULL,
       feature_id INTEGER NOT NULL,
+      quantity INTEGER DEFAULT 1,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (package_id) REFERENCES products_services(id) ON DELETE CASCADE,
       FOREIGN KEY (feature_id) REFERENCES package_features(id) ON DELETE CASCADE,
@@ -467,6 +470,73 @@ async function createTables() {
       FOREIGN KEY (sale_id) REFERENCES sales(id),
       FOREIGN KEY (user_id) REFERENCES users(id)
     )`,
+    `CREATE TABLE IF NOT EXISTS supply_categories (
+      id SERIAL PRIMARY KEY,
+      name VARCHAR(100) NOT NULL UNIQUE,
+      description TEXT,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )`,
+
+    `CREATE TABLE IF NOT EXISTS supplies (
+      id SERIAL PRIMARY KEY,
+      name VARCHAR(255) NOT NULL,
+      category_id INTEGER,
+      stock DECIMAL(10,2) DEFAULT 0,
+      unit_of_measure VARCHAR(50) NOT NULL,
+      min_stock DECIMAL(10,2) DEFAULT 0,
+      barcode VARCHAR(255) UNIQUE,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (category_id) REFERENCES supply_categories(id)
+    )`,
+
+    `CREATE TABLE IF NOT EXISTS supply_adjustments (
+      id SERIAL PRIMARY KEY,
+      supply_id INTEGER NOT NULL,
+      adjustment_type VARCHAR(50) NOT NULL,
+      quantity DECIMAL(10,2) NOT NULL,
+      previous_stock DECIMAL(10,2) NOT NULL,
+      new_stock DECIMAL(10,2) NOT NULL,
+      reason TEXT NOT NULL,
+      notes TEXT,
+      created_by INTEGER,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (supply_id) REFERENCES supplies(id),
+      FOREIGN KEY (created_by) REFERENCES users(id)
+    )`,
+
+    `CREATE TABLE IF NOT EXISTS equipment_categories (
+      id SERIAL PRIMARY KEY,
+      name VARCHAR(100) NOT NULL UNIQUE,
+      description TEXT,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )`,
+
+    `CREATE TABLE IF NOT EXISTS equipment (
+      id SERIAL PRIMARY KEY,
+      name VARCHAR(255) NOT NULL,
+      category_id INTEGER,
+      quantity INTEGER DEFAULT 0,
+      status VARCHAR(50) DEFAULT 'active',
+      location VARCHAR(255),
+      barcode VARCHAR(255) UNIQUE,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (category_id) REFERENCES equipment_categories(id)
+    )`,
+
+    `CREATE TABLE IF NOT EXISTS equipment_adjustments (
+      id SERIAL PRIMARY KEY,
+      equipment_id INTEGER NOT NULL,
+      adjustment_type VARCHAR(50) NOT NULL,
+      quantity INTEGER NOT NULL,
+      previous_quantity INTEGER NOT NULL,
+      new_quantity INTEGER NOT NULL,
+      reason TEXT NOT NULL,
+      notes TEXT,
+      created_by INTEGER,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (equipment_id) REFERENCES equipment(id),
+      FOREIGN KEY (created_by) REFERENCES users(id)
+    )`
   ];
 
   for (const sql of tables) {
@@ -496,6 +566,8 @@ async function createTables() {
     `CREATE INDEX IF NOT EXISTS idx_client_memberships_status ON client_memberships(status)`,
     `CREATE INDEX IF NOT EXISTS idx_client_visits_client ON client_visits(client_id)`,
     `CREATE INDEX IF NOT EXISTS idx_client_visits_date ON client_visits(visit_date)`,
+    `CREATE INDEX IF NOT EXISTS idx_supplies_category ON supplies(category_id)`,
+    `CREATE INDEX IF NOT EXISTS idx_equipment_category ON equipment(category_id)`
   ];
 
   for (const sql of indexes) {
@@ -511,6 +583,8 @@ async function createTables() {
     // Verificar si la columna is_paid existe en active_sessions, si no, crearla
     await pool.query(`
       DO $$ 
+      DECLARE
+        bebidas_emb_exists BOOLEAN;
       BEGIN 
         IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='active_sessions' AND column_name='is_paid') THEN
           ALTER TABLE active_sessions ADD COLUMN is_paid BOOLEAN DEFAULT FALSE;
@@ -531,7 +605,68 @@ async function createTables() {
           ALTER TABLE client_memberships ADD COLUMN acquisition_date DATE;
           ALTER TABLE client_memberships ADD COLUMN total_hours VARCHAR(50);
         END IF;
-      END $$;
+
+        -- Migración para client_name en sales (agregado aquí para asegurar ejecución)
+        ALTER TABLE sales ADD COLUMN IF NOT EXISTS client_name VARCHAR(255);
+
+        -- Migración para columnas de características de paquetes
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='package_features' AND column_name='requires_quantity') THEN
+          ALTER TABLE package_features ADD COLUMN requires_quantity BOOLEAN DEFAULT false;
+        END IF;
+
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='package_included_features' AND column_name='quantity') THEN
+          ALTER TABLE package_included_features ADD COLUMN quantity INTEGER DEFAULT 1;
+        END IF;
+
+        -- Migración para tipo en categorías
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='categories' AND column_name='type') THEN
+          ALTER TABLE categories ADD COLUMN type VARCHAR(50) DEFAULT 'food';
+        END IF;
+
+        -- Migración para can_open_drawer en user_permissions
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='user_permissions' AND column_name='can_open_drawer') THEN
+          ALTER TABLE user_permissions ADD COLUMN can_open_drawer BOOLEAN DEFAULT FALSE;
+        END IF;
+
+        -- Asegurar categorías base para productos antiguos
+        INSERT INTO categories (name, type) VALUES ('Tiempo', 'time') ON CONFLICT (name) DO NOTHING;
+        INSERT INTO categories (name, type) VALUES ('Paquetes', 'package') ON CONFLICT (name) DO NOTHING;
+        INSERT INTO categories (name, type) VALUES ('Comida', 'food') ON CONFLICT (name) DO NOTHING;
+        INSERT INTO categories (name, type) VALUES ('Bebidas', 'drink') ON CONFLICT (name) DO NOTHING;
+        INSERT INTO categories (name, type) VALUES ('Snacks', 'snack') ON CONFLICT (name) DO NOTHING;
+        INSERT INTO categories (name, type) VALUES ('Eventos', 'event') ON CONFLICT (name) DO NOTHING;
+        INSERT INTO categories (name, type) VALUES ('Alquiler', 'rental') ON CONFLICT (name) DO NOTHING;
+        INSERT INTO categories (name, type) VALUES ('Membresía', 'membership') ON CONFLICT (name) DO NOTHING;
+
+        -- Migrar productos sin categoría al nombre de su tipo
+        UPDATE products_services SET category = 'Tiempo' WHERE type = 'time' AND (category IS NULL OR category = '' OR category = '-');
+        UPDATE products_services SET category = 'Paquetes' WHERE type = 'package' AND (category IS NULL OR category = '' OR category = '-');
+        UPDATE products_services SET category = 'Comida' WHERE type = 'food' AND (category IS NULL OR category = '' OR category = '-');
+        UPDATE products_services SET category = 'Bebidas' WHERE type = 'drink' AND (category IS NULL OR category = '' OR category = '-');
+        UPDATE products_services SET category = 'Snacks' WHERE type = 'snack' AND (category IS NULL OR category = '' OR category = '-');
+        UPDATE products_services SET category = 'Eventos' WHERE type = 'event' AND (category IS NULL OR category = '' OR category = '-');
+        UPDATE products_services SET category = 'Alquiler' WHERE type = 'rental' AND (category IS NULL OR category = '' OR category = '-');
+        UPDATE products_services SET category = 'Membresía' WHERE type = 'membership' AND (category IS NULL OR category = '' OR category = '-');
+
+        -- Asegurar que los productos tengan una categoría válida, quitando lo innecesario
+        -- 1. Mover productos de la genérica 'Bebidas' a 'Bebidas embotelladas' si existe
+        SELECT EXISTS (SELECT 1 FROM categories WHERE name = 'Bebidas embotelladas') INTO bebidas_emb_exists;
+        IF bebidas_emb_exists THEN
+            UPDATE products_services SET category = 'Bebidas embotelladas' WHERE category = 'Bebidas';
+        END IF;
+
+        -- 2. Asegurarnos que 'Paquetes' existe (porque el usuario lo quiere aparte de sus categorías)
+        INSERT INTO categories (name, type) VALUES ('Paquetes', 'package') ON CONFLICT (name) DO NOTHING;
+        
+        -- 3. Mover productos de tipo 'package' sin categoría a 'Paquetes'
+        UPDATE products_services SET category = 'Paquetes' WHERE type = 'package' AND (category IS NULL OR category = '' OR category = '-');
+
+        -- 4. Eliminar todas las categorías genéricas que el usuario NO quiere ver
+        DELETE FROM categories WHERE name IN ('Bebidas', 'Comida', 'Alquiler', 'Eventos', 'Membresía', 'Snacks', 'Tiempo');
+        
+        -- 5. Si eliminamos 'Bebidas' y quedaron productos ahí (porque no existía 'Bebidas embotelladas'), 
+        --    podemos regresarlos a su tipo original o dejarlos para que el usuario les asigne una.
+        END $$;
     `);
   } catch (error) {
     console.warn("⚠️ Advertencia al aplicar migraciones:", error.message);

@@ -161,6 +161,43 @@ async function printTestTicket(printerName) {
 }
 
 /**
+ * Imprime texto simple en una impresora (para tickets térmicos)
+ */
+async function printTicket(printerName, content) {
+  if (!printerName) return false;
+  try {
+    const platform = os.platform();
+    const fs = require("fs");
+    const path = require("path");
+
+    const tempDir = os.tmpdir();
+    const tempFile = path.join(tempDir, `sipark_ticket_${Date.now()}.txt`);
+
+    fs.writeFileSync(tempFile, content, "utf-8");
+
+    if (platform === "win32") {
+      // Windows
+      const printCommand = `powershell -Command "Print-Document -FilePath '${tempFile}' -PrinterName '${printerName}'"`;
+      execSync(printCommand);
+    } else if (platform === "darwin" || platform === "linux") {
+      // macOS y Linux
+      const printCommand = `lp -d "${printerName}" "${tempFile}"`;
+      execSync(printCommand);
+    }
+
+    // Limpiar archivo temporal
+    if (fs.existsSync(tempFile)) {
+      fs.unlinkSync(tempFile);
+    }
+
+    return true;
+  } catch (error) {
+    console.error("Error al imprimir texto:", error.message);
+    return false;
+  }
+}
+
+/**
  * Abre el cajón de dinero enviando la secuencia ESC/POS
  */
 async function openCashDrawer(printerName) {
@@ -362,6 +399,7 @@ module.exports = {
   getPrinters,
   getDefaultPrinter,
   printTestTicket,
+  printTicket,
   openCashDrawer,
   generateTicketContent,
   getDefaultTicketConfig,

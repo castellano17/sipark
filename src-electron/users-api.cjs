@@ -228,8 +228,8 @@ async function createUser(userData, createdBy) {
       for (const perm of permissions) {
         await runAsync(
           `INSERT INTO user_permissions 
-           (user_id, module, can_view, can_create, can_edit, can_delete)
-           VALUES (?, ?, ?, ?, ?, ?)`,
+           (user_id, module, can_view, can_create, can_edit, can_delete, can_open_drawer)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
           [
             userId,
             perm.module,
@@ -237,6 +237,7 @@ async function createUser(userData, createdBy) {
             perm.can_create,
             perm.can_edit,
             perm.can_delete,
+            perm.can_open_drawer || false,
           ],
         );
       }
@@ -245,8 +246,8 @@ async function createUser(userData, createdBy) {
       for (const module of AVAILABLE_MODULES) {
         await runAsync(
           `INSERT INTO user_permissions 
-           (user_id, module, can_view, can_create, can_edit, can_delete)
-           VALUES (?, ?, false, false, false, false)`,
+           (user_id, module, can_view, can_create, can_edit, can_delete, can_open_drawer)
+           VALUES (?, ?, false, false, false, false, false)`,
           [userId, module],
         );
       }
@@ -344,8 +345,8 @@ async function updateUser(userId, userData, updatedBy) {
       for (const perm of permissions) {
         await runAsync(
           `INSERT INTO user_permissions 
-           (user_id, module, can_view, can_create, can_edit, can_delete)
-           VALUES (?, ?, ?, ?, ?, ?)`,
+           (user_id, module, can_view, can_create, can_edit, can_delete, can_open_drawer)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
           [
             userId,
             perm.module,
@@ -353,6 +354,7 @@ async function updateUser(userId, userData, updatedBy) {
             perm.can_create,
             perm.can_edit,
             perm.can_delete,
+            perm.can_open_drawer || false,
           ],
         );
       }
@@ -492,7 +494,11 @@ async function checkPermission(userId, module, action) {
       case "edit":
         return permission.can_edit === 1;
       case "delete":
-        return permission.can_delete === 1;
+        return permission.can_delete === true || permission.can_delete === 1;
+      case "open_drawer":
+        return (
+          permission.can_open_drawer === true || permission.can_open_drawer === 1
+        );
       default:
         return false;
     }

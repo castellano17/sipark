@@ -38,6 +38,7 @@ interface Permission {
   can_create: boolean;
   can_edit: boolean;
   can_delete: boolean;
+  can_open_drawer: boolean;
 }
 
 interface AuditLog {
@@ -272,6 +273,7 @@ export function Users() {
           can_create: existing?.can_create || false,
           can_edit: existing?.can_edit || false,
           can_delete: existing?.can_delete || false,
+          can_open_drawer: existing?.can_open_drawer || false,
         };
       });
 
@@ -777,6 +779,9 @@ export function Users() {
                       <th className="px-4 py-3 text-center text-sm font-semibold">
                         Eliminar
                       </th>
+                      <th className="px-4 py-3 text-center text-sm font-semibold">
+                        Abrir Cajón
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y">
@@ -826,6 +831,18 @@ export function Users() {
                             onChange={(e) => {
                               const newPerms = [...permissions];
                               newPerms[index].can_delete = e.target.checked;
+                              setPermissions(newPerms);
+                            }}
+                            className="w-4 h-4 cursor-pointer"
+                          />
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <input
+                            type="checkbox"
+                            checked={permissions[index]?.can_open_drawer || false}
+                            onChange={(e) => {
+                              const newPerms = [...permissions];
+                              newPerms[index].can_open_drawer = e.target.checked;
                               setPermissions(newPerms);
                             }}
                             className="w-4 h-4 cursor-pointer"
@@ -977,7 +994,22 @@ export function Users() {
                           </div>
                         </td>
                         <td className="px-4 py-3">
-                          <Badge className="text-xs">{log.action}</Badge>
+                          <Badge className={`text-xs ${
+                            log.action === 'MANUAL_DRAWER_OPEN' 
+                              ? 'bg-orange-100 text-orange-800 border-orange-200' 
+                              : ''
+                          }`}>
+                            {(() => {
+                              switch(log.action) {
+                                case 'CREATE_USER': return 'Crear Usuario';
+                                case 'UPDATE_USER': return 'Actualizar Usuario';
+                                case 'DELETE_USER': return 'Desactivar Usuario';
+                                case 'CHANGE_PASSWORD': return 'Cambiar Contraseña';
+                                case 'MANUAL_DRAWER_OPEN': return 'Apertura de Cajón';
+                                default: return log.action;
+                              }
+                            })()}
+                          </Badge>
                         </td>
                         <td className="px-4 py-3 text-sm">
                           {log.target_username ? (

@@ -275,6 +275,7 @@ export function RenewMembership() {
       const saleData = {
         cash_box_id: activeCashBox.id,
         client_id: selectedClient.id,
+        client_name: selectedClient.name,
         items: [
           {
             product_id: null,
@@ -341,8 +342,8 @@ export function RenewMembership() {
 
   const filteredClients = clients.filter(
     (client) =>
-      client.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      client.phone?.includes(searchTerm),
+      (client.name || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (client.phone || "").includes(searchTerm),
   );
 
   const finalAmount = customPrice ? customPrice - discount : 0;

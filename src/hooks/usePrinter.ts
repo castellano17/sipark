@@ -66,10 +66,19 @@ export function usePrinter() {
     }
   };
 
-  const openDrawer = async () => {
+  const openDrawer = async (reason = "Apertura por venta/operación") => {
     try {
       if (!ticketPrinter) return false;
-      return await window.api.openCashDrawer(ticketPrinter);
+      const currentUser = JSON.parse(
+        localStorage.getItem("currentUser") || "{}",
+      );
+      const userId = currentUser.id || 1;
+
+      return await (window as any).api.openCashDrawer({
+        printerName: ticketPrinter,
+        userId,
+        reason,
+      });
     } catch (error) {
       console.error("Error al abrir cajón de dinero:", error);
       return false;
@@ -181,7 +190,7 @@ export function usePrinter() {
       if (printerMode === "real") {
         // Modo real: enviar a impresora física
         try {
-          await window.api.printTicket(ticketPrinter, text);
+          await (window as any).api.printTicket(ticketPrinter, text);
         } catch (err) {
           console.warn("Error al enviar a impresora, mostrando en consola:", err);
         }
@@ -237,7 +246,7 @@ export function usePrinter() {
       // Imprimir en impresora térmica
 
       try {
-        await window.api.printTicket(ticketPrinter, ticketText);
+        await (window as any).api.printTicket(ticketPrinter, ticketText);
       } catch (err) {
         console.warn("Error al enviar a impresora, mostrando en consola:", err);
       }

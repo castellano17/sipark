@@ -371,9 +371,7 @@ export const Cotizaciones: React.FC = () => {
             const newClientId = await window.api.createClient(
               quotationToApprove.client_name,
               "Persona de Cotización",
-              quotationToApprove.client_phone || "0000000000",
-              null, // emergency phone
-              quotationToApprove.client_email || null,
+              quotationToApprove.client_phone || null,
               null, // child name
               0, // child age
               null, // allergies

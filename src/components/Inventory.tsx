@@ -8,12 +8,13 @@ import {
   BarChart3,
   ClipboardList,
   FileText,
-  Download,
   Printer,
+  FileDown,
 } from "lucide-react";
 import { Card } from "./ui/card";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
+import { useReportExport } from "../hooks/useReportExport";
 import { Dialog } from "./ui/dialog";
 import { useNotification } from "../hooks/useNotification";
 import { usePermissions } from "../hooks/usePermissions";
@@ -74,13 +75,12 @@ export function Inventory() {
   const { success, error } = useNotification();
   const { canEdit } = usePermissions();
   const { formatCurrency } = useCurrency();
+  const { exportToExcel: exportExcel, exportToPDF, printReport } = useReportExport();
 
-  const categoryFilters = [
-    { id: "all", name: "Todos", icon: Package },
-    { id: "drink", name: "Bebidas", icon: Package },
-    { id: "snack", name: "Snacks", icon: Package },
-    { id: "rental", name: "Alquileres", icon: Package },
-  ];
+  const totalValue = products.reduce((sum, p) => sum + p.price * p.stock, 0);
+  const totalItems = products.reduce((sum, p) => sum + p.stock, 0);
+
+
 
   const adjustmentTypes = [
     {
@@ -153,7 +153,7 @@ export function Inventory() {
     let filtered = products;
 
     if (selectedCategory !== "all") {
-      filtered = filtered.filter((p) => p.type === selectedCategory);
+      filtered = filtered.filter((p) => (p.category === selectedCategory || p.type === selectedCategory));
     }
 
     if (searchTerm) {
@@ -286,43 +286,57 @@ export function Inventory() {
     return matchesSearch && matchesType;
   });
 
-  const exportToExcel = () => {
-    // Preparar datos para Excel
-    const data = filteredAdjustments.map((adj) => ({
-      Fecha: new Date(adj.timestamp).toLocaleString("es-ES"),
-      Producto: adj.product_name,
-      Tipo: getAdjustmentTypeLabel(adj.adjustment_type),
-      Cantidad: adj.quantity_change,
-      "Stock Anterior": adj.stock_before,
-      "Stock Nuevo": adj.stock_after,
-      Razón: adj.reason,
-      Notas: adj.notes || "-",
-      Usuario: adj.user,
-    }));
 
-    // Convertir a CSV
-    const headers = Object.keys(data[0]).join(",");
-    const rows = data.map((row) => Object.values(row).join(","));
-    const csv = [headers, ...rows].join("\n");
 
-    // Descargar
-    const blob = new Blob([csv], { type: "text/csv" });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `ajustes-inventario-${new Date().toISOString().split("T")[0]}.csv`;
-    a.click();
-
-    success("Archivo Excel descargado");
+  const getSummary = () => {
+    return [
+      { label: "Total Productos", value: products.length },
+      { label: "Total Items en Stock", value: totalItems },
+      { label: "Valor Total Inventario", value: formatCurrency(totalValue) },
+      { label: "Productos con Bajo Stock", value: lowStockCount },
+    ];
   };
 
-  const printAdjustments = () => {
-    window.print();
-    success("Enviado a impresora");
+  const reportConfig = {
+    title: "Inventario General de Productos",
+    subtitle: `Búsqueda: ${searchTerm || "Todas"} | Categoría: ${selectedCategory}`,
+    filename: `inventario-general-${new Date().toISOString().split("T")[0]}`,
+    columns: [
+      { header: "Producto", key: "name", width: 40 },
+      { header: "Categoría", key: "category", width: 25 },
+      { header: "Código de Barras", key: "barcode", width: 22 },
+      { header: "Precio", key: "price", width: 15, format: "currency" as const },
+      { header: "Stock", key: "stock", width: 10, format: "number" as const },
+      { header: "Subtotal", key: "subtotal", width: 18, format: "currency" as const },
+    ],
+    data: filteredProducts.map((p) => ({
+      ...p,
+      category: p.category || p.type || "-",
+      subtotal: p.price * p.stock,
+    })),
+    summary: getSummary(),
   };
 
-  const totalValue = products.reduce((sum, p) => sum + p.price * p.stock, 0);
-  const totalItems = products.reduce((sum, p) => sum + p.stock, 0);
+  const adjustmentReportConfig = {
+    title: "Historial de Ajustes de Inventario",
+    subtitle: `Búsqueda: ${adjustmentSearch || "Todas"} | Tipo: ${adjustmentTypeFilter}`,
+    filename: `ajustes-inventario-${new Date().toISOString().split("T")[0]}`,
+    columns: [
+      { header: "Fecha/Hora", key: "timestamp", width: 25, format: "datetime" as const },
+      { header: "Producto", key: "product_name", width: 30 },
+      { header: "Tipo", key: "type_label", width: 20 },
+      { header: "Cantidad", key: "quantity_change", width: 10, format: "number" as const },
+      { header: "Stock Ant.", key: "stock_before", width: 10, format: "number" as const },
+      { header: "Stock Nuevo", key: "stock_after", width: 10, format: "number" as const },
+      { header: "Razón", key: "reason", width: 35 },
+      { header: "Usuario", key: "user", width: 15 },
+    ],
+    data: filteredAdjustments.map((adj) => ({
+      ...adj,
+      type_label: getAdjustmentTypeLabel(adj.adjustment_type),
+    })),
+  };
+
 
   return (
     <div className="h-full flex flex-col bg-gray-50">
@@ -335,14 +349,48 @@ export function Inventory() {
               Gestión de productos físicos (bebidas, snacks, alquileres)
             </p>
           </div>
-          <Button
-            onClick={() => setShowAuditModal(true)}
-            variant="outline"
-            className="gap-2"
-          >
-            <FileText className="w-4 h-4" />
-            Historial de Ajustes
-          </Button>
+          <div className="flex gap-2">
+            <div className="flex bg-white border rounded-lg p-1 mr-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => exportExcel(reportConfig)}
+                className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                title="Exportar a Excel"
+              >
+                <FileDown className="w-4 h-4 mr-1" />
+                Excel
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => exportToPDF(reportConfig)}
+                className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                title="Exportar a PDF"
+              >
+                <FileText className="w-4 h-4 mr-1" />
+                PDF
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => printReport(reportConfig)}
+                className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                title="Imprimir"
+              >
+                <Printer className="w-4 h-4 mr-1" />
+                Imprimir
+              </Button>
+            </div>
+            <Button
+              onClick={() => setShowAuditModal(true)}
+              variant="outline"
+              className="gap-2"
+            >
+              <FileText className="w-4 h-4" />
+              Historial de Ajustes
+            </Button>
+          </div>
         </div>
 
         {/* Stats */}
@@ -412,13 +460,22 @@ export function Inventory() {
             />
           </div>
 
-          <div className="flex gap-2">
-            {categoryFilters.map((cat) => (
+          <div className="flex gap-2 flex-wrap pb-2 overflow-x-auto max-w-full">
+            <Button
+              variant={selectedCategory === "all" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setSelectedCategory("all")}
+              className="gap-2"
+            >
+              <Package className="w-4 h-4" />
+              Todos
+            </Button>
+            {dbCategories.map((cat) => (
               <Button
                 key={cat.id}
-                variant={selectedCategory === cat.id ? "default" : "outline"}
+                variant={selectedCategory === cat.name ? "default" : "outline"}
                 size="sm"
-                onClick={() => setSelectedCategory(cat.id)}
+                onClick={() => setSelectedCategory(cat.name)}
               >
                 {cat.name}
               </Button>
@@ -757,24 +814,38 @@ export function Inventory() {
                   </div>
                 </div>
                 <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={exportToExcel}
-                    className="gap-2 bg-white/10 text-white border-white/20 hover:bg-white/20"
-                  >
-                    <Download className="w-4 h-4" />
-                    Excel
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={printAdjustments}
-                    className="gap-2 bg-white/10 text-white border-white/20 hover:bg-white/20"
-                  >
-                    <Printer className="w-4 h-4" />
-                    Imprimir
-                  </Button>
+                  <div className="flex bg-white/10 border border-white/20 rounded-lg p-1 mr-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => exportExcel(adjustmentReportConfig)}
+                      className="text-white hover:bg-white/20"
+                      title="Exportar a Excel"
+                    >
+                      <FileDown className="w-4 h-4 mr-1" />
+                      Excel
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => exportToPDF(adjustmentReportConfig)}
+                      className="text-white hover:bg-white/20"
+                      title="Exportar a PDF"
+                    >
+                      <FileText className="w-4 h-4 mr-1" />
+                      PDF
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => printReport(adjustmentReportConfig)}
+                      className="text-white hover:bg-white/20"
+                      title="Imprimir"
+                    >
+                      <Printer className="w-4 h-4 mr-1" />
+                      Imprimir
+                    </Button>
+                  </div>
                 </div>
               </div>
 

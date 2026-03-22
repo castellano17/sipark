@@ -1,11 +1,16 @@
 import { useState, useEffect } from "react";
-import { Truck, Plus, Edit, Trash2, Phone, Mail, MapPin } from "lucide-react";
+import { Truck, Plus, Edit, Trash2, Phone, Mail, MapPin,
+  FileDown,
+  FileText,
+  Printer,
+} from "lucide-react";
 import { Card } from "./ui/card";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Dialog } from "./ui/dialog";
 import { useNotification } from "../hooks/useNotification";
 import { usePermissions } from "../hooks/usePermissions";
+import { useReportExport } from "../hooks/useReportExport";
 
 interface Supplier {
   id: number;
@@ -23,6 +28,8 @@ export function Suppliers() {
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
   const { success, error } = useNotification();
   const { canCreate, canEdit, canDelete } = usePermissions();
+  const { exportToExcel, exportToPDF, printReport } = useReportExport();
+  const [searchTerm, setSearchTerm] = useState("");
 
   const [formData, setFormData] = useState({
     name: "",
@@ -123,6 +130,25 @@ export function Suppliers() {
     });
   };
 
+  const filteredSuppliers = suppliers.filter((s) =>
+    s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (s.contact_name && s.contact_name.toLowerCase().includes(searchTerm.toLowerCase()))
+  );
+
+  const reportConfig = {
+    title: "Directorio de Proveedores",
+    subtitle: `Búsqueda: ${searchTerm || "Todos"}`,
+    filename: `proveedores-${new Date().toISOString().split("T")[0]}`,
+    columns: [
+      { header: "Proveedor", key: "name", width: 40 },
+      { header: "Contacto", key: "contact_name", width: 30 },
+      { header: "Teléfono", key: "phone", width: 25 },
+      { header: "Email", key: "email", width: 35 },
+      { header: "Dirección", key: "address", width: 40 },
+    ],
+    data: filteredSuppliers,
+  };
+
   return (
     <div className="h-full flex flex-col bg-gray-50">
       <div className="bg-white border-b px-6 py-4">
@@ -133,20 +159,61 @@ export function Suppliers() {
               Gestión de proveedores de inventario
             </p>
           </div>
-          <Button
-            onClick={() => setShowModal(true)}
-            className="gap-2"
-            disabled={!canCreate("inventory")}
-          >
-            <Plus className="w-4 h-4" />
-            Nuevo Proveedor
-          </Button>
+          <div className="flex gap-2">
+            <div className="flex bg-white border rounded-lg p-1 mr-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => exportToExcel(reportConfig)}
+                className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                title="Exportar a Excel"
+              >
+                <FileDown className="w-4 h-4 mr-1" />
+                Excel
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => exportToPDF(reportConfig)}
+                className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                title="Exportar a PDF"
+              >
+                <FileText className="w-4 h-4 mr-1" />
+                PDF
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => printReport(reportConfig)}
+                className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                title="Imprimir"
+              >
+                <Printer className="w-4 h-4 mr-1" />
+                Imprimir
+              </Button>
+            </div>
+            <Button
+              onClick={() => setShowModal(true)}
+              className="gap-2"
+              disabled={!canCreate("inventory")}
+            >
+              <Plus className="w-4 h-4" />
+              Nuevo Proveedor
+            </Button>
+          </div>
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto p-6">
+        <div className="mb-4">
+          <Input
+            placeholder="Buscar por nombre o contacto..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full"
+          />
+        </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {suppliers.map((supplier) => (
+          {filteredSuppliers.map((supplier) => (
             <Card
               key={supplier.id}
               className="p-6 hover:shadow-lg transition-shadow"
@@ -220,7 +287,6 @@ export function Suppliers() {
             <p className="text-gray-500">No hay proveedores registrados</p>
           </div>
         )}
-      </div>
 
       {/* Modal */}
       {showModal && (

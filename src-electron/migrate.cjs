@@ -12,14 +12,6 @@ async function migrateDatabase() {
     const clientColumns = db.prepare("PRAGMA table_info(clients)").all();
     const clientColumnNames = clientColumns.map((col) => col.name);
 
-    if (!clientColumnNames.includes("emergency_phone")) {
-      db.prepare("ALTER TABLE clients ADD COLUMN emergency_phone TEXT").run();
-    }
-
-    if (!clientColumnNames.includes("email")) {
-      db.prepare("ALTER TABLE clients ADD COLUMN email TEXT").run();
-    }
-
     if (!clientColumnNames.includes("child_name")) {
       db.prepare("ALTER TABLE clients ADD COLUMN child_name TEXT").run();
     }
@@ -76,29 +68,7 @@ async function migrateDatabase() {
       db.prepare("ALTER TABLE products_services ADD COLUMN barcode TEXT").run();
     }
 
-    if (!clientColumnNames.includes("emergency_phone")) {
-      db.prepare("ALTER TABLE clients ADD COLUMN emergency_phone TEXT").run();
-    }
 
-    if (!clientColumnNames.includes("email")) {
-      db.prepare("ALTER TABLE clients ADD COLUMN email TEXT").run();
-    }
-
-    if (!clientColumnNames.includes("child_name")) {
-      db.prepare("ALTER TABLE clients ADD COLUMN child_name TEXT").run();
-    }
-
-    if (!clientColumnNames.includes("child_age")) {
-      db.prepare("ALTER TABLE clients ADD COLUMN child_age INTEGER").run();
-    }
-
-    if (!clientColumnNames.includes("allergies")) {
-      db.prepare("ALTER TABLE clients ADD COLUMN allergies TEXT").run();
-    }
-
-    if (!clientColumnNames.includes("special_notes")) {
-      db.prepare("ALTER TABLE clients ADD COLUMN special_notes TEXT").run();
-    }
 
     // Verificar columnas de active_sessions
     const sessionColumns = db

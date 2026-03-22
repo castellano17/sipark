@@ -19,9 +19,9 @@ export interface User {
 }
 
 export interface SystemStatus {
-  database: "connected" | "disconnected" | "error";
-  printer: "connected" | "disconnected" | "error";
-  cashBox: "open" | "closed";
+  database: "connected" | "disconnected" | "error" | "loading";
+  printer: "connected" | "disconnected" | "error" | "loading";
+  cashBox: "open" | "closed" | "loading";
   currentTime: Date;
   isOnline: boolean;
 }

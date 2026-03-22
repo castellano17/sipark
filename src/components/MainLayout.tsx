@@ -24,6 +24,8 @@ import { PackagesManager } from "./PackagesManager";
 import { Reports } from "./Reports";
 import { Reservaciones } from "./Reservaciones";
 import { Cotizaciones } from "./Cotizaciones";
+import { SuppliesInventory } from "./SuppliesInventory";
+import { EquipmentInventory } from "./EquipmentInventory";
 import { SystemStatus, SystemUser } from "@/types";
 
 interface MainLayoutProps {
@@ -35,9 +37,9 @@ export default function MainLayout({ currentUser, onLogout }: MainLayoutProps) {
   const [currentPath, setCurrentPath] = useState("/dashboard");
   const [checkoutData, setCheckoutData] = useState<any>(null);
   const [systemStatus, setSystemStatus] = useState<SystemStatus>({
-    database: "connected",
-    printer: "disconnected",
-    cashBox: "closed",
+    database: "loading",
+    printer: "loading",
+    cashBox: "loading",
     currentTime: new Date(),
     isOnline: true,
   });
@@ -54,7 +56,7 @@ export default function MainLayout({ currentUser, onLogout }: MainLayoutProps) {
       const dbStatus = await window.api.checkDatabaseConnection();
 
       // Verificar estado de la caja
-      const activeCashBox = await window.api.getActiveCashBox();
+      const activeCashBox = await (window as any).api.getActiveCashBox();
 
       // Verificar impresora
       let printerStatus: "connected" | "disconnected" | "error" =
@@ -186,6 +188,10 @@ export default function MainLayout({ currentUser, onLogout }: MainLayoutProps) {
         return <Suppliers />;
       case "/inventario/categorias":
         return <Categories />;
+      case "/inventario-interno/insumos":
+        return <SuppliesInventory />;
+      case "/inventario-interno/equipos":
+        return <EquipmentInventory />;
       case "/reportes":
         return <Reports />;
       case "/usuarios":

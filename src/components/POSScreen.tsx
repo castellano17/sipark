@@ -8,75 +8,18 @@ import { usePrinter } from "../hooks/usePrinter";
 import { useNotification } from "../hooks/useNotification";
 import { useCurrency } from "../hooks/useCurrency";
 import { useCashBox } from "../hooks/useCashBox";
+import { usePermissions } from "../hooks/usePermissions";
 import { ClientSelectorModal } from "./ClientSelectorModal";
 import { PaymentModal } from "./PaymentModal";
 import type {
   ProductService,
   SaleItem,
   CurrentSale,
-  ProductCategory,
   Client,
   PaymentDetails,
 } from "../types";
 
-const CATEGORIES: ProductCategory[] = [
-  {
-    id: "time",
-    name: "Tiempo",
-    icon: "⏱️",
-    type: "time",
-    color: "bg-blue-500",
-  },
-  {
-    id: "package",
-    name: "Paquetes",
-    icon: "🎮",
-    type: "package",
-    color: "bg-purple-500",
-  },
-  {
-    id: "food",
-    name: "Comida",
-    icon: "🍔",
-    type: "food",
-    color: "bg-orange-500",
-  },
-  {
-    id: "drink",
-    name: "Bebidas",
-    icon: "🥤",
-    type: "drink",
-    color: "bg-cyan-500",
-  },
-  {
-    id: "snack",
-    name: "Snacks",
-    icon: "🍿",
-    type: "snack",
-    color: "bg-yellow-500",
-  },
-  {
-    id: "event",
-    name: "Eventos",
-    icon: "🎂",
-    type: "event",
-    color: "bg-pink-500",
-  },
-  {
-    id: "rental",
-    name: "Alquiler",
-    icon: "🏠",
-    type: "rental",
-    color: "bg-green-500",
-  },
-  {
-    id: "membership",
-    name: "Membresía",
-    icon: "🎟️",
-    type: "membership",
-    color: "bg-indigo-500",
-  },
-];
+
 
 interface POSScreenProps {
   checkoutData?: {
@@ -103,16 +46,19 @@ export function POSScreen({
   const { warning, error, success } = useNotification();
   const { formatCurrency } = useCurrency();
   const { createSaleWithItems, getActiveCashBox } = useCashBox();
+  const { canOpenDrawer } = usePermissions();
   const [products, setProducts] = useState<ProductService[]>([]);
   const [filteredProducts, setFilteredProducts] = useState<ProductService[]>(
     [],
   );
+  const [dbCategories, setDbCategories] = useState<any[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [barcodeInput, setBarcodeInput] = useState("");
   const [showClientSelector, setShowClientSelector] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [cashBoxOpen, setCashBoxOpen] = useState(false);
+  const [isCheckingCashBox, setIsCheckingCashBox] = useState(true);
   const [activeSessionId, setActiveSessionId] = useState<number | null>(null);
   const [currentSale, setCurrentSale] = useState<CurrentSale>({
     items: [],
@@ -127,6 +73,7 @@ export function POSScreen({
   // Cargar productos y verificar estado de caja
   useEffect(() => {
     loadProducts();
+    loadCategories();
     checkCashBoxStatus();
 
     // Enfocar automáticamente el input de código de barras al cargar
@@ -212,6 +159,21 @@ export function POSScreen({
   const checkCashBoxStatus = async () => {
     const activeCashBox = await getActiveCashBox();
     setCashBoxOpen(!!activeCashBox);
+    setIsCheckingCashBox(false);
+  };
+
+  const loadCategories = async () => {
+    try {
+      const data = await (window as any).api.getCategories();
+      // Filtrar para ocultar las categorías que el usuario no quiere (excepto Paquetes)
+      const systemCategoriesToHide = ["Bebidas", "Comida", "Alquiler", "Eventos", "Membresía", "Snacks", "Tiempo"];
+      const filtered = data.filter((cat: any) => 
+        cat.name === "Paquetes" || !systemCategoriesToHide.includes(cat.name)
+      );
+      setDbCategories(filtered);
+    } catch (err) {
+      console.error("Error cargando categorías:", err);
+    }
   };
 
   // Filtrar productos por categoría y búsqueda
@@ -219,7 +181,7 @@ export function POSScreen({
     let filtered = products;
 
     if (selectedCategory) {
-      filtered = filtered.filter((p) => p.type === selectedCategory);
+      filtered = filtered.filter((p) => p.category === selectedCategory || p.type === selectedCategory);
     }
 
     if (searchQuery.trim()) {
@@ -426,7 +388,7 @@ export function POSScreen({
   return (
     <div className="h-full flex flex-col p-4 gap-4">
       {/* Alerta de Caja Cerrada */}
-      {!cashBoxOpen && (
+      {!isCheckingCashBox && !cashBoxOpen && (
         <div className="bg-red-50 border-2 border-red-500 rounded-lg p-4 flex items-center gap-3">
           <div className="text-red-600 text-2xl">⚠️</div>
           <div className="flex-1">
@@ -443,26 +405,30 @@ export function POSScreen({
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <h1 className="text-2xl font-bold">Punto de Venta</h1>
-          {cashBoxOpen ? (
-            <span className="bg-green-100 text-green-800 text-xs px-3 py-1 rounded-full font-semibold">
-              ✓ Caja Abierta
-            </span>
-          ) : (
-            <span className="bg-red-100 text-red-800 text-xs px-3 py-1 rounded-full font-semibold">
-              ✗ Caja Cerrada
-            </span>
+          {!isCheckingCashBox && (
+            cashBoxOpen ? (
+              <span className="bg-green-100 text-green-800 text-xs px-3 py-1 rounded-full font-semibold">
+                ✓ Caja Abierta
+              </span>
+            ) : (
+              <span className="bg-red-100 text-red-800 text-xs px-3 py-1 rounded-full font-semibold">
+                ✗ Caja Cerrada
+              </span>
+            )
           )}
         </div>
         <div className="flex gap-2">
-          <Button
-            variant="outline"
-            className="gap-2 bg-slate-100 font-semibold text-slate-700 hover:bg-slate-200"
-            onClick={() => openDrawer()}
-            disabled={!cashBoxOpen}
-            title="Abrir cajón de dinero manualmente"
-          >
-            💰 Abrir Cajón
-          </Button>
+          {canOpenDrawer("pos") && (
+            <Button
+              variant="outline"
+              className="gap-2 bg-slate-100 font-semibold text-slate-700 hover:bg-slate-200"
+              onClick={() => openDrawer("Apertura manual desde Punto de Venta")}
+              disabled={!cashBoxOpen}
+              title="Abrir cajón de dinero manualmente"
+            >
+              💰 Abrir Cajón
+            </Button>
+          )}
           <Button
             variant="outline"
             className="gap-2"
@@ -519,16 +485,23 @@ export function POSScreen({
         >
           Todos
         </Button>
-        {CATEGORIES.map((cat) => (
+        {dbCategories.map((cat) => (
           <Button
             key={cat.id}
-            variant={selectedCategory === cat.id ? "default" : "outline"}
-            onClick={() => setSelectedCategory(cat.id)}
+            variant={selectedCategory === cat.name ? "default" : "outline"}
+            onClick={() => setSelectedCategory(cat.name)}
             size="sm"
             className="gap-2"
             disabled={!cashBoxOpen}
           >
-            <span>{cat.icon}</span>
+            <span>{cat.type === 'food' ? '🍔' : 
+                   cat.type === 'drink' ? '🥤' :
+                   cat.type === 'snack' ? '🍿' :
+                   cat.type === 'time' ? '⏱️' :
+                   cat.type === 'package' ? '🎮' :
+                   cat.type === 'event' ? '🎂' :
+                   cat.type === 'rental' ? '🏠' :
+                   cat.type === 'membership' ? '🎟️' : '🏷️'}</span>
             {cat.name}
           </Button>
         ))}

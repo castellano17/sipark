@@ -92,12 +92,12 @@ export function SellMembership() {
 
   useEffect(() => {
     if (clientSearch.length >= 2) {
-      const filtered = clients.filter(
+      const filteredClients = clients.filter(
         (client) =>
-          client.name.toLowerCase().includes(clientSearch.toLowerCase()) ||
-          client.phone.includes(clientSearch),
+          (client.name || "").toLowerCase().includes(clientSearch.toLowerCase()) ||
+          (client.phone || "").includes(clientSearch),
       );
-      setFilteredClients(filtered);
+      setFilteredClients(filteredClients);
       setShowClientDropdown(true);
     } else {
       setFilteredClients([]);
@@ -204,6 +204,7 @@ export function SellMembership() {
       const saleData = {
         cash_box_id: activeCashBox.id,
         client_id: selectedClient.id,
+        client_name: selectedClient.name,
         items: [
           {
             product_id: null,
@@ -252,11 +253,18 @@ export function SellMembership() {
         acquisition_date: acquisitionDate,
       };
 
-      // Mostrar modal de impresión
+      // Imprimir automáticamente el ticket
+      try {
+        await printMembershipTicket(membershipData);
+      } catch (printErr) {
+        console.warn("No se pudo imprimir automáticamente:", printErr);
+      }
+
+      // Mostrar modal de impresión (opcional ahora, para reimprimir o ver factura)
       setLastMembershipData(membershipData);
       setShowPrintModal(true);
 
-      success("Membresía vendida exitosamente");
+      success("Membresía vendida exitosamente - Registrado en caja");
     } catch (err: any) {
       console.error("Error vendiendo membresía:", err);
       error("Error al procesar la venta de membresía: " + (err.message || "Error desconocido"));

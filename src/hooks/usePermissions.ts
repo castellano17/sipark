@@ -17,7 +17,7 @@ export function usePermissions() {
 
   const hasPermission = (
     module: string,
-    action: "view" | "create" | "edit" | "delete",
+    action: "view" | "create" | "edit" | "delete" | "open_drawer",
   ): boolean => {
     if (!currentUser) return false;
 
@@ -39,7 +39,9 @@ export function usePermissions() {
       case "edit":
         return permission.can_edit;
       case "delete":
-        return permission.can_delete;
+        return (permission as any).can_delete;
+      case "open_drawer":
+        return (permission as any).can_open_drawer;
       default:
         return false;
     }
@@ -49,6 +51,11 @@ export function usePermissions() {
   const canCreate = (module: string) => hasPermission(module, "create");
   const canEdit = (module: string) => hasPermission(module, "edit");
   const canDelete = (module: string) => hasPermission(module, "delete");
+  const canOpenDrawer = (module: string) => {
+    const perm = hasPermission(module, "open_drawer");
+    console.log(`[DEBUG] canOpenDrawer("${module}") result:`, perm, "for user:", currentUser?.username, "role:", currentUser?.role);
+    return perm;
+  };
 
   return {
     currentUser,
@@ -57,5 +64,6 @@ export function usePermissions() {
     canCreate,
     canEdit,
     canDelete,
+    canOpenDrawer,
   };
 }

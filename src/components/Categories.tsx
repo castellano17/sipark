@@ -10,6 +10,7 @@ import { usePermissions } from "../hooks/usePermissions";
 interface Category {
   id: number;
   name: string;
+  type: string;
   description: string;
 }
 
@@ -22,6 +23,7 @@ export function Categories() {
 
   const [formData, setFormData] = useState({
     name: "",
+    type: "food",
     description: "",
   });
 
@@ -49,14 +51,19 @@ export function Categories() {
 
     try {
       if (editingCategory) {
-        await window.api.updateCategory(
+        await (window as any).api.updateCategory(
           editingCategory.id,
           formData.name,
           formData.description,
+          formData.type,
         );
         success("Categoría actualizada");
       } else {
-        await window.api.createCategory(formData.name, formData.description);
+        await (window as any).api.createCategory(
+          formData.name,
+          formData.description,
+          formData.type,
+        );
         success("Categoría creada");
       }
 
@@ -72,6 +79,7 @@ export function Categories() {
     setEditingCategory(category);
     setFormData({
       name: category.name,
+      type: category.type || "food",
       description: category.description || "",
     });
     setShowModal(true);
@@ -95,6 +103,7 @@ export function Categories() {
     setEditingCategory(null);
     setFormData({
       name: "",
+      type: "food",
       description: "",
     });
   };
@@ -200,6 +209,32 @@ export function Categories() {
                       required
                       placeholder="Ej: Bebidas Calientes"
                     />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium mb-2">
+                      Tipo de Comportamiento *
+                    </label>
+                    <select
+                      className="w-full px-3 py-2 border rounded-md"
+                      value={formData.type}
+                      onChange={(e) =>
+                        setFormData({ ...formData, type: e.target.value })
+                      }
+                      required
+                    >
+                      <option value="food">Comida / Preparado</option>
+                      <option value="drink">Bebida (Físico/Stock)</option>
+                      <option value="snack">Snack (Físico/Stock)</option>
+                      <option value="time">Tiempo / Servicio</option>
+                      <option value="package">Paquete</option>
+                      <option value="event">Evento</option>
+                      <option value="rental">Alquiler (Físico/Stock)</option>
+                      <option value="membership">Membresía</option>
+                    </select>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Determina si el producto descuenta stock o requiere cronómetro.
+                    </p>
                   </div>
 
                   <div>

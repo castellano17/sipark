@@ -7,6 +7,9 @@ import {
   CreditCard,
   History,
   Search,
+  FileDown,
+  Printer,
+  Table,
 } from "lucide-react";
 import { Card } from "./ui/card";
 import { Button } from "./ui/button";
@@ -14,14 +17,13 @@ import { Input } from "./ui/input";
 import { Dialog } from "./ui/dialog";
 import { useNotification } from "../hooks/useNotification";
 import { usePermissions } from "../hooks/usePermissions";
+import { useReportExport } from "../hooks/useReportExport";
 
 interface Client {
   id: number;
   name: string;
   parent_name?: string;
   phone: string;
-  emergency_phone?: string;
-  email?: string;
   child_name?: string;
   child_age?: number;
   allergies?: string;
@@ -77,13 +79,12 @@ export function Clients() {
   const [searchTerm, setSearchTerm] = useState("");
   const { success, error } = useNotification();
   const { canCreate, canEdit, canDelete } = usePermissions();
+  const { exportToExcel, exportToPDF, printReport } = useReportExport();
 
   const [formData, setFormData] = useState({
     name: "",
     parent_name: "",
     phone: "",
-    emergency_phone: "",
-    email: "",
     child_name: "",
     child_age: "",
     allergies: "",
@@ -110,8 +111,6 @@ export function Clients() {
         name: client.name,
         parent_name: client.parent_name || "",
         phone: client.phone,
-        emergency_phone: client.emergency_phone || "",
-        email: client.email || "",
         child_name: client.child_name || "",
         child_age: client.child_age?.toString() || "",
         allergies: client.allergies || "",
@@ -123,8 +122,6 @@ export function Clients() {
         name: "",
         parent_name: "",
         phone: "",
-        emergency_phone: "",
-        email: "",
         child_name: "",
         child_age: "",
         allergies: "",
@@ -138,7 +135,7 @@ export function Clients() {
     e.preventDefault();
 
     if (!formData.name.trim()) {
-      error("El campo 'Nombre del Responsable' es obligatorio");
+      error("El campo 'Nombre del padre/madre/tutor' es obligatorio");
       return;
     }
 
@@ -149,8 +146,6 @@ export function Clients() {
           formData.name,
           formData.parent_name || null,
           formData.phone || null,
-          formData.emergency_phone || null,
-          formData.email || null,
           formData.child_name || null,
           formData.child_age ? parseInt(formData.child_age) : null,
           formData.allergies || null,
@@ -162,8 +157,6 @@ export function Clients() {
           formData.name,
           formData.parent_name || null,
           formData.phone || null,
-          formData.emergency_phone || null,
-          formData.email || null,
           formData.child_name || null,
           formData.child_age ? parseInt(formData.child_age) : null,
           formData.allergies || null,
@@ -221,6 +214,20 @@ export function Clients() {
         client.child_name.toLowerCase().includes(searchTerm.toLowerCase())),
   );
 
+  const reportConfig = {
+    title: "Listado de Clientes",
+    subtitle: `Búsqueda: ${searchTerm || "Todos"}`,
+    filename: `clientes-${new Date().toISOString().split("T")[0]}`,
+    columns: [
+      { header: "Responsable (Padre/Tutor)", key: "name", width: 40 },
+      { header: "Teléfono", key: "phone", width: 20 },
+      { header: "Niño", key: "child_name", width: 30 },
+      { header: "Edad", key: "child_age", width: 10, format: "number" as const },
+      { header: "Alergias", key: "allergies", width: 30 },
+    ],
+    data: filteredClients,
+  };
+
   return (
     <div className="p-6 max-w-7xl mx-auto">
       <div className="flex items-center justify-between mb-6">
@@ -236,14 +243,40 @@ export function Clients() {
             </p>
           </div>
         </div>
-        <Button
-          onClick={() => handleOpenModal()}
-          className="gap-2"
-          disabled={!canCreate("clients")}
-        >
-          <Plus className="w-4 h-4" />
-          Nuevo Cliente
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            className="gap-2"
+            onClick={() => exportToExcel(reportConfig)}
+          >
+            <Table className="w-4 h-4" />
+            Excel
+          </Button>
+          <Button
+            variant="outline"
+            className="gap-2"
+            onClick={() => exportToPDF(reportConfig)}
+          >
+            <FileDown className="w-4 h-4" />
+            PDF
+          </Button>
+          <Button
+            variant="outline"
+            className="gap-2"
+            onClick={() => printReport(reportConfig)}
+          >
+            <Printer className="w-4 h-4" />
+            Imprimir
+          </Button>
+          <Button
+            onClick={() => handleOpenModal()}
+            className="gap-2"
+            disabled={!canCreate("clients")}
+          >
+            <Plus className="w-4 h-4" />
+            Nuevo Cliente
+          </Button>
+        </div>
       </div>
 
       {/* Buscador */}
@@ -302,12 +335,6 @@ export function Clients() {
                 <span className="font-medium">Tel:</span>
                 <span>{client.phone}</span>
               </div>
-              {client.email && (
-                <div className="flex items-center gap-2 text-gray-600">
-                  <span className="font-medium">Email:</span>
-                  <span className="truncate">{client.email}</span>
-                </div>
-              )}
               {client.allergies && (
                 <div className="bg-red-50 border border-red-200 rounded p-2 mt-2">
                   <span className="text-red-700 text-xs font-medium">
@@ -376,7 +403,7 @@ export function Clients() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="md:col-span-1">
                       <label className="block text-sm font-medium mb-2">
-                        Nombre del Responsable *
+                        Nombre del padre/madre/tutor *
                       </label>
                       <Input
                         value={formData.name}
@@ -388,7 +415,7 @@ export function Clients() {
 
                     <div className="md:col-span-1">
                       <label className="block text-sm font-medium mb-2">
-                        Teléfono Principal
+                        Teléfono
                       </label>
                       <Input
                         type="tel"
@@ -401,29 +428,15 @@ export function Clients() {
 
                     <div className="md:col-span-1">
                       <label className="block text-sm font-medium mb-2">
-                        Teléfono de Emergencia
+                        Nombre del padre/madre (opcional)
                       </label>
                       <Input
-                        type="tel"
-                        value={formData.emergency_phone}
+                        value={formData.parent_name}
                         onChange={(e) =>
                           setFormData({
                             ...formData,
-                            emergency_phone: e.target.value,
+                            parent_name: e.target.value,
                           })
-                        }
-                      />
-                    </div>
-
-                    <div className="col-span-1 md:col-span-2">
-                      <label className="block text-sm font-medium mb-2">
-                        Email
-                      </label>
-                      <Input
-                        type="email"
-                        value={formData.email}
-                        onChange={(e) =>
-                          setFormData({ ...formData, email: e.target.value })
                         }
                       />
                     </div>
@@ -799,7 +812,6 @@ function MembershipModal({
                   </label>
                   <Input
                     type="number"
-                    step="0.01"
                     value={paymentAmount}
                     onChange={(e) => setPaymentAmount(e.target.value)}
                   />
@@ -808,9 +820,7 @@ function MembershipModal({
                   <label className="block text-sm font-medium mb-2">
                     Notas
                   </label>
-                  <textarea
-                    className="w-full px-3 py-2 border rounded-md"
-                    rows={3}
+                  <Input
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
                   />
@@ -819,18 +829,13 @@ function MembershipModal({
               <div className="p-6 border-t bg-gray-50 flex justify-end gap-3">
                 <Button
                   variant="outline"
-                  onClick={() => {
-                    setShowAssignModal(false);
-                    setSelectedMembership(null);
-                    setPaymentAmount("");
-                    setNotes("");
-                  }}
+                  onClick={() => setShowAssignModal(false)}
                 >
                   Cancelar
                 </Button>
                 <Button
                   onClick={handleAssign}
-                  className="bg-purple-600 hover:bg-purple-700"
+                  className="bg-purple-600 hover:bg-purple-700 text-white"
                 >
                   Asignar
                 </Button>
@@ -845,13 +850,7 @@ function MembershipModal({
 
 // ============ VISITS MODAL ============
 
-function VisitsModal({
-  client,
-  onClose,
-}: {
-  client: Client;
-  onClose: () => void;
-}) {
+function VisitsModal({ client, onClose }: { client: Client; onClose: () => void }) {
   const [visits, setVisits] = useState<ClientVisit[]>([]);
   const { error } = useNotification();
 
@@ -861,18 +860,11 @@ function VisitsModal({
 
   const loadVisits = async () => {
     try {
-      const data = await window.api.getClientVisits(client.id, 50);
+      const data = await window.api.getClientVisits(client.id);
       setVisits(data);
     } catch (err) {
-      error("Error cargando visitas");
+      error("Error cargando historial");
     }
-  };
-
-  const formatDuration = (minutes?: number) => {
-    if (!minutes) return "-";
-    const hours = Math.floor(minutes / 60);
-    const mins = minutes % 60;
-    return `${hours}h ${mins}m`;
   };
 
   return (
@@ -881,7 +873,7 @@ function VisitsModal({
         <Card className="w-full max-w-4xl bg-white max-h-[90vh] overflow-y-auto">
           <div className="p-6 border-b bg-gradient-to-r from-blue-600 to-blue-700">
             <h2 className="text-xl font-bold text-white">
-              Historial de Visitas - {client.name}
+              Historial de {client.name}
             </h2>
           </div>
 
@@ -892,49 +884,29 @@ function VisitsModal({
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-gray-100">
-                    <tr>
-                      <th className="px-4 py-2 text-left text-sm font-medium">
-                        Fecha
-                      </th>
-                      <th className="px-4 py-2 text-left text-sm font-medium">
-                        Entrada
-                      </th>
-                      <th className="px-4 py-2 text-left text-sm font-medium">
-                        Salida
-                      </th>
-                      <th className="px-4 py-2 text-left text-sm font-medium">
-                        Duración
-                      </th>
-                      <th className="px-4 py-2 text-left text-sm font-medium">
-                        Monto
-                      </th>
-                      <th className="px-4 py-2 text-left text-sm font-medium">
-                        Notas
-                      </th>
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b">
+                      <th className="py-2 text-left">Fecha</th>
+                      <th className="py-2 text-left">Entrada</th>
+                      <th className="py-2 text-left">Salida</th>
+                      <th className="py-2 text-left">Duración</th>
+                      <th className="py-2 text-right">Monto</th>
                     </tr>
                   </thead>
                   <tbody>
                     {visits.map((visit) => (
-                      <tr key={visit.id} className="border-b hover:bg-gray-50">
-                        <td className="px-4 py-3 text-sm">
+                      <tr key={visit.id} className="border-b">
+                        <td className="py-2">
                           {new Date(visit.visit_date).toLocaleDateString()}
                         </td>
-                        <td className="px-4 py-3 text-sm">
-                          {visit.check_in_time}
+                        <td className="py-2">{visit.check_in_time}</td>
+                        <td className="py-2">{visit.check_out_time || "-"}</td>
+                        <td className="py-2">
+                          {visit.duration_minutes ? `${visit.duration_minutes} min` : "-"}
                         </td>
-                        <td className="px-4 py-3 text-sm">
-                          {visit.check_out_time || "-"}
-                        </td>
-                        <td className="px-4 py-3 text-sm">
-                          {formatDuration(visit.duration_minutes)}
-                        </td>
-                        <td className="px-4 py-3 text-sm">
+                        <td className="py-2 text-right">
                           ${Number(visit.amount_paid).toFixed(2)}
-                        </td>
-                        <td className="px-4 py-3 text-sm text-gray-600">
-                          {visit.notes || "-"}
                         </td>
                       </tr>
                     ))}

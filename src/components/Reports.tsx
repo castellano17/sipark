@@ -53,6 +53,8 @@ import { SalesAuditReport } from "./reports/SalesAuditReport";
 import { MostPurchasedProductsReport } from "./reports/MostPurchasedProductsReport";
 import { PurchaseOrdersHistoryReport } from "./reports/PurchaseOrdersHistoryReport";
 import { HourlyOccupancy } from "./reports/HourlyOccupancy";
+import { SuppliesReport } from "./reports/SuppliesReport";
+import { EquipmentReport } from "./reports/EquipmentReport";
 
 type ReportCategory =
   | "dashboard"
@@ -101,7 +103,9 @@ type SpecificReport =
   | "sales-audit"
   | "most-purchased-products"
   | "purchase-orders-history"
-  | "hourly-occupancy";
+  | "hourly-occupancy"
+  | "supplies-report"
+  | "equipment-report";
 
 interface CategoryCard {
   id: ReportCategory;
@@ -148,7 +152,7 @@ export function Reports() {
       id: "inventory",
       name: "Inventario",
       icon: <Package className="w-6 h-6" />,
-      count: 5,
+      count: 7,
       color: "text-orange-600",
       bgColor: "bg-orange-50",
     },
@@ -321,6 +325,14 @@ export function Reports() {
     return (
       <InventoryAdjustmentsReport onBack={() => setSelectedReport(null)} />
     );
+  }
+
+  if (selectedReport === "supplies-report") {
+    return <SuppliesReport onBack={() => setSelectedReport(null)} />;
+  }
+
+  if (selectedReport === "equipment-report") {
+    return <EquipmentReport onBack={() => setSelectedReport(null)} />;
   }
 
   if (selectedReport === "price-changes") {
@@ -686,6 +698,46 @@ export function Reports() {
             </h3>
             <p className="text-sm text-gray-600">
               Historial de ajustes manuales de stock
+            </p>
+          </Card>
+
+          <Card
+            className="p-6 cursor-pointer hover:shadow-lg transition-all"
+            onClick={() => setSelectedReport("supplies-report")}
+          >
+            <div className="flex items-center gap-3 mb-3">
+              <div className="p-3 bg-orange-100 rounded-lg">
+                <Package className="w-6 h-6 text-orange-600" />
+              </div>
+              <span className="px-2 py-1 bg-green-100 text-green-600 text-xs font-semibold rounded">
+                Disponible
+              </span>
+            </div>
+            <h3 className="font-semibold text-lg mb-2">
+              Inventario de Insumos
+            </h3>
+            <p className="text-sm text-gray-600">
+              Reporte de stock actual de insumos
+            </p>
+          </Card>
+
+          <Card
+            className="p-6 cursor-pointer hover:shadow-lg transition-all"
+            onClick={() => setSelectedReport("equipment-report")}
+          >
+            <div className="flex items-center gap-3 mb-3">
+              <div className="p-3 bg-orange-100 rounded-lg">
+                <Package className="w-6 h-6 text-orange-600" />
+              </div>
+              <span className="px-2 py-1 bg-green-100 text-green-600 text-xs font-semibold rounded">
+                Disponible
+              </span>
+            </div>
+            <h3 className="font-semibold text-lg mb-2">
+              Mobiliario y Equipos
+            </h3>
+            <p className="text-sm text-gray-600">
+              Reporte de estado de mobiliario y equipos
             </p>
           </Card>
         </div>

@@ -309,6 +309,8 @@ contextBridge.exposeInMainWorld("api", {
     ipcRenderer.invoke("api:printTestTicket", printerName),
   openCashDrawer: (printerName) =>
     ipcRenderer.invoke("api:openCashDrawer", printerName),
+  printTicket: (printerName, content) =>
+    ipcRenderer.invoke("api:printTicket", printerName, content),
 
   // Cash Box
   openCashBox: (openingAmount, openedBy) =>
@@ -482,18 +484,20 @@ contextBridge.exposeInMainWorld("api", {
 
   // Package Features
   getPackageFeatures: () => ipcRenderer.invoke("api:getPackageFeatures"),
-  createPackageFeature: (name, description, category) =>
+  createPackageFeature: (name, description, category, requires_quantity) =>
     ipcRenderer.invoke("api:createPackageFeature", {
       name,
       description,
       category,
+      requires_quantity,
     }),
-  updatePackageFeature: (id, name, description, category) =>
+  updatePackageFeature: (id, name, description, category, requires_quantity) =>
     ipcRenderer.invoke("api:updatePackageFeature", {
       id,
       name,
       description,
       category,
+      requires_quantity,
     }),
   deletePackageFeature: (id) =>
     ipcRenderer.invoke("api:deletePackageFeature", { id }),
@@ -595,6 +599,30 @@ contextBridge.exposeInMainWorld("api", {
     ipcRenderer.invoke("pdf:generateReservationPDF", reservationData),
   generateQuotationPDF: (quotationData) =>
     ipcRenderer.invoke("pdf:generateQuotationPDF", quotationData),
+
+  // Supplies
+  getSupplyCategories: () => ipcRenderer.invoke("api:getSupplyCategories"),
+  createSupplyCategory: (name, description) => ipcRenderer.invoke("api:createSupplyCategory", { name, description }),
+  updateSupplyCategory: (id, name, description) => ipcRenderer.invoke("api:updateSupplyCategory", { id, name, description }),
+  deleteSupplyCategory: (id) => ipcRenderer.invoke("api:deleteSupplyCategory", id),
+  getSupplies: () => ipcRenderer.invoke("api:getSupplies"),
+  createSupply: (name, category_id, stock, unit_of_measure, min_stock, barcode) => ipcRenderer.invoke("api:createSupply", { name, category_id, stock, unit_of_measure, min_stock, barcode }),
+  updateSupply: (id, name, category_id, stock, unit_of_measure, min_stock, barcode) => ipcRenderer.invoke("api:updateSupply", { id, name, category_id, stock, unit_of_measure, min_stock, barcode }),
+  deleteSupply: (id) => ipcRenderer.invoke("api:deleteSupply", id),
+  adjustSupplyStock: (supply_id, adjustment_type, quantity, reason, notes, created_by) => ipcRenderer.invoke("api:adjustSupplyStock", { supply_id, adjustment_type, quantity, reason, notes, created_by }),
+  getSupplyAdjustments: (supply_id) => ipcRenderer.invoke("api:getSupplyAdjustments", supply_id),
+
+  // Equipment
+  getEquipmentCategories: () => ipcRenderer.invoke("api:getEquipmentCategories"),
+  createEquipmentCategory: (name, description) => ipcRenderer.invoke("api:createEquipmentCategory", { name, description }),
+  updateEquipmentCategory: (id, name, description) => ipcRenderer.invoke("api:updateEquipmentCategory", { id, name, description }),
+  deleteEquipmentCategory: (id) => ipcRenderer.invoke("api:deleteEquipmentCategory", id),
+  getEquipment: () => ipcRenderer.invoke("api:getEquipment"),
+  createEquipment: (name, category_id, quantity, status, location, barcode) => ipcRenderer.invoke("api:createEquipment", { name, category_id, quantity, status, location, barcode }),
+  updateEquipment: (id, name, category_id, quantity, status, location, barcode) => ipcRenderer.invoke("api:updateEquipment", { id, name, category_id, quantity, status, location, barcode }),
+  deleteEquipment: (id) => ipcRenderer.invoke("api:deleteEquipment", id),
+  adjustEquipmentStock: (equipment_id, adjustment_type, quantity, reason, notes, created_by) => ipcRenderer.invoke("api:adjustEquipmentStock", { equipment_id, adjustment_type, quantity, reason, notes, created_by }),
+  getEquipmentAdjustments: (equipment_id) => ipcRenderer.invoke("api:getEquipmentAdjustments", equipment_id),
 
   // Utilidades de mantenimiento
   fixNegativeCashMovements: () =>

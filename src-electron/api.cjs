@@ -18,7 +18,7 @@ function getLocalTimestamp() {
 
 async function getClients() {
   try {
-    const sql = `SELECT id, name, parent_name, phone, emergency_phone, email, 
+    const sql = `SELECT id, name, parent_name, phone, 
                  child_name, child_age, allergies, special_notes, photo_path, 
                  created_at FROM clients ORDER BY name`;
     return await allAsync(sql);
@@ -32,8 +32,6 @@ async function createClient(
   name,
   parentName,
   phone,
-  emergencyPhone,
-  email,
   childName,
   childAge,
   allergies,
@@ -41,7 +39,7 @@ async function createClient(
 ) {
   try {
     if (!name || typeof name !== 'string' || !name.trim()) {
-      throw new Error("El campo 'Nombre del Responsable' es obligatorio.");
+      throw new Error("El campo 'Nombre del padre/madre/tutor' es obligatorio.");
     }
 
     // Verificar si ya existe un cliente con el mismo nombre y teléfono
@@ -55,16 +53,14 @@ async function createClient(
     }
 
     const sql = `
-      INSERT INTO clients (name, parent_name, phone, emergency_phone, email, child_name, child_age, allergies, special_notes)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO clients (name, parent_name, phone, child_name, child_age, allergies, special_notes)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
       RETURNING id
     `;
     const result = await runAsync(sql, [
       name,
       parentName,
       phone,
-      emergencyPhone,
-      email,
       childName,
       childAge,
       allergies,
@@ -82,8 +78,6 @@ async function updateClient(
   name,
   parentName,
   phone,
-  emergencyPhone,
-  email,
   childName,
   childAge,
   allergies,
@@ -92,7 +86,7 @@ async function updateClient(
   try {
     const sql = `
       UPDATE clients 
-      SET name = ?, parent_name = ?, phone = ?, emergency_phone = ?, email = ?, 
+      SET name = ?, parent_name = ?, phone = ?, 
           child_name = ?, child_age = ?, allergies = ?, special_notes = ?
       WHERE id = ?
     `;
@@ -100,8 +94,6 @@ async function updateClient(
       name,
       parentName,
       phone,
-      emergencyPhone,
-      email,
       childName,
       childAge,
       allergies,
@@ -157,7 +149,7 @@ async function deleteClient(id) {
 
 async function getClientById(clientId) {
   try {
-    const sql = `SELECT id, name, parent_name, phone, emergency_phone, email, 
+    const sql = `SELECT id, name, parent_name, phone, 
                  child_name, child_age, allergies, special_notes, photo_path, 
                  created_at FROM clients WHERE id = ?`;
     return await getAsync(sql, [clientId]);
@@ -330,10 +322,14 @@ async function updateProductService(
   }
 }
 
-async function updateProductCategory(productId, category) {
+async function updateProductCategory(productId, categoryName) {
   try {
-    const sql = "UPDATE products_services SET category = ? WHERE id = ?";
-    await runAsync(sql, [category, productId]);
+    // Buscar el tipo de la categoría seleccionada
+    const category = await getAsync("SELECT type FROM categories WHERE name = ?", [categoryName]);
+    const type = category ? category.type : "food";
+
+    const sql = "UPDATE products_services SET category = ?, type = ? WHERE id = ?";
+    await runAsync(sql, [categoryName, type, productId]);
     return true;
   } catch (error) {
     console.error("Error actualizando categoría:", error);
@@ -1169,6 +1165,7 @@ async function createSaleWithItems(saleData) {
   try {
     const {
       client_id,
+      client_name,
       items,
       subtotal,
       discount,
@@ -1180,12 +1177,13 @@ async function createSaleWithItems(saleData) {
 
     // Crear venta
     const saleSql = `
-      INSERT INTO sales (client_id, subtotal, discount, total, payment_method, cash_box_id, timestamp)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO sales (client_id, client_name, subtotal, discount, total, payment_method, cash_box_id, timestamp)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       RETURNING id
     `;
     const saleResult = await runAsync(saleSql, [
       client_id || null,
+      client_name || null,
       subtotal,
       discount,
       total,
@@ -1471,11 +1469,11 @@ async function getCategories() {
   }
 }
 
-async function createCategory(name, description) {
+async function createCategory(name, description, type = "food") {
   try {
     const sql =
-      "INSERT INTO categories (name, description) VALUES (?, ?) RETURNING id";
-    const result = await runAsync(sql, [name, description]);
+      "INSERT INTO categories (name, description, type) VALUES (?, ?, ?) RETURNING id";
+    const result = await runAsync(sql, [name, description, type]);
     return result.lastID;
   } catch (error) {
     console.error("❌ API: Error creando categoría:", error);
@@ -1484,10 +1482,10 @@ async function createCategory(name, description) {
   }
 }
 
-async function updateCategory(id, name, description) {
+async function updateCategory(id, name, description, type = "food") {
   try {
-    const sql = "UPDATE categories SET name = ?, description = ? WHERE id = ?";
-    await runAsync(sql, [name, description, id]);
+    const sql = "UPDATE categories SET name = ?, description = ?, type = ? WHERE id = ?";
+    await runAsync(sql, [name, description, type, id]);
     return true;
   } catch (error) {
     console.error("Error actualizando categoría:", error);
@@ -2153,14 +2151,14 @@ async function getPackageFeatures() {
   }
 }
 
-async function createPackageFeature(name, description, category) {
+async function createPackageFeature(name, description, category, requires_quantity = false) {
   try {
     const sql = `
-      INSERT INTO package_features (name, description, category, is_active)
-      VALUES (?, ?, ?, true)
+      INSERT INTO package_features (name, description, category, requires_quantity, is_active)
+      VALUES (?, ?, ?, ?, true)
       RETURNING id
     `;
-    const result = await runAsync(sql, [name, description, category]);
+    const result = await runAsync(sql, [name, description, category, requires_quantity]);
     return result.lastID;
   } catch (error) {
     console.error("Error creando característica:", error);
@@ -2168,14 +2166,14 @@ async function createPackageFeature(name, description, category) {
   }
 }
 
-async function updatePackageFeature(id, name, description, category) {
+async function updatePackageFeature(id, name, description, category, requires_quantity = false) {
   try {
     const sql = `
       UPDATE package_features 
-      SET name = ?, description = ?, category = ?
+      SET name = ?, description = ?, category = ?, requires_quantity = ?
       WHERE id = ?
     `;
-    await runAsync(sql, [name, description, category, id]);
+    await runAsync(sql, [name, description, category, requires_quantity, id]);
     return true;
   } catch (error) {
     console.error("Error actualizando característica:", error);
@@ -2199,7 +2197,7 @@ async function deletePackageFeature(id) {
 async function getPackageIncludedFeatures(packageId) {
   try {
     const sql = `
-      SELECT pf.* 
+      SELECT pf.*, pif.quantity 
       FROM package_features pf
       JOIN package_included_features pif ON pf.id = pif.feature_id
       WHERE pif.package_id = ?
@@ -2212,8 +2210,10 @@ async function getPackageIncludedFeatures(packageId) {
   }
 }
 
-async function setPackageFeatures(packageId, featureIds) {
+async function setPackageFeatures(packageId, features) {
   try {
+    // features puede ser [id1, id2] o [{id: id1, quantity: q1}, {id: id2, quantity: q2}]
+
     // Eliminar características existentes
     await runAsync(
       "DELETE FROM package_included_features WHERE package_id = ?",
@@ -2221,10 +2221,13 @@ async function setPackageFeatures(packageId, featureIds) {
     );
 
     // Agregar nuevas características
-    for (const featureId of featureIds) {
+    for (const item of features) {
+      const featureId = typeof item === 'object' ? item.id : item;
+      const quantity = typeof item === 'object' ? (item.quantity || 1) : 1;
+
       await runAsync(
-        "INSERT INTO package_included_features (package_id, feature_id) VALUES (?, ?)",
-        [packageId, featureId],
+        "INSERT INTO package_included_features (package_id, feature_id, quantity) VALUES (?, ?, ?)",
+        [packageId, featureId, quantity],
       );
     }
     return true;
@@ -3639,7 +3642,6 @@ async function getActiveMemberships(statusFilter = "all") {
       SELECT 
         cm.id,
         c.name as client_name,
-        c.email as client_email,
         c.phone as client_phone,
         m.name as membership_name,
         m.duration_days,
@@ -3717,7 +3719,6 @@ async function getExpiringMemberships(daysThreshold = 30) {
         cm.id,
         c.id as client_id,
         c.name as client_name,
-        c.email as client_email,
         c.phone as client_phone,
         m.name as membership_name,
         m.duration_days,
@@ -3788,7 +3789,6 @@ async function getSessionsHistory(
         cv.duration_minutes,
         c.id as client_id,
         c.name as client_name,
-        c.email as client_email,
         c.phone as client_phone,
         m.name as membership_name,
         cm.end_date as membership_end_date,
@@ -3862,7 +3862,6 @@ async function getDiscountsReport(
         s.timestamp,
         s.client_id,
         COALESCE(c.name, 'Cliente General') as client_name,
-        c.email as client_email,
         c.phone as client_phone,
         s.subtotal,
         s.discount,
@@ -4671,14 +4670,38 @@ module.exports = {
   updatePackageFeatureCategory,
   deletePackageFeatureCategory,
   fixNegativeCashMovements,
+  openCashDrawerWithAudit,
 };
+
+async function openCashDrawerWithAudit(userId, printerName, reason = "Apertura manual") {
+  try {
+    const printerModule = require("./printer.cjs");
+    const success = await printerModule.openCashDrawer(printerName);
+    if (success) {
+      // Usar 1 como fallback si el userId es nulo/inválido
+      const finalUserId = userId || 1; 
+      await runAsync(
+        "INSERT INTO user_audit_log (user_id, action, details) VALUES ($1, $2, $3)",
+        [finalUserId, "MANUAL_DRAWER_OPEN", reason]
+      );
+    }
+    return success;
+  } catch (error) {
+    console.error("Error en openCashDrawerWithAudit:", error);
+    throw error;
+  }
+}
 
 // Importar funciones adicionales
 const usersApi = require("./users-api.cjs");
 const quotationsApi = require("./quotations-api.cjs");
 const reservationsApi = require("./reservations-api.cjs");
+const suppliesApi = require("./supplies-api.cjs");
+const equipmentApi = require("./equipment-api.cjs");
 
 // Agregar funciones al módulo
 Object.assign(module.exports, usersApi);
 Object.assign(module.exports, quotationsApi);
 Object.assign(module.exports, reservationsApi);
+Object.assign(module.exports, suppliesApi);
+Object.assign(module.exports, equipmentApi);

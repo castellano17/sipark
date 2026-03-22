@@ -211,6 +211,26 @@ export const Sidebar: React.FC<SidebarProps> = ({
       ],
     },
     {
+      id: "inventario-interno",
+      label: "Gestión Interna",
+      icon: <Package className="w-5 h-5" />,
+      path: "/inventario-interno",
+      children: [
+        {
+          id: "inventario-insumos",
+          label: "Insumos",
+          icon: <Package className="w-4 h-4" />,
+          path: "/inventario-interno/insumos",
+        },
+        {
+          id: "inventario-equipos",
+          label: "Mobiliario y Equipos",
+          icon: <Package className="w-4 h-4" />,
+          path: "/inventario-interno/equipos",
+        },
+      ],
+    },
+    {
       id: "usuarios",
       label: "Usuarios",
       icon: <UserCog className="w-5 h-5" />,
@@ -305,6 +325,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               reservaciones: "operations", // Reservaciones usa el mismo permiso que operaciones
               cotizaciones: "operations", // Cotizaciones usa el mismo permiso que operaciones
               inventario: "inventory",
+              "inventario-interno": "inventory",
               reportes: "reports",
               configuracion: "settings",
               usuarios: "users",

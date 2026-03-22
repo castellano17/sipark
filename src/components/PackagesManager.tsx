@@ -32,13 +32,15 @@ interface PackageFeature {
   name: string;
   description?: string;
   category?: string;
+  requires_quantity: boolean;
   is_active: boolean;
+  quantity?: number; // Propiedad volátil para la UI
 }
 
 export const PackagesManager: React.FC = () => {
   const [packages, setPackages] = useState<ProductService[]>([]);
   const [features, setFeatures] = useState<PackageFeature[]>([]);
-  const [selectedFeatures, setSelectedFeatures] = useState<number[]>([]);
+  const [featureSelections, setFeatureSelections] = useState<Record<number, number>>({});
   const [modalMode, setModalMode] = useState<ModalMode>(null);
   const [showFeaturesManager, setShowFeaturesManager] = useState(false);
   const [formData, setFormData] = useState<FormData>({
@@ -93,7 +95,7 @@ export const PackagesManager: React.FC = () => {
       durationUnit: "hours",
       description: "",
     });
-    setSelectedFeatures([]);
+    setFeatureSelections({});
     setModalMode("create");
   };
 
@@ -119,10 +121,15 @@ export const PackagesManager: React.FC = () => {
       const includedFeatures = await (
         window as any
       ).api.getPackageIncludedFeatures(pkg.id);
-      setSelectedFeatures(includedFeatures.map((f: PackageFeature) => f.id));
+      
+      const selections: Record<number, number> = {};
+      includedFeatures.forEach((f: any) => {
+        selections[f.id] = f.quantity || 1;
+      });
+      setFeatureSelections(selections);
     } catch (err) {
       console.error("Error cargando características del paquete:", err);
-      setSelectedFeatures([]);
+      setFeatureSelections({});
     }
 
     setModalMode("edit");
@@ -144,15 +151,26 @@ export const PackagesManager: React.FC = () => {
       durationUnit: "hours",
       description: "",
     });
-    setSelectedFeatures([]);
+    setFeatureSelections({});
   };
 
   const toggleFeature = (featureId: number) => {
-    setSelectedFeatures((prev) =>
-      prev.includes(featureId)
-        ? prev.filter((id) => id !== featureId)
-        : [...prev, featureId],
-    );
+    setFeatureSelections((prev) => {
+      const newSelections = { ...prev };
+      if (newSelections[featureId] !== undefined) {
+        delete newSelections[featureId];
+      } else {
+        newSelections[featureId] = 1;
+      }
+      return newSelections;
+    });
+  };
+
+  const updateFeatureQuantity = (featureId: number, quantity: number) => {
+    setFeatureSelections((prev) => ({
+      ...prev,
+      [featureId]: Math.max(1, quantity),
+    }));
   };
 
   const handleSubmitFormulario = async (e: React.FormEvent) => {
@@ -206,10 +224,15 @@ export const PackagesManager: React.FC = () => {
       }
 
       // Guardar características seleccionadas
-      if (packageId && selectedFeatures.length > 0) {
+      if (packageId) {
+        const selectionsArray = Object.entries(featureSelections).map(([id, qty]) => ({
+          id: parseInt(id),
+          quantity: qty,
+        }));
+        
         await (window as any).api.setPackageFeatures(
           packageId,
-          selectedFeatures,
+          selectionsArray,
         );
       }
 
@@ -235,19 +258,6 @@ export const PackagesManager: React.FC = () => {
       errorNotification("Error al eliminar el paquete");
     }
   };
-
-  // Agrupar características por categoría
-  const featuresByCategory = features.reduce(
-    (acc, feature) => {
-      const category = feature.category || "Sin categoría";
-      if (!acc[category]) {
-        acc[category] = [];
-      }
-      acc[category].push(feature);
-      return acc;
-    },
-    {} as Record<string, PackageFeature[]>,
-  );
 
   return (
     <div className="flex flex-col h-full gap-6 p-6">
@@ -484,50 +494,55 @@ export const PackagesManager: React.FC = () => {
                 Características Incluidas
               </label>
               <div className="border border-slate-300 rounded-lg p-4 max-h-64 overflow-y-auto bg-slate-50">
-                {Object.keys(featuresByCategory).length === 0 ? (
+                {features.length === 0 ? (
                   <p className="text-sm text-slate-500 text-center py-4">
                     No hay características disponibles. Crea algunas primero.
                   </p>
                 ) : (
-                  Object.entries(featuresByCategory).map(
-                    ([category, categoryFeatures]) => (
-                      <div key={category} className="mb-4 last:mb-0">
-                        <h4 className="text-xs font-bold text-slate-700 uppercase mb-2">
-                          {category}
-                        </h4>
-                        <div className="space-y-2">
-                          {categoryFeatures.map((feature) => (
-                            <label
-                              key={feature.id}
-                              className="flex items-center gap-3 p-2 hover:bg-white rounded cursor-pointer"
-                            >
-                              <div className="relative inline-flex items-center">
-                                <input
-                                  type="checkbox"
-                                  checked={selectedFeatures.includes(
-                                    feature.id,
-                                  )}
-                                  onChange={() => toggleFeature(feature.id)}
-                                  className="sr-only peer"
-                                />
-                                <div className="w-11 h-6 bg-slate-300 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                              </div>
-                              <div className="flex-1">
-                                <p className="text-sm font-medium text-slate-900">
-                                  {feature.name}
-                                </p>
-                                {feature.description && (
-                                  <p className="text-xs text-slate-500">
-                                    {feature.description}
-                                  </p>
-                                )}
-                              </div>
-                            </label>
-                          ))}
-                        </div>
+                  <div className="space-y-2">
+                    {features.map((feature) => (
+                      <div
+                        key={feature.id}
+                        className="flex items-center gap-3 p-2 hover:bg-white rounded"
+                      >
+                        <label className="flex items-center gap-3 cursor-pointer flex-1">
+                          <div className="relative inline-flex items-center">
+                            <input
+                              type="checkbox"
+                              checked={featureSelections[feature.id] !== undefined}
+                              onChange={() => toggleFeature(feature.id)}
+                              className="sr-only peer"
+                            />
+                            <div className="w-11 h-6 bg-slate-300 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                          </div>
+                          <div className="flex-1">
+                            <p className="text-sm font-medium text-slate-900">
+                              {feature.name}
+                            </p>
+                            {feature.description && (
+                              <p className="text-xs text-slate-500">
+                                {feature.description}
+                              </p>
+                            )}
+                          </div>
+                        </label>
+
+                        {/* Input de cantidad si aplica */}
+                        {featureSelections[feature.id] !== undefined && feature.requires_quantity && (
+                          <div className="flex items-center gap-2 animate-in fade-in slide-in-from-right-2">
+                            <span className="text-xs font-semibold text-slate-500">Cant:</span>
+                            <input
+                              type="number"
+                              min="1"
+                              value={featureSelections[feature.id]}
+                              onChange={(e) => updateFeatureQuantity(feature.id, parseInt(e.target.value) || 1)}
+                              className="w-16 px-2 py-1 border border-slate-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            />
+                          </div>
+                        )}
                       </div>
-                    ),
-                  )
+                    ))}
+                  </div>
                 )}
               </div>
             </div>

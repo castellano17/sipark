@@ -411,8 +411,11 @@ function setupIpcHandlers() {
   ipcMain.handle("api:printTestTicket", (event, printerName) =>
     printerModule.printTestTicket(printerName),
   );
-  ipcMain.handle("api:openCashDrawer", (event, printerName) =>
-    printerModule.openCashDrawer(printerName),
+  ipcMain.handle("api:printTicket", (event, printerName, content) =>
+    printerModule.printTicket(printerName, content),
+  );
+  ipcMain.handle("api:openCashDrawer", (event, data) =>
+    api.openCashDrawerWithAudit(data.userId, data.printerName, data.reason),
   );
 
   // Cash Box
@@ -629,7 +632,7 @@ function setupIpcHandlers() {
   // Package Features
   ipcMain.handle("api:getPackageFeatures", () => api.getPackageFeatures());
   ipcMain.handle("api:createPackageFeature", (event, data) =>
-    api.createPackageFeature(data.name, data.description, data.category),
+    api.createPackageFeature(data.name, data.description, data.category, data.requires_quantity),
   );
   ipcMain.handle("api:updatePackageFeature", (event, data) =>
     api.updatePackageFeature(
@@ -637,6 +640,7 @@ function setupIpcHandlers() {
       data.name,
       data.description,
       data.category,
+      data.requires_quantity,
     ),
   );
   ipcMain.handle("api:deletePackageFeature", (event, data) =>
@@ -779,6 +783,30 @@ function setupIpcHandlers() {
     shell.openPath(filepath);
     return filepath;
   });
+
+  // Supplies
+  ipcMain.handle("api:getSupplyCategories", () => api.getSupplyCategories());
+  ipcMain.handle("api:createSupplyCategory", (event, data) => api.createSupplyCategory(data.name, data.description));
+  ipcMain.handle("api:updateSupplyCategory", (event, data) => api.updateSupplyCategory(data.id, data.name, data.description));
+  ipcMain.handle("api:deleteSupplyCategory", (event, id) => api.deleteSupplyCategory(id));
+  ipcMain.handle("api:getSupplies", () => api.getSupplies());
+  ipcMain.handle("api:createSupply", (event, data) => api.createSupply(data.name, data.category_id, data.stock, data.unit_of_measure, data.min_stock, data.barcode));
+  ipcMain.handle("api:updateSupply", (event, data) => api.updateSupply(data.id, data.name, data.category_id, data.stock, data.unit_of_measure, data.min_stock, data.barcode));
+  ipcMain.handle("api:deleteSupply", (event, id) => api.deleteSupply(id));
+  ipcMain.handle("api:adjustSupplyStock", (event, data) => api.adjustSupplyStock(data.supply_id, data.adjustment_type, data.quantity, data.reason, data.notes, data.created_by));
+  ipcMain.handle("api:getSupplyAdjustments", (event, supply_id) => api.getSupplyAdjustments(supply_id));
+
+  // Equipment
+  ipcMain.handle("api:getEquipmentCategories", () => api.getEquipmentCategories());
+  ipcMain.handle("api:createEquipmentCategory", (event, data) => api.createEquipmentCategory(data.name, data.description));
+  ipcMain.handle("api:updateEquipmentCategory", (event, data) => api.updateEquipmentCategory(data.id, data.name, data.description));
+  ipcMain.handle("api:deleteEquipmentCategory", (event, id) => api.deleteEquipmentCategory(id));
+  ipcMain.handle("api:getEquipment", () => api.getEquipment());
+  ipcMain.handle("api:createEquipment", (event, data) => api.createEquipment(data.name, data.category_id, data.quantity, data.status, data.location, data.barcode));
+  ipcMain.handle("api:updateEquipment", (event, data) => api.updateEquipment(data.id, data.name, data.category_id, data.quantity, data.status, data.location, data.barcode));
+  ipcMain.handle("api:deleteEquipment", (event, id) => api.deleteEquipment(id));
+  ipcMain.handle("api:adjustEquipmentStock", (event, data) => api.adjustEquipmentStock(data.equipment_id, data.adjustment_type, data.quantity, data.reason, data.notes, data.created_by));
+  ipcMain.handle("api:getEquipmentAdjustments", (event, equipment_id) => api.getEquipmentAdjustments(equipment_id));
 
   // Utilidades de mantenimiento
   ipcMain.handle("api:fixNegativeCashMovements", () =>

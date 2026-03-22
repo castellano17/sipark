@@ -29,7 +29,7 @@ export const StatusBar: React.FC<StatusBarProps> = ({
   };
 
   const getStatusColor = (
-    status: "connected" | "disconnected" | "error" | "open" | "closed",
+    status: "connected" | "disconnected" | "error" | "open" | "closed" | "loading",
   ) => {
     switch (status) {
       case "connected":
@@ -40,13 +40,15 @@ export const StatusBar: React.FC<StatusBarProps> = ({
         return "bg-amber-500";
       case "error":
         return "bg-rose-500";
+      case "loading":
+        return "bg-slate-300 animate-pulse";
       default:
         return "bg-slate-400";
     }
   };
 
   const getStatusLabel = (
-    status: "connected" | "disconnected" | "error" | "open" | "closed",
+    status: "connected" | "disconnected" | "error" | "open" | "closed" | "loading",
   ) => {
     switch (status) {
       case "connected":
@@ -59,6 +61,8 @@ export const StatusBar: React.FC<StatusBarProps> = ({
         return "Abierta";
       case "closed":
         return "Cerrada";
+      case "loading":
+        return "Cargando...";
       default:
         return status;
     }

@@ -45,8 +45,6 @@ export const CheckInModal: React.FC<CheckInModalProps> = ({
     name: "",
     parentName: "",
     phone: "",
-    emergencyPhone: "",
-    email: "",
     childName: "",
     childAge: "",
     allergies: "",
@@ -103,8 +101,6 @@ export const CheckInModal: React.FC<CheckInModalProps> = ({
       name: "",
       parentName: "",
       phone: "",
-      emergencyPhone: "",
-      email: "",
       childName: "",
       childAge: "",
       allergies: "",
@@ -185,8 +181,8 @@ export const CheckInModal: React.FC<CheckInModalProps> = ({
   };
 
   const handleCreateClient = async () => {
-    if (!newClientData.name || !newClientData.phone) {
-      errorNotification("Nombre del tutor y teléfono son requeridos");
+    if (!newClientData.name) {
+      errorNotification("El nombre del tutor es requerido");
       return;
     }
 
@@ -194,9 +190,7 @@ export const CheckInModal: React.FC<CheckInModalProps> = ({
       const result = await createClient(
         newClientData.name,
         newClientData.parentName,
-        newClientData.phone,
-        newClientData.emergencyPhone,
-        newClientData.email,
+        newClientData.phone || null, // Phone is now optional
         newClientData.childName,
         Number(newClientData.childAge),
         newClientData.allergies,
@@ -477,41 +471,7 @@ export const CheckInModal: React.FC<CheckInModalProps> = ({
                           />
                         </div>
 
-                        <div className="md:col-span-1">
-                          <label className="block text-sm font-medium text-slate-700 mb-1">
-                            Tel. Emergencia
-                          </label>
-                          <input
-                            type="tel"
-                            value={newClientData.emergencyPhone}
-                            onChange={(e) =>
-                              setNewClientData({
-                                ...newClientData,
-                                emergencyPhone: e.target.value,
-                              })
-                            }
-                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            placeholder="555-0002"
-                          />
-                        </div>
 
-                        <div className="col-span-1 md:col-span-2">
-                          <label className="block text-sm font-medium text-slate-700 mb-1">
-                            Email
-                          </label>
-                          <input
-                            type="email"
-                            value={newClientData.email}
-                            onChange={(e) =>
-                              setNewClientData({
-                                ...newClientData,
-                                email: e.target.value,
-                              })
-                            }
-                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            placeholder="correo@ejemplo.com"
-                          />
-                        </div>
 
                         <div className="md:col-span-1">
                           <label className="block text-sm font-medium text-slate-700 mb-1">

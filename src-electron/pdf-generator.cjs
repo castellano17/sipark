@@ -1103,14 +1103,20 @@ async function generateGenericReport(options) {
         let currentY = tableTop + 6;
         let columnX = 45;
         
-        // Calcular anchos dinámicos básicos
-        const columnsCount = options.columns.length;
-        const colWidth = 510 / columnsCount;
+        // Calcular anchos proporcionales
+        const totalWidthUnit = options.columns.reduce((sum, col) => sum + (col.width || 15), 0);
+        const availableWidth = 505; // 515 total - 10 margen
+        const getColWidth = (col) => ((col.width || 15) / totalWidthUnit) * availableWidth;
 
         // Escribir cabeceras
         options.columns.forEach((col, i) => {
             const isRight = col.format === "currency" || col.format === "number";
-            doc.text(col.header, columnX, currentY, { width: colWidth - 5, align: isRight ? "right" : "left" });
+            const colWidth = getColWidth(col);
+            doc.text(col.header, columnX, currentY, { 
+                width: colWidth - 5, 
+                align: isRight ? "right" : "left",
+                lineBreak: false // Evitar saltos de línea en cabeceras para no romper la tabla
+            });
             columnX += colWidth;
         });
 
@@ -1145,7 +1151,12 @@ async function generateGenericReport(options) {
                 }
 
                 const isRight = col.format === "currency" || col.format === "number";
-                doc.text(String(cellValue), columnX, currentY, { width: colWidth - 5, align: isRight ? "right" : "left" });
+                const colWidth = getColWidth(col);
+                doc.text(String(cellValue), columnX, currentY, { 
+                  width: colWidth - 8, 
+                  align: isRight ? "right" : "left",
+                  ellipsis: true
+                });
                 columnX += colWidth;
             });
 

@@ -5,9 +5,7 @@ type AppApi = {
   createClient: (
     name: string,
     parentName: string | null,
-    phone: string,
-    emergencyPhone: string | null,
-    email: string | null,
+    phone: string | null,
     childName: string | null,
     childAge: number | null,
     allergies: string | null,
@@ -17,9 +15,7 @@ type AppApi = {
     id: number,
     name: string,
     parentName: string | null,
-    phone: string,
-    emergencyPhone: string | null,
-    email: string | null,
+    phone: string | null,
     childName: string | null,
     childAge: number | null,
     allergies: string | null,
@@ -76,6 +72,39 @@ type AppApi = {
 
   // Products & Services
   getProductsServices: () => Promise<any[]>;
+  createProductService: (name: string, price: number, type: string, category: string | null, barcode: string | null, stock: number | null, durationMinutes: number | null) => Promise<any>;
+  updateProductService: (id: number, name: string, price: number, type: string, category: string | null, barcode: string | null, stock: number | null, durationMinutes: number | null) => Promise<any>;
+  deleteProductService: (id: number) => Promise<any>;
+
+  // Categories
+  getCategories: () => Promise<any[]>;
+  createCategory: (name: string, description: string, type?: string) => Promise<any>;
+  updateCategory: (id: number, name: string, description: string, type?: string) => Promise<any>;
+  deleteCategory: (id: number) => Promise<any>;
+
+  // Supplies
+  getSupplyCategories: () => Promise<any[]>;
+  createSupplyCategory: (name: string, description?: string) => Promise<any>;
+  updateSupplyCategory: (id: number, name: string, description?: string) => Promise<any>;
+  deleteSupplyCategory: (id: number) => Promise<any>;
+  getSupplies: () => Promise<any[]>;
+  createSupply: (name: string, category_id: number | null, stock: number, unit_of_measure: string, min_stock: number, barcode?: string) => Promise<any>;
+  updateSupply: (id: number, name: string, category_id: number | null, stock: number, unit_of_measure: string, min_stock: number, barcode?: string) => Promise<any>;
+  deleteSupply: (id: number) => Promise<any>;
+  adjustSupplyStock: (supply_id: number, adjustment_type: string, quantity: number, reason: string, notes: string, created_by: number | null) => Promise<any>;
+  getSupplyAdjustments: (supply_id: number) => Promise<any[]>;
+
+  // Equipment
+  getEquipmentCategories: () => Promise<any[]>;
+  createEquipmentCategory: (name: string, description?: string) => Promise<any>;
+  updateEquipmentCategory: (id: number, name: string, description?: string) => Promise<any>;
+  deleteEquipmentCategory: (id: number) => Promise<any>;
+  getEquipment: () => Promise<any[]>;
+  createEquipment: (name: string, category_id: number | null, quantity: number, status: string, location: string, barcode?: string) => Promise<any>;
+  updateEquipment: (id: number, name: string, category_id: number | null, quantity: number, status: string, location: string, barcode?: string) => Promise<any>;
+  deleteEquipment: (id: number) => Promise<any>;
+  adjustEquipmentStock: (equipment_id: number, adjustment_type: string, quantity: number, reason: string, notes: string, created_by: number | null) => Promise<any>;
+  getEquipmentAdjustments: (equipment_id: number) => Promise<any[]>;
 
   // Quotations
   getAllQuotations: () => Promise<any>;
@@ -144,7 +173,11 @@ type AppApi = {
   getDefaultPrinter: () => Promise<any>;
   printTestTicket: (printerName: string) => Promise<boolean>;
   printTicket: (printerName: string, text: string) => Promise<boolean>;
-  openCashDrawer: (printerName: string) => Promise<boolean>;
+  openCashDrawer: (data: {
+    printerName: string;
+    userId: number;
+    reason?: string;
+  }) => Promise<boolean>;
 
   // Sessions / Timing
   startSession: (clientId: number, packageId: number, durationMinutes: number) => Promise<any>;
