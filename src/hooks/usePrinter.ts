@@ -56,8 +56,9 @@ export function usePrinter() {
     try {
       const result = await window.api.printTestTicket(printerName);
       return result;
-    } catch (error) {
-      return false;
+    } catch (error: any) {
+      console.error("Error en printTestTicket:", error);
+      throw error;
     }
   };
 
@@ -65,8 +66,9 @@ export function usePrinter() {
     try {
       const result = await (window as any).api.printTestNormal(printerName);
       return result;
-    } catch (error) {
-      return false;
+    } catch (error: any) {
+      console.error("Error en printTestNormal:", error);
+      throw error;
     }
   };
 

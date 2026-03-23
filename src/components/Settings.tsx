@@ -1433,9 +1433,12 @@ export const Settings: React.FC = () => {
 
                 <Button
                   onClick={async () => {
-                    const successTest = await printTestTicket(ticketPrinter);
-                    if (successTest) success("Ticket de prueba enviado");
-                    else errorNotification("Error al imprimir ticket de prueba");
+                    try {
+                      const result = await printTestTicket(ticketPrinter);
+                      if (result) success("Ticket de prueba enviado");
+                    } catch (err: any) {
+                      errorNotification(`Error tickets: ${err.message || "Fallo desconocido"}`);
+                    }
                   }}
                   disabled={!ticketPrinter || isLoadingPrinters}
                   className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold gap-2 disabled:bg-slate-300 disabled:cursor-not-allowed mb-3"
@@ -1446,9 +1449,12 @@ export const Settings: React.FC = () => {
 
                 <Button
                   onClick={async () => {
-                    const successTest = await printTestNormal(normalPrinter);
-                    if (successTest) success("Prueba en impresora normal enviada");
-                    else errorNotification("Error en prueba de impresora normal");
+                    try {
+                      const result = await printTestNormal(normalPrinter);
+                      if (result) success("Prueba en impresora normal enviada");
+                    } catch (err: any) {
+                      errorNotification(`Error normal: ${err.message || "Fallo desconocido"}`);
+                    }
                   }}
                   disabled={!normalPrinter || isLoadingPrinters}
                   className="w-full bg-slate-700 hover:bg-slate-800 text-white font-semibold gap-2 disabled:bg-slate-300 disabled:cursor-not-allowed"

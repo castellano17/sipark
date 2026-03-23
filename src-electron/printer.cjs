@@ -97,10 +97,12 @@ function getDefaultPrinter() {
  * Imprime un ticket de prueba en la impresora especificada
  */
 async function printTestTicket(printerName) {
+  const fs = require("fs");
+  const path = require("path");
+  const { app } = require("electron");
+
   try {
     const platform = os.platform();
-    const fs = require("fs");
-    const path = require("path");
 
     // Cargar configuración de tickets
     let config;
@@ -133,27 +135,41 @@ async function printTestTicket(printerName) {
       paymentMethod: "Efectivo",
     });
 
-    const tempDir = os.tmpdir();
-    const tempFile = path.join(tempDir, "sipark_test_ticket.txt");
-
+    // Usar el directorio de datos del usuario en lugar de tmp para mayor compatibilidad en macOS
+    const printDir = path.join(app.getPath("userData"), "print_temp");
+    if (!fs.existsSync(printDir)) fs.mkdirSync(printDir, { recursive: true });
+    
+    const tempFile = path.join(printDir, `test_ticket_${Date.now()}.txt`);
     fs.writeFileSync(tempFile, ticketContent, "utf-8");
 
     if (platform === "win32") {
-      // Windows
-      const printCommand = `powershell -Command "Print-Document -FilePath '${tempFile}' -PrinterName '${printerName}'"`;
-      execSync(printCommand);
+      // Usar Out-Printer nativo de PowerShell para archivos de texto
+      const printCommand = `powershell -Command "Get-Content '${tempFile}' | Out-Printer -Name '${printerName}'"`;
+      try {
+        execSync(printCommand);
+      } catch (e) {
+        console.error(`Error de impresión Windows: ${e.message}`);
+        throw new Error(`Error de impresión Windows: ${e.message}`);
+      }
     } else if (platform === "darwin" || platform === "linux") {
-      // macOS y Linux
-      const printCommand = `lp -d "${printerName}" -o raw "${tempFile}"`;
-      execSync(printCommand);
+      // Usar la ruta absoluta a lp para evitar problemas de PATH
+      const lpPath = "/usr/bin/lp";
+      const printCommand = `"${lpPath}" -d "${printerName}" -o raw "${tempFile}"`;
+      try {
+        execSync(printCommand, { stdio: 'pipe' });
+      } catch (e) {
+        const errorMsg = e.stderr ? e.stderr.toString() : e.message;
+        console.error(`Error de impresión lp: ${errorMsg}`);
+        throw new Error(errorMsg);
+      }
     }
 
-    // Limpiar archivo temporal
-    fs.unlinkSync(tempFile);
-
+    if (fs.existsSync(tempFile)) fs.unlinkSync(tempFile);
     return true;
   } catch (error) {
-    return false;
+    console.error("Error en printTestTicket:", error);
+    // Relanzar el error para que llegue al frontend si es posible (depende de cómo se llame)
+    throw error;
   }
 }
 
@@ -162,34 +178,49 @@ async function printTestTicket(printerName) {
  */
 async function printTicket(printerName, content) {
   if (!printerName) return false;
+  const fs = require("fs");
+  const path = require("path");
+  const { app } = require("electron");
+
   try {
     const platform = os.platform();
-    const fs = require("fs");
-    const path = require("path");
 
-    const tempDir = os.tmpdir();
-    const tempFile = path.join(tempDir, `sipark_ticket_${Date.now()}.txt`);
+    const printDir = path.join(app.getPath("userData"), "print_temp");
+    if (!fs.existsSync(printDir)) fs.mkdirSync(printDir, { recursive: true });
 
+    const tempFile = path.join(printDir, `sipark_ticket_${Date.now()}.txt`);
     fs.writeFileSync(tempFile, content, "utf-8");
 
     if (platform === "win32") {
-      // Windows
-      const printCommand = `powershell -Command "Print-Document -FilePath '${tempFile}' -PrinterName '${printerName}'"`;
-      execSync(printCommand);
+      const printCommand = `powershell -Command "Get-Content '${tempFile}' | Out-Printer -Name '${printerName}'"`;
+      try {
+        execSync(printCommand);
+      } catch (e) {
+        console.error(`Error de impresión Windows: ${e.message}`);
+        throw new Error(`Error de impresión Windows: ${e.message}`);
+      }
     } else if (platform === "darwin" || platform === "linux") {
-      // macOS y Linux
-      const printCommand = `lp -d "${printerName}" -o raw "${tempFile}"`;
-      execSync(printCommand);
+      const lpPath = "/usr/bin/lp";
+      // Intento 1: Con -o raw (para térmicas)
+      try {
+        execSync(`"${lpPath}" -d "${printerName}" -o raw "${tempFile}"`, { stdio: 'pipe' });
+      } catch (e) {
+        // Intento 2: Sin -o raw (para matriciales/estándar)
+        console.warn("Fallo con -o raw, reintentando sin él...");
+        try {
+          execSync(`"${lpPath}" -d "${printerName}" "${tempFile}"`, { stdio: 'pipe' });
+        } catch (e2) {
+          const errorMsg = e2.stderr ? e2.stderr.toString() : e2.message;
+          throw new Error(errorMsg);
+        }
+      }
     }
 
-    // Limpiar archivo temporal
-    if (fs.existsSync(tempFile)) {
-      fs.unlinkSync(tempFile);
-    }
-
+    if (fs.existsSync(tempFile)) fs.unlinkSync(tempFile);
     return true;
   } catch (error) {
-    return false;
+    console.error("Error en printTicket:", error);
+    throw error;
   }
 }
 
@@ -198,38 +229,46 @@ async function printTicket(printerName, content) {
  */
 async function openCashDrawer(printerName) {
   if (!printerName) return false;
+  const fs = require("fs");
+  const path = require("path");
+  const { app } = require("electron");
+
   try {
     const platform = os.platform();
-    const fs = require("fs");
-    const path = require("path");
     
-    // Secuencia típica ESC/POS para abrir cajón (ESC p m t1 t2)
-    // 27 112 0 25 250 (0x1B 0x70 0x00 0x19 0xFA)
     const drawerKick = Buffer.from([27, 112, 0, 25, 250]);
     
-    const tempDir = os.tmpdir();
-    const tempFile = path.join(tempDir, "sipark_drawer_kick.bin");
-    
+    const printDir = path.join(app.getPath("userData"), "print_temp");
+    if (!fs.existsSync(printDir)) fs.mkdirSync(printDir, { recursive: true });
+
+    const tempFile = path.join(printDir, "sipark_drawer_kick.bin");
     fs.writeFileSync(tempFile, drawerKick);
 
     if (platform === "win32") {
-      // Windows
-      const printCommand = `powershell -Command "Print-Document -FilePath '${tempFile}' -PrinterName '${printerName}'"`;
-      execSync(printCommand);
+      // Para apertura de cajón en Windows (binario), Out-Printer puede no funcionar bien con binarios puros,
+      // pero es la opción nativa más segura sin comandos externos.
+      const printCommand = `powershell -Command "Get-Content '${tempFile}' -Encoding Byte | Out-Printer -Name '${printerName}'"`;
+      try {
+        execSync(printCommand);
+      } catch (e) {
+        console.error(`Error de apertura de cajón Windows: ${e.message}`);
+        // No lanzamos error para no interrumpir el flujo si solo falla el cajón
+      }
     } else if (platform === "darwin" || platform === "linux") {
-      // macOS y Linux
-      const printCommand = `lp -d "${printerName}" -o raw "${tempFile}"`;
-      execSync(printCommand);
+      const lpPath = "/usr/bin/lp";
+      try {
+        execSync(`"${lpPath}" -d "${printerName}" -o raw "${tempFile}"`, { stdio: 'pipe' });
+      } catch (e) {
+        const errorMsg = e.stderr ? e.stderr.toString() : e.message;
+        throw new Error(errorMsg);
+      }
     }
 
-    // Limpiar archivo temporal
-    if (fs.existsSync(tempFile)) {
-      fs.unlinkSync(tempFile);
-    }
-
+    if (fs.existsSync(tempFile)) fs.unlinkSync(tempFile);
     return true;
   } catch (error) {
-    return false;
+    console.error("Error en openCashDrawer:", error);
+    throw error;
   }
 }
 
@@ -399,18 +438,21 @@ async function printPDF(printerName, pdfPath) {
     const platform = os.platform();
     
     if (platform === "win32") {
-      // Windows: Usar PowerShell para imprimir PDF
-      // Nota: Esto depende de que el sistema tenga un manejador de impresión de PDF
       const command = `Start-Process -FilePath "${pdfPath}" -Verb PrintTo -ArgumentList "${printerName}" -WindowStyle Hidden`;
       execSync(`powershell -Command "${command}"`);
     } else if (platform === "darwin" || platform === "linux") {
-      // macOS y Linux: lp maneja PDFs directamente
-      const printCommand = `lp -d "${printerName}" "${pdfPath}"`;
-      execSync(printCommand);
+      const lpPath = "/usr/bin/lp";
+      try {
+        execSync(`"${lpPath}" -d "${printerName}" "${pdfPath}"`, { stdio: 'pipe' });
+      } catch (e) {
+        const errorMsg = e.stderr ? e.stderr.toString() : e.message;
+        throw new Error(errorMsg);
+      }
     }
     return true;
   } catch (error) {
-    return false;
+    console.error("Error en printPDF:", error);
+    throw error;
   }
 }
 
@@ -419,10 +461,12 @@ async function printPDF(printerName, pdfPath) {
  */
 async function printTestNormal(printerName) {
   if (!printerName) return false;
+  const fs = require("fs");
+  const path = require("path");
+  const { app } = require("electron");
+
   try {
     const platform = os.platform();
-    const fs = require("fs");
-    const path = require("path");
     
     const content = `
 ========================================
@@ -439,24 +483,36 @@ estándar configurada en el sistema.
 ----------------------------------------
 SOPORTE TÉCNICO SIPARK
 ========================================
-\f`; // \f es Form Feed para algunas matriciales
+\f`;
 
-    const tempDir = os.tmpdir();
-    const tempFile = path.join(tempDir, `test_normal_${Date.now()}.txt`);
+    const printDir = path.join(app.getPath("userData"), "print_temp");
+    if (!fs.existsSync(printDir)) fs.mkdirSync(printDir, { recursive: true });
+
+    const tempFile = path.join(printDir, `test_normal_${Date.now()}.txt`);
     fs.writeFileSync(tempFile, content, "utf-8");
 
     if (platform === "win32") {
-      const printCommand = `powershell -Command "Print-Document -FilePath '${tempFile}' -PrinterName '${printerName}'"`;
-      execSync(printCommand);
+      const printCommand = `powershell -Command "Get-Content '${tempFile}' | Out-Printer -Name '${printerName}'"`;
+      try {
+        execSync(printCommand);
+      } catch (e) {
+        throw new Error(`Error Windows: ${e.message}`);
+      }
     } else if (platform === "darwin" || platform === "linux") {
-      const printCommand = `lp -d "${printerName}" "${tempFile}"`;
-      execSync(printCommand);
+      const lpPath = "/usr/bin/lp";
+      try {
+        execSync(`"${lpPath}" -d "${printerName}" "${tempFile}"`, { stdio: 'pipe' });
+      } catch (e) {
+        const errorMsg = e.stderr ? e.stderr.toString() : e.message;
+        throw new Error(errorMsg);
+      }
     }
 
     if (fs.existsSync(tempFile)) fs.unlinkSync(tempFile);
     return true;
   } catch (error) {
-    return false;
+    console.error("Error en printTestNormal:", error);
+    throw error;
   }
 }
 
