@@ -622,6 +622,7 @@ function setupIpcHandlers() {
     api.setSetting(data.key, data.value),
   );
   ipcMain.handle("api:getAllSettings", () => api.getAllSettings());
+  ipcMain.handle("api:selectSystemLogo", () => api.selectSystemLogo());
 
   // Sessions - Check-in
   ipcMain.handle("api:createSession", (event, data) =>

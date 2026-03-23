@@ -284,6 +284,7 @@ contextBridge.exposeInMainWorld("api", {
   setSetting: (key, value) =>
     ipcRenderer.invoke("api:setSetting", { key, value }),
   getAllSettings: () => ipcRenderer.invoke("api:getAllSettings"),
+  selectSystemLogo: () => ipcRenderer.invoke("api:selectSystemLogo"),
 
   // Sessions - Check-in
   createSession: (clientName, parentName, phone, packageId, durationMinutes, isPaid) =>

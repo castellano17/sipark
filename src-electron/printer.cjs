@@ -144,7 +144,7 @@ async function printTestTicket(printerName) {
       execSync(printCommand);
     } else if (platform === "darwin" || platform === "linux") {
       // macOS y Linux
-      const printCommand = `lp -d ${printerName} "${tempFile}"`;
+      const printCommand = `lp -d "${printerName}" "${tempFile}"`;
       execSync(printCommand);
     }
 
@@ -218,7 +218,7 @@ async function openCashDrawer(printerName) {
       execSync(printCommand);
     } else if (platform === "darwin" || platform === "linux") {
       // macOS y Linux
-      const printCommand = `lp -d ${printerName} -o raw "${tempFile}"`;
+      const printCommand = `lp -d "${printerName}" -o raw "${tempFile}"`;
       execSync(printCommand);
     }
 
