@@ -427,21 +427,6 @@ export function Clients() {
 
                     <div className="md:col-span-1">
                       <label className="block text-sm font-medium mb-2">
-                        Nombre del padre/madre (opcional)
-                      </label>
-                      <Input
-                        value={formData.parent_name}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            parent_name: e.target.value,
-                          })
-                        }
-                      />
-                    </div>
-
-                    <div className="md:col-span-1">
-                      <label className="block text-sm font-medium mb-2">
                         Nombre del Niño
                       </label>
                       <Input

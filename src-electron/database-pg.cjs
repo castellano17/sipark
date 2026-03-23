@@ -92,7 +92,7 @@ async function createTables() {
       id SERIAL PRIMARY KEY,
       name VARCHAR(255) NOT NULL,
       parent_name VARCHAR(255),
-      phone VARCHAR(50) NOT NULL,
+      phone VARCHAR(50),
       child_name VARCHAR(255),
       child_age INTEGER,
       allergies TEXT,
@@ -162,7 +162,7 @@ async function createTables() {
     `CREATE TABLE IF NOT EXISTS sale_items (
       id SERIAL PRIMARY KEY,
       sale_id INTEGER NOT NULL,
-      product_id INTEGER NOT NULL,
+      product_id INTEGER,
       product_name VARCHAR(255) NOT NULL,
       quantity INTEGER NOT NULL,
       unit_price DECIMAL(10,2) NOT NULL,
@@ -729,6 +729,16 @@ async function createTables() {
 
         IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='package_included_features' AND column_name='quantity') THEN
           ALTER TABLE package_included_features ADD COLUMN quantity INTEGER DEFAULT 1;
+        END IF;
+
+        -- Migración para permitir teléfono opcional en clientes
+        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='clients' AND column_name='phone' AND is_nullable='NO') THEN
+          ALTER TABLE clients ALTER COLUMN phone DROP NOT NULL;
+        END IF;
+
+        -- Migración para permitir product_id opcional en sale_items (Venta de membresías, etc.)
+        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='sale_items' AND column_name='product_id' AND is_nullable='NO') THEN
+          ALTER TABLE sale_items ALTER COLUMN product_id DROP NOT NULL;
         END IF;
 
         -- Migración para tipo en categorías
