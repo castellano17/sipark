@@ -1689,7 +1689,7 @@ async function createMembership(
         priority_level, auto_renew, grace_period_days, is_active,
         phone, id_card, acquisition_date, total_hours
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       RETURNING id
     `;
     const result = await runAsync(sql, [
@@ -1755,9 +1755,9 @@ async function updateMembership(
       max_sessions_per_day,
       discount_percentage,
       priority_level,
-      auto_renew ? 1 : 0,
+      !!auto_renew,
       grace_period_days,
-      is_active ? 1 : 0,
+      !!is_active,
       phone,
       id_card,
       acquisition_date,
@@ -1772,7 +1772,7 @@ async function updateMembership(
 
 async function deleteMembership(id) {
   try {
-    await runAsync("UPDATE memberships SET is_active = FALSE WHERE id = $1", [
+    await runAsync("UPDATE memberships SET is_active = FALSE WHERE id = ?", [
       id,
     ]);
     return true;

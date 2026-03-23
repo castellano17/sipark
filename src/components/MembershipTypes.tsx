@@ -83,10 +83,27 @@ export function MembershipTypes() {
 
     try {
       if (editingId) {
-        await (window as any).api.updateMembership(editingId, formData);
+        await (window as any).api.updateMembership(
+          editingId,
+          formData.name,
+          formData.description,
+          formData.price,
+          formData.duration_days,
+          formData.auto_renew,
+          formData.is_active,
+          formData.total_hours,
+        );
         success("Membresía actualizada correctamente");
       } else {
-        await (window as any).api.createMembership(formData);
+        await (window as any).api.createMembership(
+          formData.name,
+          formData.description,
+          formData.price,
+          formData.duration_days,
+          formData.auto_renew,
+          formData.is_active,
+          formData.total_hours,
+        );
         success("Membresía creada correctamente");
       }
 

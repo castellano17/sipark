@@ -938,7 +938,9 @@ function setupIpcHandlers() {
       data.description,
       data.price,
       data.durationDays,
-      data.benefits,
+      data.autoRenew,
+      data.isActive,
+      data.totalHours,
     ),
   );
   ipcMain.handle("api:updateMembership", (event, data) =>
@@ -948,7 +950,9 @@ function setupIpcHandlers() {
       data.description,
       data.price,
       data.durationDays,
-      data.benefits,
+      data.autoRenew,
+      data.isActive,
+      data.totalHours,
     ),
   );
   ipcMain.handle("api:deleteMembership", (event, data) =>
