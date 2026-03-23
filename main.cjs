@@ -232,34 +232,34 @@ function createWindow() {
 }
 
 async function applyBranding() {
-  if (!mainWindow) return;
+  if (!mainWindow || mainWindow.isDestroyed()) return;
 
   try {
+    // Si la API aún no está lista, esperamos un poco
     const api = require('./src-electron/api.cjs');
-    const systemName = await api.getSetting("system_name") || "SIPARK";
-    const logoName = await api.getSetting("system_logo");
+    
+    const systemName = await api.getSetting("system_name").catch(() => "SIPARK") || "SIPARK";
+    const logoName = await api.getSetting("system_logo").catch(() => null);
 
-    // Actualizar título
-    mainWindow.setTitle(systemName);
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.setTitle(systemName);
 
-    // Actualizar icono
-    if (logoName) {
-      const logoPath = path.join(app.getPath('userData'), 'brand', logoName);
-      if (fs.existsSync(logoPath)) {
-        mainWindow.setIcon(logoPath);
-        
-        // MacOS Dock icon
-        if (process.platform === 'darwin') {
-          app.dock.setIcon(logoPath);
+      if (logoName) {
+        const logoPath = path.join(app.getPath('userData'), 'brand', logoName);
+        if (fs.existsSync(logoPath)) {
+          mainWindow.setIcon(logoPath);
+          if (process.platform === 'darwin') {
+            app.dock.setIcon(logoPath);
+          }
         }
       }
-    }
-    
-    if (customerWindow) {
-      customerWindow.setTitle(`${systemName} - Visor de Cliente`);
+      
+      if (customerWindow && !customerWindow.isDestroyed()) {
+        customerWindow.setTitle(`${systemName} - Visor de Cliente`);
+      }
     }
   } catch (err) {
-    console.error("Error aplicando branding:", err);
+    console.error("Error aplicando branding dinámico:", err);
   }
 }
 
@@ -548,8 +548,6 @@ function setupIpcHandlers() {
   );
   ipcMain.handle("api:getBusinessSettings", () => promotionsApi.getBusinessSettings());
 
-
-  ipcMain.handle("api:applyBranding", () => applyBranding());
   // Stats
   ipcMain.handle("api:getDailyStats", () => api.getDailyStats());
   ipcMain.handle("api:getExecutiveDashboard", () =>
