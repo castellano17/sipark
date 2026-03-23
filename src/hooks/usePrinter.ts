@@ -61,6 +61,15 @@ export function usePrinter() {
     }
   };
 
+  const printTestNormal = async (printerName: string) => {
+    try {
+      const result = await (window as any).api.printTestNormal(printerName);
+      return result;
+    } catch (error) {
+      return false;
+    }
+  };
+
   const openDrawer = async (reason = "Apertura por venta/operación") => {
     try {
       if (!ticketPrinter) return false;
@@ -288,6 +297,7 @@ export function usePrinter() {
     printerStatus,
     openDrawer,
     printTestTicket,
+    printTestNormal,
     printTicket,
     printMembershipTicket,
     printMembershipInvoice,

@@ -107,7 +107,9 @@ export const Settings: React.FC = () => {
     setNormalPrinter,
     isLoading: isLoadingPrinters,
     printerStatus,
+    loadPrinters,
     printTestTicket,
+    printTestNormal,
   } = usePrinter();
 
   useEffect(() => {
@@ -1436,10 +1438,23 @@ export const Settings: React.FC = () => {
                     else errorNotification("Error al imprimir ticket de prueba");
                   }}
                   disabled={!ticketPrinter || isLoadingPrinters}
-                  className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold gap-2 disabled:bg-slate-300 disabled:cursor-not-allowed"
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold gap-2 disabled:bg-slate-300 disabled:cursor-not-allowed mb-3"
                 >
                   <Printer className="w-4 h-4" />
                   Imprimir Ticket Térmico de Prueba
+                </Button>
+
+                <Button
+                  onClick={async () => {
+                    const successTest = await printTestNormal(normalPrinter);
+                    if (successTest) success("Prueba en impresora normal enviada");
+                    else errorNotification("Error en prueba de impresora normal");
+                  }}
+                  disabled={!normalPrinter || isLoadingPrinters}
+                  className="w-full bg-slate-700 hover:bg-slate-800 text-white font-semibold gap-2 disabled:bg-slate-300 disabled:cursor-not-allowed"
+                >
+                  <Printer className="w-4 h-4" />
+                  Imprimir Prueba en Impresora Normal
                 </Button>
               </CardContent>
             </Card>

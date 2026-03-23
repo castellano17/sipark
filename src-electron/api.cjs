@@ -843,22 +843,6 @@ async function getTopClientsReport(startDate, endDate, limit = 10) {
   }
 }
 
-module.exports = {
-  getClients,
-  createClient,
-  getClientById,
-  startSession,
-  getActiveSessions,
-  endSession,
-  getProductsServices,
-  createProductService,
-  getSales,
-  getDailyStats,
-  getSetting,
-  setSetting,
-  selectSystemLogo,
-};
-
 // ============ SETTINGS ============
 
 async function getSetting(key) {
@@ -4634,6 +4618,7 @@ module.exports = {
   deleteProductService,
   getSales,
   getDailyStats,
+  selectSystemLogo,
   getExecutiveDashboard,
   getSalesByPeriod,
   getCashBoxReport,

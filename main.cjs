@@ -1040,31 +1040,66 @@ function setupIpcHandlers() {
   ipcMain.handle("printer:getDefaultPrinter", () =>
     printerModule.getDefaultPrinter(),
   );
+  ipcMain.handle("printer:printTestNormal", (event, printerName) =>
+    printerModule.printTestNormal(printerName),
+  );
 
   // PDF Generator
   ipcMain.handle("pdf:generateMembershipPDF", async (event, pdfData) => {
     try {
       const result = await pdfGenerator.generateMembershipPDF(pdfData);
-      // Abrir el archivo desde el proceso principal para máxima compatibilidad con macOS
+      
+      const printerMode = (await api.getSetting("printer_mode")) || "test";
+      if (printerMode === "real") {
+        const normalPrinter = await api.getSetting("normal_printer");
+        if (normalPrinter) {
+          await printerModule.printPDF(normalPrinter, result);
+        }
+      }
+
       shell.openPath(result);
       return result;
     } catch (error) {
       throw error;
     }
   });
-  ipcMain.handle(
-    "pdf:generateReservationPDF",
-    async (event, reservationData) => {
-      const filepath =
-        await pdfGenerator.generateReservationPDF(reservationData);
+
+  ipcMain.handle("pdf:generateReservationPDF", async (event, reservationData) => {
+    try {
+      const filepath = await pdfGenerator.generateReservationPDF(reservationData);
+      
+      const printerMode = (await api.getSetting("printer_mode")) || "test";
+      if (printerMode === "real") {
+        const normalPrinter = await api.getSetting("normal_printer");
+        if (normalPrinter) {
+          await printerModule.printPDF(normalPrinter, filepath);
+        }
+      }
+
       shell.openPath(filepath);
       return filepath;
-    },
-  );
+    } catch (error) {
+      throw error;
+    }
+  });
+
   ipcMain.handle("pdf:generateQuotationPDF", async (event, quotationData) => {
-    const filepath = await pdfGenerator.generateQuotationPDF(quotationData);
-    shell.openPath(filepath);
-    return filepath;
+    try {
+      const filepath = await pdfGenerator.generateQuotationPDF(quotationData);
+      
+      const printerMode = (await api.getSetting("printer_mode")) || "test";
+      if (printerMode === "real") {
+        const normalPrinter = await api.getSetting("normal_printer");
+        if (normalPrinter) {
+          await printerModule.printPDF(normalPrinter, filepath);
+        }
+      }
+
+      shell.openPath(filepath);
+      return filepath;
+    } catch (error) {
+      throw error;
+    }
   });
 
   // Supplies

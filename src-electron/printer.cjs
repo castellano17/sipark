@@ -144,7 +144,7 @@ async function printTestTicket(printerName) {
       execSync(printCommand);
     } else if (platform === "darwin" || platform === "linux") {
       // macOS y Linux
-      const printCommand = `lp -d "${printerName}" "${tempFile}"`;
+      const printCommand = `lp -d "${printerName}" -o raw "${tempFile}"`;
       execSync(printCommand);
     }
 
@@ -178,7 +178,7 @@ async function printTicket(printerName, content) {
       execSync(printCommand);
     } else if (platform === "darwin" || platform === "linux") {
       // macOS y Linux
-      const printCommand = `lp -d "${printerName}" "${tempFile}"`;
+      const printCommand = `lp -d "${printerName}" -o raw "${tempFile}"`;
       execSync(printCommand);
     }
 
@@ -390,11 +390,83 @@ function generateTicketContent(config, saleData) {
   return lines.join("\n");
 }
 
+/**
+ * Imprime un archivo PDF en la impresora especificada
+ */
+async function printPDF(printerName, pdfPath) {
+  if (!printerName || !pdfPath) return false;
+  try {
+    const platform = os.platform();
+    
+    if (platform === "win32") {
+      // Windows: Usar PowerShell para imprimir PDF
+      // Nota: Esto depende de que el sistema tenga un manejador de impresión de PDF
+      const command = `Start-Process -FilePath "${pdfPath}" -Verb PrintTo -ArgumentList "${printerName}" -WindowStyle Hidden`;
+      execSync(`powershell -Command "${command}"`);
+    } else if (platform === "darwin" || platform === "linux") {
+      // macOS y Linux: lp maneja PDFs directamente
+      const printCommand = `lp -d "${printerName}" "${pdfPath}"`;
+      execSync(printCommand);
+    }
+    return true;
+  } catch (error) {
+    return false;
+  }
+}
+
+/**
+ * Imprime una página de prueba simple en una impresora normal (matricial/tinta/láser)
+ */
+async function printTestNormal(printerName) {
+  if (!printerName) return false;
+  try {
+    const platform = os.platform();
+    const fs = require("fs");
+    const path = require("path");
+    
+    const content = `
+========================================
+      PRUEBA DE IMPRESIÓN SIPARK
+========================================
+Fecha: ${new Date().toLocaleString("es-ES")}
+Impresora: ${printerName}
+Estado: FUNCIONANDO CORRECTAMENTE
+
+Este es un ticket de prueba para validar la
+comunicación con la impresora matricial o
+estándar configurada en el sistema.
+
+----------------------------------------
+SOPORTE TÉCNICO SIPARK
+========================================
+\f`; // \f es Form Feed para algunas matriciales
+
+    const tempDir = os.tmpdir();
+    const tempFile = path.join(tempDir, `test_normal_${Date.now()}.txt`);
+    fs.writeFileSync(tempFile, content, "utf-8");
+
+    if (platform === "win32") {
+      const printCommand = `powershell -Command "Print-Document -FilePath '${tempFile}' -PrinterName '${printerName}'"`;
+      execSync(printCommand);
+    } else if (platform === "darwin" || platform === "linux") {
+      const printCommand = `lp -d "${printerName}" "${tempFile}"`;
+      execSync(printCommand);
+    }
+
+    if (fs.existsSync(tempFile)) fs.unlinkSync(tempFile);
+    return true;
+  } catch (error) {
+    return false;
+  }
+}
+
 module.exports = {
   getPrinters,
   getDefaultPrinter,
   printTestTicket,
   printTicket,
+  printPDF,
+  printTestNormal,
   openCashDrawer,
   generateTicketContent,
   getDefaultTicketConfig,
