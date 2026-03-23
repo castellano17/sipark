@@ -1843,10 +1843,10 @@ async function assignMembership(
     const sql = `
       INSERT INTO client_memberships (
         client_id, membership_id, start_date, end_date, status, 
-        payment_amount, notes, phone, id_card, acquisition_date, 
+        payment_amount, balance, notes, phone, id_card, acquisition_date, 
         total_hours, created_by, created_at
       )
-      VALUES (?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?, ?, ?, ?)
       RETURNING id
     `;
     const result = await runAsync(sql, [
@@ -1855,6 +1855,7 @@ async function assignMembership(
       startDate,
       endDateStr,
       paymentAmount,
+      paymentAmount, // Initial balance = payment amount
       notes,
       phone,
       id_card,
@@ -3571,15 +3572,18 @@ async function getActiveMemberships(statusFilter = "all") {
         cm.end_date,
         cm.status,
         cm.payment_amount,
+        cm.balance,
         cm.notes,
         cm.phone,
         cm.id_card,
         cm.acquisition_date,
         cm.total_hours,
+        crd.uid as nfc_uid,
         CAST((julianday(cm.end_date) - julianday('now')) AS INTEGER) as days_remaining
       FROM client_memberships cm
       INNER JOIN clients c ON cm.client_id = c.id
       INNER JOIN memberships m ON cm.membership_id = m.id
+      LEFT JOIN nfc_cards crd ON cm.nfc_card_id = crd.id
     `;
 
     const params = [];

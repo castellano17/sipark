@@ -163,18 +163,7 @@ function createWindow() {
     },
   });
 
-  // Cargar icono personalizado si existe
-  try {
-    const api = require('./src-electron/api.cjs');
-    api.getSetting("system_logo").then(logoName => {
-      if (logoName) {
-        const logoPath = path.join(app.getPath('userData'), 'brand', logoName);
-        if (fs.existsSync(logoPath)) {
-          mainWindow.setIcon(logoPath);
-        }
-      }
-    });
-  } catch (e) {}
+  // La marca (nombre e icono) se aplica dinámicamente en ready-to-show
 
   // En producción, cargar la URL desde dist
   const startUrl = isDev
@@ -187,6 +176,7 @@ function createWindow() {
   mainWindow.once('ready-to-show', () => {
     mainWindow.maximize();
     mainWindow.show();
+    applyBranding();
   });
 
   if (isDev) {
@@ -238,6 +228,38 @@ function createWindow() {
     customerWindow.on("closed", () => {
       customerWindow = null;
     });
+  }
+}
+
+async function applyBranding() {
+  if (!mainWindow) return;
+
+  try {
+    const api = require('./src-electron/api.cjs');
+    const systemName = await api.getSetting("system_name") || "SIPARK";
+    const logoName = await api.getSetting("system_logo");
+
+    // Actualizar título
+    mainWindow.setTitle(systemName);
+
+    // Actualizar icono
+    if (logoName) {
+      const logoPath = path.join(app.getPath('userData'), 'brand', logoName);
+      if (fs.existsSync(logoPath)) {
+        mainWindow.setIcon(logoPath);
+        
+        // MacOS Dock icon
+        if (process.platform === 'darwin') {
+          app.dock.setIcon(logoPath);
+        }
+      }
+    }
+    
+    if (customerWindow) {
+      customerWindow.setTitle(`${systemName} - Visor de Cliente`);
+    }
+  } catch (err) {
+    console.error("Error aplicando branding:", err);
   }
 }
 
@@ -504,6 +526,7 @@ function setupIpcHandlers() {
   ipcMain.handle("api:getNfcTransactions", (event, clientMembershipId) => 
     nfcApi.getNfcTransactions(clientMembershipId)
   );
+  ipcMain.handle("api:applyBranding", () => applyBranding());
 
   // Promotions
   ipcMain.handle("api:createCampaign", (event, data) => promotionsApi.createCampaign(data));
@@ -526,6 +549,7 @@ function setupIpcHandlers() {
   ipcMain.handle("api:getBusinessSettings", () => promotionsApi.getBusinessSettings());
 
 
+  ipcMain.handle("api:applyBranding", () => applyBranding());
   // Stats
   ipcMain.handle("api:getDailyStats", () => api.getDailyStats());
   ipcMain.handle("api:getExecutiveDashboard", () =>
@@ -1142,17 +1166,25 @@ function setupIpcHandlers() {
     try {
       const result = await pdfGenerator.generateMembershipPDF(pdfData);
       
-      const printerMode = (await api.getSetting("printer_mode")) || "test";
-      if (printerMode === "real") {
-        const normalPrinter = await api.getSetting("normal_printer");
-        if (normalPrinter) {
-          await printerModule.printPDF(normalPrinter, result);
+      // Intentar imprimir físicamente si está en modo real, pero NO bloquear la apertura si falla
+      try {
+        const printerMode = (await api.getSetting("printer_mode")) || "test";
+        if (printerMode === "real") {
+          const normalPrinter = await api.getSetting("normal_printer");
+          if (normalPrinter) {
+            await printerModule.printPDF(normalPrinter, result);
+          }
         }
+      } catch (printErr) {
+        console.error("Error al intentar imprimir PDF automáticamente:", printErr);
+        // Continuamos para que al menos se abra el archivo
       }
 
-      shell.openPath(result);
+      // Siempre intentar abrir el archivo para el usuario
+      await shell.openPath(result);
       return result;
     } catch (error) {
+      console.error("Error crítico generando PDF de membresía:", error);
       throw error;
     }
   });

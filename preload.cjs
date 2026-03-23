@@ -579,6 +579,7 @@ contextBridge.exposeInMainWorld("api", {
   deactivateVoucher: (voucherId) => ipcRenderer.invoke("api:deactivateVoucher", voucherId),
   getVouchersForPrint: (campaignId, voucherIds) => ipcRenderer.invoke("api:getVouchersForPrint", { campaignId, voucherIds }),
   getBusinessSettings: () => ipcRenderer.invoke("api:getBusinessSettings"),
+  applyBranding: () => ipcRenderer.invoke("api:applyBranding"),
 
   // File Handlers (Logos)
   saveLogo: (type, base64Data, extension) =>

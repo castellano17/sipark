@@ -235,7 +235,14 @@ export function usePrinter() {
       ticketText += `Inicio: ${new Date(membership.start_date).toLocaleDateString("es-ES")}\n`;
       ticketText += `Vence: ${new Date(membership.end_date).toLocaleDateString("es-ES")}\n`;
       ticketText += "--------------------------------\n";
-      ticketText += `Método: ${(membership.payment_method || "EFECTIVO").toUpperCase()}\n`;
+      const paymentMethodMap: Record<string, string> = {
+        cash: "EFECTIVO",
+        card: "TARJETA",
+        transfer: "TRANSFERENCIA",
+      };
+      const methodLabel = paymentMethodMap[membership.payment_method] || (membership.payment_method || "EFECTIVO").toUpperCase();
+
+      ticketText += `Método: ${methodLabel}\n`;
       ticketText += `TOTAL: ${new Intl.NumberFormat("es-NI", {
         style: "currency",
         currency: "NIO",

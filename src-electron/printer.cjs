@@ -140,11 +140,11 @@ async function printTestTicket(printerName) {
     if (!fs.existsSync(printDir)) fs.mkdirSync(printDir, { recursive: true });
     
     const tempFile = path.join(printDir, `test_ticket_${Date.now()}.txt`);
-    fs.writeFileSync(tempFile, ticketContent, "utf-8");
+    fs.writeFileSync(tempFile, ticketContent, "latin1");
 
     if (platform === "win32") {
       // Usar Out-Printer nativo de PowerShell para archivos de texto
-      const printCommand = `powershell -Command "Get-Content '${tempFile}' | Out-Printer -Name '${printerName}'"`;
+      const printCommand = `powershell -Command "Get-Content -Path '${tempFile}' -Encoding Latin1 | Out-Printer -Name '${printerName}'"`;
       try {
         execSync(printCommand);
       } catch (e) {
@@ -189,10 +189,10 @@ async function printTicket(printerName, content) {
     if (!fs.existsSync(printDir)) fs.mkdirSync(printDir, { recursive: true });
 
     const tempFile = path.join(printDir, `sipark_ticket_${Date.now()}.txt`);
-    fs.writeFileSync(tempFile, content, "utf-8");
+    fs.writeFileSync(tempFile, content, "latin1");
 
     if (platform === "win32") {
-      const printCommand = `powershell -Command "Get-Content '${tempFile}' | Out-Printer -Name '${printerName}'"`;
+      const printCommand = `powershell -Command "Get-Content -Path '${tempFile}' -Encoding Latin1 | Out-Printer -Name '${printerName}'"`;
       try {
         execSync(printCommand);
       } catch (e) {
@@ -489,10 +489,10 @@ SOPORTE TÉCNICO SIPARK
     if (!fs.existsSync(printDir)) fs.mkdirSync(printDir, { recursive: true });
 
     const tempFile = path.join(printDir, `test_normal_${Date.now()}.txt`);
-    fs.writeFileSync(tempFile, content, "utf-8");
+    fs.writeFileSync(tempFile, content, "latin1");
 
     if (platform === "win32") {
-      const printCommand = `powershell -Command "Get-Content '${tempFile}' | Out-Printer -Name '${printerName}'"`;
+      const printCommand = `powershell -Command "Get-Content -Path '${tempFile}' -Encoding Latin1 | Out-Printer -Name '${printerName}'"`;
       try {
         execSync(printCommand);
       } catch (e) {

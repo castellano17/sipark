@@ -60,6 +60,7 @@ export const Settings: React.FC = () => {
   const [exchangeRate, setExchangeRate] = useState("1.00");
   const [nfcEntryPrice, setNfcEntryPrice] = useState("100.00");
   const [extraMinutePrice, setExtraMinutePrice] = useState("1.00");
+  const [nfcCustomMessage, setNfcCustomMessage] = useState("¡Bienvenido a SIPARK!");
 
   // Contabilidad
   const [enableTax, setEnableTax] = useState(false);
@@ -195,6 +196,9 @@ export const Settings: React.FC = () => {
               break;
             case "extra_minute_price":
               setExtraMinutePrice(setting.value);
+              break;
+            case "nfc_custom_message":
+              setNfcCustomMessage(setting.value);
               break;
             case "enable_tax":
               setEnableTax(setting.value === "true");
@@ -376,7 +380,8 @@ export const Settings: React.FC = () => {
         bankAccounts,
       };
       await setSetting("payment_methods", JSON.stringify(paymentMethods));
-
+      
+      await (window as any).api.applyBranding();
       success("Configuración de empresa guardada correctamente");
     } catch (err) {
       errorNotification("Error al guardar la configuración");
@@ -392,6 +397,7 @@ export const Settings: React.FC = () => {
       await setSetting("exchange_rate", exchangeRate);
       await setSetting("nfc_entry_price", nfcEntryPrice.toString());
       await setSetting("extra_minute_price", extraMinutePrice.toString());
+      await setSetting("nfc_custom_message", nfcCustomMessage);
       success("Configuración de operaciones guardada correctamente");
     } catch (err) {
       errorNotification("Error al guardar la configuración");
@@ -516,6 +522,7 @@ export const Settings: React.FC = () => {
                           const logoName = await (window as any).api.selectSystemLogo();
                           if (logoName) {
                             setSystemLogo(logoName);
+                            await (window as any).api.applyBranding();
                             success("Logo actualizado correctamente.");
                           }
                         } catch (err) {
@@ -857,6 +864,22 @@ export const Settings: React.FC = () => {
                       Se cobrará por cada minuto adicional al terminar el paquete.
                     </p>
                   </div>
+                </div>
+
+                <div className="mt-4 border-t border-slate-100 pt-4">
+                  <label className="block text-sm font-semibold text-slate-900 mb-2">
+                    Mensaje personalizado para Clientes NFC (Pantalla TV)
+                  </label>
+                  <input
+                    type="text"
+                    value={nfcCustomMessage}
+                    onChange={(e) => setNfcCustomMessage(e.target.value)}
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="Ej: ¡Disfruta tu estancia! / ¡Feliz día!"
+                  />
+                  <p className="text-[11px] text-slate-500 mt-1">
+                    Este mensaje aparecerá en la segunda pantalla cuando el cliente escanee su tarjeta para entrar.
+                  </p>
                 </div>
 
                 <Button

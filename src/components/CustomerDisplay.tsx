@@ -34,11 +34,14 @@ export function CustomerDisplay() {
     title: string;
     message: string;
     subMessage?: string;
+    customMessage?: string;
   }>({
     visible: false,
     type: 'info',
     title: '',
-    message: ''
+    message: '',
+    subMessage: '',
+    customMessage: ''
   });
 
   // Ciclo del carrusel de publicidad
@@ -79,7 +82,8 @@ export function CustomerDisplay() {
           type: payload.type || 'info', // success, error
           title: payload.title || 'Atención',
           message: payload.message || '',
-          subMessage: payload.subMessage || ''
+          subMessage: payload.subMessage || '',
+          customMessage: payload.customMessage || ''
         });
 
         // Ocultar alerta automáticamente después de 6 segundos
@@ -151,6 +155,14 @@ export function CustomerDisplay() {
               <p className="text-2xl font-bold text-slate-800 mt-6 bg-slate-100 py-4 px-6 rounded-2xl inline-block">
                 {nfcAlert.subMessage}
               </p>
+            )}
+
+            {nfcAlert.customMessage && (
+              <div className="mt-8 pt-8 border-t border-slate-200">
+                <p className="text-4xl font-extrabold text-blue-700 italic animate-pulse">
+                   {nfcAlert.customMessage}
+                </p>
+              </div>
             )}
           </div>
         )}

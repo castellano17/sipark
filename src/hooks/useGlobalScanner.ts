@@ -86,18 +86,25 @@ export function useGlobalScanner(currentPath: string) {
               userId: currentUser.id || null,
             });
 
+            const customMsg = await (window as any).api.getSetting('nfc_custom_message');
+
             // Asumiendo que descontamos. ¡Mandamos éxito visual al cliente!
             (window as any).api.broadcastToCustomer({
               action: "SHOW_NFC_ALERT",
               type: "success",
               title: `¡Entrada Autorizada!`,
-              message: `Monto Deducido: C$ ${entryPrice.toFixed(2)}`,
-              subMessage: `Saldo Restante: C$ ${result.newBalance.toFixed(2)}`
+              message: `${result.clientName || 'Cliente'}`,
+              subMessage: `Saldo Restante: C$ ${result.newBalance.toFixed(2)}`,
+              customMessage: customMsg || "¡Bienvenido a SIPARK!"
             });
             success(`NFC Rápido: Entrada cobrada. Saldo restante: C$ ${result.newBalance.toFixed(2)}`);
+            
+            // Avisar a otras pantallas (ej: Gestión Membresías) para refrescar saldo
+            window.dispatchEvent(new CustomEvent('memberships-updated'));
 
           } catch (err: any) {
-             error("Error leyendo tarjeta rápida: " + err.message);
+            const cleanMessage = err.message.replace(/Error invoking remote method '.*': /i, "");
+            error("Error leyendo tarjeta rápida: " + cleanMessage);
           } finally {
              // Prevenir lecturas rebotadas por 2 segundos
              setTimeout(() => { activeProcessingRef.current = false; }, 2000);
@@ -105,6 +112,11 @@ export function useGlobalScanner(currentPath: string) {
         }
         keysRef.current = [];
       } else if (e.key.length === 1) { // Normal character
+        // Si el tiempo entre teclas es muy corto (lector), bloqueamos que se escriba en los inputs
+        if (timeDiff < 50) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
         keysRef.current.push(e.key);
       }
     };

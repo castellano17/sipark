@@ -366,10 +366,26 @@ export function POSScreen({
         amount: entryPrice,
         userId: currentUser.id || null,
       });
+
+      // Avisar a la pantalla secundaria (TV)
+      const nfcMsgSetting = Array.isArray(settings)
+        ? settings.find((s: any) => s.key === 'nfc_custom_message')
+        : null;
+
+      await (window as any).api.broadcastToCustomer({
+        action: "SHOW_NFC_ALERT",
+        type: "success",
+        title: `¡Entrada Autorizada!`,
+        message: `${result.clientName || 'Cliente'}`,
+        subMessage: `Saldo Restante: C$ ${result.newBalance.toFixed(2)}`,
+        customMessage: nfcMsgSetting?.value || "¡Bienvenido a SIPARK!"
+      });
+
       success(`Entrada cobrada. Nuevo saldo: C$ ${result.newBalance.toFixed(2)}`);
       closeNfcModal();
     } catch (err: any) {
-      error(`Error cobrando entrada: ${err.message}`);
+      const cleanMessage = err.message.replace(/Error invoking remote method '.*': /i, "");
+      error(`Error cobrando entrada: ${cleanMessage}`);
     }
   };
 
@@ -573,7 +589,11 @@ export function POSScreen({
               saleId,
               userId: currentUser.id || null,
             });
-          } catch { /* silencioso en producción */ }
+            window.dispatchEvent(new CustomEvent('memberships-updated'));
+          } catch (rechargeErr: any) {
+             console.error("Error en recarga NFC post-venta:", rechargeErr);
+             error(`No se pudo actualizar el saldo NFC: ${rechargeErr.message}`);
+          }
         }
         // Post-proceso: vouchers de promoción canjeados
         if ((item as any).voucher_code) {

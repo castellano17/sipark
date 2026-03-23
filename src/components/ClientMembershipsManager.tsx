@@ -5,7 +5,6 @@ import {
   Printer,
   FileText,
   XCircle,
-  Calendar,
   User,
   DollarSign,
   CheckCircle,
@@ -46,6 +45,8 @@ interface ClientMembership {
   id_card?: string;
   acquisition_date?: string;
   total_hours?: string;
+  balance?: number;
+  nfc_uid?: string;
 }
 
 export function ClientMembershipsManager() {
@@ -67,6 +68,10 @@ export function ClientMembershipsManager() {
 
   useEffect(() => {
     loadMemberships();
+
+    const handleUpdate = () => loadMemberships();
+    window.addEventListener('memberships-updated', handleUpdate);
+    return () => window.removeEventListener('memberships-updated', handleUpdate);
   }, []);
 
   useEffect(() => {
@@ -93,7 +98,8 @@ export function ClientMembershipsManager() {
       filtered = filtered.filter(
         (m) =>
           m.client_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          m.membership_name.toLowerCase().includes(searchTerm.toLowerCase()),
+          m.membership_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          (m.nfc_uid && m.nfc_uid.toLowerCase().includes(searchTerm.toLowerCase())),
       );
     }
 
@@ -130,7 +136,7 @@ export function ClientMembershipsManager() {
           membership_name: membership.membership_name,
           payment_amount: membership.payment_amount,
           payment_method: membership.payment_method || "N/A",
-          phone: membership.phone || membership.client_phone,
+          phone: membership.phone,
           id_card: membership.id_card,
           total_hours: membership.total_hours,
         });
@@ -142,7 +148,7 @@ export function ClientMembershipsManager() {
           membership_name: membership.membership_name,
           payment_amount: membership.payment_amount,
           payment_method: membership.payment_method || "N/A",
-          phone: membership.phone || membership.client_phone,
+          phone: membership.phone,
           id_card: membership.id_card,
           total_hours: membership.total_hours,
         });
@@ -345,12 +351,12 @@ export function ClientMembershipsManager() {
               <tr>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Cliente</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Membresía</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Saldo (NFC)</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Cédula / Tel.</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Horas</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Inicio / Vence</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Estado</th>
-                <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase">Monto</th>
-                <th className="w-32 px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase">Acciones</th>
+                <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase">Acciones</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
@@ -362,16 +368,28 @@ export function ClientMembershipsManager() {
                       <span className="text-sm font-medium text-gray-900">{membership.client_name}</span>
                     </div>
                   </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-2">
-                      <Award className="w-4 h-4 text-purple-600" />
-                      <span className="text-sm text-gray-900">{membership.membership_name}</span>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 whitespace-nowrap">
-                    <div className="text-xs text-gray-900 font-medium">{membership.id_card || "-"}</div>
-                    <div className="text-xs text-gray-500">{membership.phone || "-"}</div>
-                  </td>
+                    <td className="px-4 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">
+                        {membership.membership_name}
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        Total: {formatCurrency(membership.payment_amount)}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <div className="text-sm font-bold text-blue-600">
+                        {formatCurrency(membership.balance || 0)}
+                      </div>
+                      {membership.nfc_uid && (
+                        <div className="text-[10px] text-gray-400 font-mono">
+                          ID: {membership.nfc_uid}
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <div className="text-xs text-gray-900 font-medium">{membership.id_card || "-"}</div>
+                      <div className="text-xs text-gray-500">{membership.phone || "-"}</div>
+                    </td>
                   <td className="px-4 py-3">
                     <span className="text-xs font-medium text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full">{membership.total_hours || "-"}</span>
                   </td>
