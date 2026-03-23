@@ -4,10 +4,14 @@ async function seedDatabase() {
   try {
 
     // Crear configuración por defecto
+    // Crear configuración por defecto solo si no existe
     try {
-      await api.setSetting("system_name", "SIPARK");
+      const current = await api.getSetting("system_name");
+      if (!current) {
+        await api.setSetting("system_name", "SIPARK");
+      }
     } catch (err) {
-      // Setting ya existe
+      // Ignorar errores menores
     }
     // Base de datos lista.
   } catch (error) {

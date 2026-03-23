@@ -854,6 +854,9 @@ module.exports = {
   createProductService,
   getSales,
   getDailyStats,
+  getSetting,
+  setSetting,
+  selectSystemLogo,
 };
 
 // ============ SETTINGS ============
@@ -879,6 +882,35 @@ async function setSetting(key, value) {
   } catch (error) {
     throw error;
   }
+}
+
+async function selectSystemLogo() {
+  const { dialog, app } = require('electron');
+  const fs = require('fs');
+  const path = require('path');
+
+  const result = await dialog.showOpenDialog({
+    properties: ['openFile'],
+    filters: [{ name: 'Imágenes', extensions: ['jpg', 'png', 'jpeg'] }]
+  });
+
+  if (!result.canceled && result.filePaths.length > 0) {
+    const sourcePath = result.filePaths[0];
+    const extension = path.extname(sourcePath);
+    const destDir = path.join(app.getPath('userData'), 'brand');
+    
+    if (!fs.existsSync(destDir)) fs.mkdirSync(destDir, { recursive: true });
+    
+    // Generar un nombre único para forzar refresco del navegador (cache bust)
+    const fileName = `logo_${Date.now()}${extension}`;
+    const destPath = path.join(destDir, fileName);
+    fs.copyFileSync(sourcePath, destPath);
+    
+    // Guardar la ruta en la DB
+    await setSetting('system_logo', destPath);
+    return destPath;
+  }
+  return null;
 }
 
 async function getAllSettings() {

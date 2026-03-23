@@ -498,9 +498,30 @@ export const Settings: React.FC = () => {
                     type="text"
                     value={systemName}
                     onChange={(e) => setSystemName(e.target.value)}
-                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent mb-3"
                     placeholder="SIPARK"
                   />
+                  <div className="flex items-center gap-3">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={async () => {
+                        try {
+                          const logoPath = await (window as any).api.selectSystemLogo();
+                          if (logoPath) {
+                            success("Logo actualizado correctamente. El cambio se verá reflejado en unos segundos.");
+                          }
+                        } catch (err) {
+                          errorNotification("Error al cambiar el logo");
+                        }
+                      }}
+                      className="text-xs gap-2 border-slate-300 hover:bg-slate-50 font-semibold"
+                    >
+                      <img src="./icon.png" className="w-4 h-4 object-contain" onError={(e) => e.currentTarget.style.display = 'none'} />
+                      Seleccionar Logo de Marca
+                    </Button>
+                    <p className="text-[10px] text-slate-500 italic">Formatos: PNG, JPG (Se recomienda cuadrado)</p>
+                  </div>
                 </div>
 
                 <div>
