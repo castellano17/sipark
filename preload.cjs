@@ -317,6 +317,8 @@ contextBridge.exposeInMainWorld("api", {
   getDefaultPrinter: () => ipcRenderer.invoke("api:getDefaultPrinter"),
   printTestTicket: (printerName) =>
     ipcRenderer.invoke("api:printTestTicket", printerName),
+  printTestNormal: (printerName) =>
+    ipcRenderer.invoke("api:printTestNormal", printerName),
   openCashDrawer: (printerName) =>
     ipcRenderer.invoke("api:openCashDrawer", printerName),
   printTicket: (printerName, content) =>

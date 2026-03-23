@@ -655,6 +655,9 @@ function setupIpcHandlers() {
   ipcMain.handle("api:printTestTicket", (event, printerName) =>
     printerModule.printTestTicket(printerName),
   );
+  ipcMain.handle("api:printTestNormal", (event, printerName) =>
+    printerModule.printTestNormal(printerName),
+  );
   ipcMain.handle("api:printTicket", (event, printerName, content) =>
     printerModule.printTicket(printerName, content),
   );

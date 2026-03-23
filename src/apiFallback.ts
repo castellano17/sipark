@@ -339,6 +339,8 @@ export const apiFallback = {
   getDefaultPrinter: () => invokeHttp("api:getDefaultPrinter"),
   printTestTicket: (printerName) =>
     invokeHttp("api:printTestTicket", printerName),
+  printTestNormal: (printerName) =>
+    invokeHttp("api:printTestNormal", printerName),
   openCashDrawer: (printerName) =>
     invokeHttp("api:openCashDrawer", printerName),
   printTicket: (printerName, content) =>
