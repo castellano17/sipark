@@ -1308,11 +1308,23 @@ export const Settings: React.FC = () => {
 
             {/* Configuración de Impresoras */}
             <Card className="shadow-md border-none">
-              <CardHeader>
-                <CardTitle className="text-lg">Impresoras</CardTitle>
-                <CardDescription>
-                  Configura la impresora para tickets/recibos y la impresora para documentos A4
-                </CardDescription>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <div>
+                  <CardTitle className="text-lg">Impresoras</CardTitle>
+                  <CardDescription>
+                    Configura la impresora para tickets/recibos
+                  </CardDescription>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => loadPrinters()}
+                  disabled={isLoadingPrinters}
+                  className="gap-2 border-slate-300 hover:bg-slate-50"
+                >
+                  <Printer className={`w-4 h-4 ${isLoadingPrinters ? "animate-spin" : ""}`} />
+                  {isLoadingPrinters ? "Buscando..." : "Buscar Impresoras"}
+                </Button>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
@@ -1397,7 +1409,11 @@ export const Settings: React.FC = () => {
                 </div>
 
                 <Button
-                  onClick={() => printTestTicket(ticketPrinter)}
+                  onClick={async () => {
+                    const successTest = await printTestTicket(ticketPrinter);
+                    if (successTest) success("Ticket de prueba enviado");
+                    else errorNotification("Error al imprimir ticket de prueba");
+                  }}
                   disabled={!ticketPrinter || isLoadingPrinters}
                   className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold gap-2 disabled:bg-slate-300 disabled:cursor-not-allowed"
                 >

@@ -42,13 +42,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   useEffect(() => {
     loadSystemName();
+    const interval = setInterval(loadSystemName, 5000); // Actualizar cada 5s por si cambia en Settings
+    return () => clearInterval(interval);
   }, []);
 
   const loadSystemName = async () => {
-    const name = await getSetting("system_name");
-    if (name) {
-      setSystemName(name);
-    }
+    try {
+      const name = await getSetting("system_name");
+      if (name && name !== systemName) {
+        setSystemName(name);
+      }
+    } catch (e) {}
   };
 
   const toggleMenu = (menuId: string) => {
@@ -295,9 +299,25 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b border-slate-800">
         {!isCollapsed && (
-          <h1 className="text-lg font-bold text-white tracking-tight">
-            {systemName}
-          </h1>
+          <div className="flex items-center gap-3 overflow-hidden">
+            <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center overflow-hidden">
+               <img 
+                 src="./icon.png" 
+                 alt="Logo" 
+                 className="w-full h-full object-cover"
+                 onError={(e) => {
+                   // Si no hay logo, mostramos la primera letra
+                   e.currentTarget.style.display = 'none';
+                 }}
+               />
+               <span className="text-white font-bold text-lg">
+                 {systemName.charAt(0)}
+               </span>
+            </div>
+            <h1 className="text-lg font-bold text-white tracking-tight truncate">
+              {systemName}
+            </h1>
+          </div>
         )}
         <Button
           variant="sidebar"

@@ -18,9 +18,6 @@ export function usePrinter() {
 
   useEffect(() => {
     loadPrinters();
-    // Verificar estado de impresoras cada 5 segundos
-    const interval = setInterval(loadPrinters, 5000);
-    return () => clearInterval(interval);
   }, []);
 
   const loadPrinters = async () => {

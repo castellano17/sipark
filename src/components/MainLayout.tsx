@@ -59,6 +59,21 @@ export default function MainLayout({ currentUser, onLogout }: MainLayoutProps) {
     isOnline: true,
   });
 
+  const [systemName, setSystemName] = useState("SIPARK");
+
+  useEffect(() => {
+    loadName();
+    const interval = setInterval(loadName, 10000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const loadName = async () => {
+    try {
+      const name = await (window as any).api.getSetting("system_name");
+      if (name) setSystemName(name);
+    } catch {}
+  };
+
   // Verificar estado de la base de datos y caja cada 5 segundos
   useEffect(() => {
     checkSystemStatus();
@@ -306,7 +321,13 @@ export default function MainLayout({ currentUser, onLogout }: MainLayoutProps) {
     <div className="flex flex-col h-screen bg-background text-foreground">
       {/* Mobile Top App Bar */}
       <header className="md:hidden flex items-center justify-between p-4 bg-slate-950 border-b border-slate-800 z-40 relative shadow-sm">
-        <h1 className="text-xl font-bold tracking-tight text-white">SIPARK</h1>
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center overflow-hidden">
+             <img src="./icon.png" alt="Logo" className="w-full h-full object-cover" onError={(e) => (e.currentTarget.style.display = 'none')} />
+             <span className="text-white font-bold text-lg">{systemName.charAt(0)}</span>
+          </div>
+          <h1 className="text-xl font-bold tracking-tight text-white">{systemName}</h1>
+        </div>
         <Button variant="ghost" size="icon" onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="text-white hover:bg-slate-800">
           {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
         </Button>
