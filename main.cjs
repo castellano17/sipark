@@ -1,5 +1,6 @@
 const { app, BrowserWindow, ipcMain, shell, screen } = require("electron");
 const path = require("path");
+const fs = require("fs");
 // Detectar si estamos en desarrollo sin dependencias externas
 const isDev = !app.isPackaged;
 const { initializeDatabase } = require("./src-electron/database-pg.cjs");
@@ -54,6 +55,41 @@ function startLocalServer() {
         }
       } else {
         res.status(404).json({ success: false, error: 'Endpoint no encontrado: ' + channel });
+      }
+    });
+
+    // Servir archivos de publicidad desde Documentos
+    const adsDir = path.join(app.getPath('documents'), 'SIPARK', 'Publicidad');
+    if (!fs.existsSync(adsDir)) {
+      fs.mkdirSync(adsDir, { recursive: true });
+    }
+    server.use('/ads', express.static(adsDir));
+
+    // Servir carpeta de marca (Logos)
+    const brandDir = path.join(app.getPath('userData'), 'brand');
+    if (!fs.existsSync(brandDir)) {
+      fs.mkdirSync(brandDir, { recursive: true });
+    }
+    server.use('/brand', express.static(brandDir));
+
+    // Ruta para el favicon dinámico
+    server.get('/favicon.ico', async (req, res) => {
+      try {
+        const api = require('./src-electron/api.cjs');
+        const logoName = await api.getSetting("system_logo");
+        if (logoName) {
+          const logoPath = path.join(brandDir, logoName);
+          if (fs.existsSync(logoPath)) {
+            return res.sendFile(logoPath);
+          }
+        }
+      } catch (e) {}
+      // Fallback al icono por defecto
+      const defaultIcon = path.join(__dirname, isDev ? 'public/icon.png' : 'dist/icon.png');
+      if (fs.existsSync(defaultIcon)) {
+        res.sendFile(defaultIcon);
+      } else {
+        res.status(404).send();
       }
     });
 
@@ -118,6 +154,7 @@ function createWindow() {
     height: 900,
     minWidth: 1024,
     minHeight: 768,
+    show: false, // No mostrar hasta que esté lista y maximizada
     icon: path.join(__dirname, isDev ? "public/icon.png" : "dist/icon.png"),
     webPreferences: {
       preload: path.join(__dirname, "preload.cjs"),
@@ -126,15 +163,31 @@ function createWindow() {
     },
   });
 
-  // En producción, cargar desde dist
+  // Cargar icono personalizado si existe
+  try {
+    const api = require('./src-electron/api.cjs');
+    api.getSetting("system_logo").then(logoName => {
+      if (logoName) {
+        const logoPath = path.join(app.getPath('userData'), 'brand', logoName);
+        if (fs.existsSync(logoPath)) {
+          mainWindow.setIcon(logoPath);
+        }
+      }
+    });
+  } catch (e) {}
+
+  // En producción, cargar la URL desde dist
   const startUrl = isDev
     ? "http://localhost:5173"
     : `file://${path.join(__dirname, "dist", "index.html")}`;
 
   mainWindow.loadURL(startUrl);
   
-  // Maximizar ventana al iniciar
-  mainWindow.maximize();
+  // Maximizar y mostrar cuando esté lista la URL
+  mainWindow.once('ready-to-show', () => {
+    mainWindow.maximize();
+    mainWindow.show();
+  });
 
   if (isDev) {
     mainWindow.webContents.openDevTools();
@@ -164,6 +217,7 @@ function createWindow() {
       hasShadow: false,
       alwaysOnTop: true,
       skipTaskbar: true,
+      kiosk: true, // Modo Quiosco para ocultar barra de tareas y bloquear salida
       webPreferences: {
         preload: path.join(__dirname, "preload.cjs"),
         nodeIntegration: false,
@@ -174,6 +228,12 @@ function createWindow() {
 
     const customerUrl = startUrl + (startUrl.includes("?") ? "&" : "?") + "view=customer";
     customerWindow.loadURL(customerUrl);
+    
+    // Forzar pantalla completa en Windows
+    customerWindow.once('ready-to-show', () => {
+      customerWindow.setFullScreen(true);
+      customerWindow.removeMenu();
+    });
 
     customerWindow.on("closed", () => {
       customerWindow = null;
@@ -249,11 +309,30 @@ ipcMain.handle("api:toggleAdsWindow", async (event, hidden) => {
   return false;
 });
 
+// Función para actualizar el icono de la aplicación dinámicamente
+ipcMain.handle("api:updateAppIcon", async (event, logoPath) => {
+  if (mainWindow && !mainWindow.isDestroyed() && logoPath && fs.existsSync(logoPath)) {
+    try {
+      mainWindow.setIcon(logoPath);
+      if (customerWindow && !customerWindow.isDestroyed()) {
+        customerWindow.setIcon(logoPath);
+      }
+      return true;
+    } catch (e) {
+      console.error("Error actualizando icono:", e);
+      return false;
+    }
+  }
+  return false;
+});
+
 ipcMain.handle("api:getAdFiles", async () => {
   const fs = require('fs');
   const path = require('path');
   const docsPath = app.getPath('documents');
-  const adsDir = path.join(docsPath, 'SIPARK_Publicidad');
+  const adsDir = path.join(docsPath, 'SIPARK', 'Publicidad');
+  // Determinar puerto basándose en si es dev o no
+  const HTTP_PORT = isDev ? 9595 : 80;
 
   try {
     if (!fs.existsSync(adsDir)) {
@@ -264,9 +343,11 @@ ipcMain.handle("api:getAdFiles", async () => {
       .filter((file) => /\.(mp4|webm|jpg|jpeg|png|webp|gif)$/i.test(file))
       .map((file) => {
         const type = /\.(mp4|webm)$/i.test(file) ? 'video' : 'image';
+        // Construir URL absoluta para evitar problemas de ruteo
+        const src = `http://localhost:${HTTP_PORT}/ads/${file}`;
         return {
           type,
-          src: `file://${path.join(adsDir, file)}`,
+          src,
           duration: type === 'image' ? 10000 : undefined
         };
       });

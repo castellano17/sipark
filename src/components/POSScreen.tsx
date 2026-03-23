@@ -102,7 +102,7 @@ export function POSScreen({
     }, 300);
 
     // Verificar estado de caja cada 5 segundos
-    const interval = setInterval(checkCashBoxStatus, 5000);
+    const interval = setInterval(checkCashBoxStatus, 10000);
     return () => clearInterval(interval);
   }, []);
 
@@ -791,7 +791,12 @@ export function POSScreen({
       <div className="flex-1 flex gap-4 overflow-hidden relative">
         {/* Grid de Productos */}
         <div className="flex-1 overflow-auto pb-24 md:pb-0">
-          {!cashBoxOpen ? (
+          {isCheckingCashBox ? (
+            <div className="flex flex-col items-center justify-center h-full gap-4">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+              <p className="text-gray-500 font-medium">Verificando estado de caja...</p>
+            </div>
+          ) : !cashBoxOpen ? (
             <div className="flex items-center justify-center h-full">
               <div className="text-center text-gray-400">
                 <div className="text-6xl mb-4">🔒</div>
@@ -809,10 +814,10 @@ export function POSScreen({
                   className="p-3 sm:p-4 cursor-pointer hover:bg-gray-50 transition-colors flex flex-col justify-between"
                   onClick={() => addItemToSale(product)}
                 >
-                  <div className="font-semibold text-sm mb-1">
+                  <div className="font-semibold text-sm mb-1 line-clamp-2">
                     {product.name}
                   </div>
-                  <div className="text-lg font-bold text-blue-600">
+                  <div className="text-lg font-bold text-blue-600 mt-auto">
                     {formatCurrency(product.price)}
                   </div>
                   {product.duration_minutes && (

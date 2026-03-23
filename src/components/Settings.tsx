@@ -46,6 +46,7 @@ export const Settings: React.FC = () => {
   const [companyRuc, setCompanyRuc] = useState("");
   const [companyPhone, setCompanyPhone] = useState("");
   const [companyAddress, setCompanyAddress] = useState("");
+  const [systemLogo, setSystemLogo] = useState("");
 
   // Formas de pago
   const [checkPayeeName, setCheckPayeeName] = useState("");
@@ -229,6 +230,9 @@ export const Settings: React.FC = () => {
                 setGdriveConfig(gdriveCfg);
                 setGdriveConfigured(true);
               } catch (e) {}
+              break;
+            case "system_logo":
+              setSystemLogo(setting.value);
               break;
           }
         });
@@ -509,9 +513,10 @@ export const Settings: React.FC = () => {
                       size="sm"
                       onClick={async () => {
                         try {
-                          const logoPath = await (window as any).api.selectSystemLogo();
-                          if (logoPath) {
-                            success("Logo actualizado correctamente. El cambio se verá reflejado en unos segundos.");
+                          const logoName = await (window as any).api.selectSystemLogo();
+                          if (logoName) {
+                            setSystemLogo(logoName);
+                            success("Logo actualizado correctamente.");
                           }
                         } catch (err) {
                           errorNotification("Error al cambiar el logo");
@@ -519,7 +524,12 @@ export const Settings: React.FC = () => {
                       }}
                       className="text-xs gap-2 border-slate-300 hover:bg-slate-50 font-semibold"
                     >
-                      <img src="./icon.png" className="w-4 h-4 object-contain" onError={(e) => e.currentTarget.style.display = 'none'} />
+                      {(() => {
+                        const isVite = window.location.port === "5173";
+                        const serverPort = isVite ? "9595" : (window.location.port || "80");
+                        const baseUrl = `http://${window.location.hostname}:${serverPort}`;
+                        return <img src={systemLogo ? `${baseUrl}/brand/${systemLogo}` : "./icon.png"} className="w-8 h-8 object-contain" onError={(e) => e.currentTarget.style.display = 'none'} />;
+                      })()}
                       Seleccionar Logo de Marca
                     </Button>
                     <p className="text-[10px] text-slate-500 italic">Formatos: PNG, JPG (Se recomienda cuadrado)</p>

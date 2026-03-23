@@ -50,7 +50,12 @@ async function createFirstAdmin() {
     for (const module of AVAILABLE_MODULES) {
       await runAsync(
         `INSERT INTO user_permissions (user_id, module, can_view, can_create, can_edit, can_delete)
-         VALUES ($1, $2, $3, $4, $5, $6)`,
+         VALUES (?, ?, ?, ?, ?, ?)
+         ON CONFLICT (user_id, module) DO UPDATE 
+         SET can_view = EXCLUDED.can_view, 
+             can_create = EXCLUDED.can_create, 
+             can_edit = EXCLUDED.can_edit, 
+             can_delete = EXCLUDED.can_delete`,
         [userId, module, true, true, true, true],
       );
     }
@@ -71,7 +76,7 @@ async function createFirstAdmin() {
 async function authenticateUser(username, password) {
   try {
     const user = await getAsync(
-      "SELECT * FROM users WHERE username = $1 AND is_active = TRUE",
+      "SELECT * FROM users WHERE username = ? AND is_active = TRUE",
       [username],
     );
 
@@ -87,13 +92,13 @@ async function authenticateUser(username, password) {
 
     // Actualizar último login
     await runAsync(
-      "UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = $1",
+      "UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = ?",
       [user.id],
     );
 
     // Obtener permisos existentes
     let permissions = await allAsync(
-      "SELECT * FROM user_permissions WHERE user_id = $1",
+      "SELECT * FROM user_permissions WHERE user_id = ?",
       [user.id],
     );
 
@@ -107,7 +112,13 @@ async function authenticateUser(username, password) {
         const isDefaultTrue = user.role === 'admin' || user.role === 'gerente';
         await runAsync(
           `INSERT INTO user_permissions (user_id, module, can_view, can_create, can_edit, can_delete, can_open_drawer)
-           VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+           VALUES (?, ?, ?, ?, ?, ?, ?)
+           ON CONFLICT (user_id, module) DO UPDATE
+           SET can_view = EXCLUDED.can_view,
+               can_create = EXCLUDED.can_create,
+               can_edit = EXCLUDED.can_edit,
+               can_delete = EXCLUDED.can_delete,
+               can_open_drawer = EXCLUDED.can_open_drawer`,
           [user.id, module, isDefaultTrue, isDefaultTrue, isDefaultTrue, isDefaultTrue, false]
         );
       }
@@ -252,7 +263,13 @@ async function createUser(userData, createdBy) {
         await runAsync(
           `INSERT INTO user_permissions 
            (user_id, module, can_view, can_create, can_edit, can_delete, can_open_drawer)
-           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+           VALUES (?, ?, ?, ?, ?, ?, ?)
+           ON CONFLICT (user_id, module) DO UPDATE
+           SET can_view = EXCLUDED.can_view,
+               can_create = EXCLUDED.can_create,
+               can_edit = EXCLUDED.can_edit,
+               can_delete = EXCLUDED.can_delete,
+               can_open_drawer = EXCLUDED.can_open_drawer`,
           [
             userId,
             perm.module,
@@ -270,7 +287,8 @@ async function createUser(userData, createdBy) {
         await runAsync(
           `INSERT INTO user_permissions 
            (user_id, module, can_view, can_create, can_edit, can_delete, can_open_drawer)
-           VALUES (?, ?, false, false, false, false, false)`,
+           VALUES (?, ?, false, false, false, false, false)
+           ON CONFLICT (user_id, module) DO NOTHING`,
           [userId, module],
         );
       }
@@ -368,7 +386,13 @@ async function updateUser(userId, userData, updatedBy) {
         await runAsync(
           `INSERT INTO user_permissions 
            (user_id, module, can_view, can_create, can_edit, can_delete, can_open_drawer)
-           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+           VALUES (?, ?, ?, ?, ?, ?, ?)
+           ON CONFLICT (user_id, module) DO UPDATE
+           SET can_view = EXCLUDED.can_view,
+               can_create = EXCLUDED.can_create,
+               can_edit = EXCLUDED.can_edit,
+               can_delete = EXCLUDED.can_delete,
+               can_open_drawer = EXCLUDED.can_open_drawer`,
           [
             userId,
             perm.module,
@@ -443,8 +467,8 @@ async function deleteUser(userId, deletedBy) {
     // Desactivar usuario
     await runAsync(
       `UPDATE users 
-       SET is_active = FALSE, updated_by = $1, updated_at = CURRENT_TIMESTAMP
-       WHERE id = $2`,
+       SET is_active = FALSE, updated_by = ?, updated_at = CURRENT_TIMESTAMP
+       WHERE id = ?`,
       [deletedBy, userId],
     );
 

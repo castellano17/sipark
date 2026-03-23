@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card } from "./ui/card";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -14,8 +14,26 @@ export function Login({ onLogin }: LoginProps) {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [systemLogo, setSystemLogo] = useState("");
+
+  const loadLogo = async () => {
+    try {
+      const logo = await (window as any).api.getSetting("system_logo");
+      if (logo) {
+        const isVite = window.location.port === "5173";
+        const serverPort = isVite ? "9595" : (window.location.port || "80");
+        const baseUrl = `http://${window.location.hostname}:${serverPort}`;
+        setSystemLogo(`${baseUrl}/brand/${logo}`);
+      }
+    } catch {}
+  };
+
+  useEffect(() => {
+    loadLogo();
+  }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
+    // ... rest of function
     e.preventDefault();
     setError("");
     setLoading(true);
@@ -41,10 +59,15 @@ export function Login({ onLogin }: LoginProps) {
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-slate-950">
-      <Card className="w-full max-w-md p-8 bg-slate-900 border-slate-800">
+      <Card className="w-full max-w-md p-8 bg-slate-900 border-slate-800 shadow-2xl">
         <div className="text-center mb-8">
+          {systemLogo && (
+            <div className="flex justify-center mb-4">
+              <img src={systemLogo} alt="Logo" className="w-24 h-24 object-contain" />
+            </div>
+          )}
           <h1 className="text-3xl font-bold text-white mb-2">SIPARK</h1>
-          <p className="text-slate-400">Sistema de Gestión</p>
+          <p className="text-slate-400 font-medium">Sistema de Gestión</p>
         </div>
 
         <form onSubmit={handleLogin} className="space-y-4">

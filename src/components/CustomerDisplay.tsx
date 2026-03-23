@@ -24,8 +24,8 @@ export function CustomerDisplay() {
       }
     };
     loadAds();
-    // Actualizar la carpeta cada hora (opcional)
-    const interval = setInterval(loadAds, 3600000);
+    // Actualizar la carpeta cada 2 minutos para detectar nuevos archivos
+    const interval = setInterval(loadAds, 120000);
     return () => clearInterval(interval);
   }, []);
   const [nfcAlert, setNfcAlert] = useState<{

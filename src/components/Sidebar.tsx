@@ -38,11 +38,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [expandedMenus, setExpandedMenus] = useState<string[]>(["operaciones"]);
   const [systemName, setSystemName] = useState("SIPARK");
+  const [systemLogo, setSystemLogo] = useState("");
   const { getSetting } = useDatabase();
 
   useEffect(() => {
     loadSystemName();
-    const interval = setInterval(loadSystemName, 5000); // Actualizar cada 5s por si cambia en Settings
+    const interval = setInterval(loadSystemName, 5000); 
     return () => clearInterval(interval);
   }, []);
 
@@ -51,6 +52,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
       const name = await getSetting("system_name");
       if (name && name !== systemName) {
         setSystemName(name);
+      }
+      
+      const logo = await getSetting("system_logo");
+      if (logo) {
+        const isVite = window.location.port === "5173";
+        const serverPort = isVite ? "9595" : (window.location.port || "80");
+        const baseUrl = `http://${window.location.hostname}:${serverPort}`;
+        setSystemLogo(`${baseUrl}/brand/${logo}`);
       }
     } catch (e) {}
   };
@@ -302,7 +311,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <div className="flex items-center gap-3 overflow-hidden">
             <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center overflow-hidden">
                <img 
-                 src="./icon.png" 
+                 src={systemLogo || "./icon.png"} 
                  alt="Logo" 
                  className="w-full h-full object-cover"
                  onError={(e) => {

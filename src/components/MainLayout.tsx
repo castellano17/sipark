@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Sidebar } from "./Sidebar";
 import { StatusBar } from "./StatusBar";
 import { Dashboard } from "./Dashboard";
-import { Menu, X } from "lucide-react";
+import { Menu, X, LogOut } from "lucide-react";
 import { Button } from "./ui/button";
 import { TimingDashboard } from "./TimingDashboard";
 import { Settings } from "./Settings";
@@ -60,6 +60,7 @@ export default function MainLayout({ currentUser, onLogout }: MainLayoutProps) {
   });
 
   const [systemName, setSystemName] = useState("SIPARK");
+  const [systemLogo, setSystemLogo] = useState("");
 
   useEffect(() => {
     loadName();
@@ -71,13 +72,22 @@ export default function MainLayout({ currentUser, onLogout }: MainLayoutProps) {
     try {
       const name = await (window as any).api.getSetting("system_name");
       if (name) setSystemName(name);
+      
+      const logo = await (window as any).api.getSetting("system_logo");
+      if (logo) {
+        // En desarrollo Vite corre en 5173 pero Express en 9595
+        const isVite = window.location.port === "5173";
+        const serverPort = isVite ? "9595" : (window.location.port || "80");
+        const baseUrl = `http://${window.location.hostname}:${serverPort}`;
+        setSystemLogo(`${baseUrl}/brand/${logo}`);
+      }
     } catch {}
   };
 
   // Verificar estado de la base de datos y caja cada 5 segundos
   useEffect(() => {
     checkSystemStatus();
-    const interval = setInterval(checkSystemStatus, 5000);
+    const interval = setInterval(checkSystemStatus, 10000);
     return () => clearInterval(interval);
   }, []);
 
@@ -323,14 +333,19 @@ export default function MainLayout({ currentUser, onLogout }: MainLayoutProps) {
       <header className="md:hidden flex items-center justify-between p-4 bg-slate-950 border-b border-slate-800 z-40 relative shadow-sm">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center overflow-hidden">
-             <img src="./icon.png" alt="Logo" className="w-full h-full object-cover" onError={(e) => (e.currentTarget.style.display = 'none')} />
+             <img src={systemLogo || "./icon.png"} alt="Logo" className="w-full h-full object-cover" onError={(e) => (e.currentTarget.style.display = 'none')} />
              <span className="text-white font-bold text-lg">{systemName.charAt(0)}</span>
           </div>
           <h1 className="text-xl font-bold tracking-tight text-white">{systemName}</h1>
         </div>
-        <Button variant="ghost" size="icon" onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="text-white hover:bg-slate-800">
-          {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-        </Button>
+        <div className="flex items-center gap-1">
+          <Button variant="ghost" size="icon" onClick={onLogout} title="Cerrar Sesión" className="text-white hover:bg-slate-800">
+            <LogOut className="w-6 h-6" />
+          </Button>
+          <Button variant="ghost" size="icon" onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="text-white hover:bg-slate-800">
+            {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+          </Button>
+        </div>
       </header>
 
       {/* Main Container */}

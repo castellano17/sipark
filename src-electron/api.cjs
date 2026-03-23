@@ -890,9 +890,16 @@ async function selectSystemLogo() {
     const destPath = path.join(destDir, fileName);
     fs.copyFileSync(sourcePath, destPath);
     
-    // Guardar la ruta en la DB
-    await setSetting('system_logo', destPath);
-    return destPath;
+    // Guardar solo el nombre del archivo en la DB (Express servirá la carpeta 'brand')
+    await setSetting('system_logo', fileName);
+    
+    // Actualizar icono de ventana manualmente (Electron Main Process)
+    try {
+      const { ipcMain } = require('electron');
+      ipcMain.emit('api:updateAppIcon', { sender: null }, destPath);
+    } catch (e) {}
+
+    return fileName;
   }
   return null;
 }
