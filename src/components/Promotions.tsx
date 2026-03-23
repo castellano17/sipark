@@ -337,9 +337,9 @@ export default function Promotions() {
   return (
     <div className="h-full flex flex-col bg-slate-50">
       {/* Header */}
-      <div className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between">
+      <div className="bg-white border-b border-slate-200 px-4 md:px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-purple-100 rounded-xl flex items-center justify-center">
+          <div className="w-10 h-10 bg-purple-100 rounded-xl flex items-center justify-center shrink-0">
             <Gift className="w-5 h-5 text-purple-600" />
           </div>
           <div>
@@ -347,16 +347,16 @@ export default function Promotions() {
             <p className="text-sm text-slate-500">Campañas con códigos QR y código de barras</p>
           </div>
         </div>
-        <Button onClick={() => setActiveTab("create")} className="bg-purple-600 hover:bg-purple-700 text-white gap-2">
+        <Button onClick={() => setActiveTab("create")} className="bg-purple-600 hover:bg-purple-700 text-white gap-2 w-full sm:w-auto">
           <Plus className="w-4 h-4" /> Nueva Campaña
         </Button>
       </div>
 
       {/* Tabs */}
-      <div className="bg-white border-b border-slate-200 px-6 flex gap-1">
+      <div className="bg-white border-b border-slate-200 px-2 md:px-6 flex gap-1 overflow-x-auto">
         {([["campaigns", "Campañas", BarChart2], ["create", "Crear Campaña", Plus], ["redeem", "Canje Manual", Tag]] as const).map(([tab, label, Icon]) => (
           <button key={tab} onClick={() => setActiveTab(tab)}
-            className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+            className={`flex items-center gap-2 px-3 md:px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
               activeTab === tab ? "border-purple-600 text-purple-600" : "border-transparent text-slate-500 hover:text-slate-700"
             }`}>
             <Icon className="w-4 h-4" />{label}
@@ -364,12 +364,12 @@ export default function Promotions() {
         ))}
       </div>
 
-      <div className="flex-1 overflow-y-auto p-6">
+      <div className="flex-1 overflow-y-auto p-3 md:p-6">
 
         {/* ── TAB: CAMPAIGNS ── */}
         {activeTab === "campaigns" && (
           <div className="space-y-4">
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-2">
               <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
                 className="border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white text-slate-700">
                 <option value="">Todas</option>
@@ -394,7 +394,7 @@ export default function Promotions() {
 
             {campaigns.map(c => (
               <div key={c.id} className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
-                <div className="p-4 flex items-start justify-between gap-4">
+                <div className="p-4 flex flex-col sm:flex-row sm:items-start justify-between gap-3">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <h3 className="font-semibold text-slate-800">{c.name}</h3>
@@ -404,7 +404,7 @@ export default function Promotions() {
                       </span>
                     </div>
                     {c.description && <p className="text-sm text-slate-500 mt-1 truncate">{c.description}</p>}
-                    <div className="flex items-center gap-4 mt-2 text-xs text-slate-500 flex-wrap">
+                    <div className="flex items-center gap-3 mt-2 text-xs text-slate-500 flex-wrap">
                       <span className="flex items-center gap-1"><Tag className="w-3 h-3" />{getBenefitLabel(c.type, c.benefit_value)}</span>
                       <span>{c.total_vouchers} vouchers</span>
                       <span className={c.total_redemptions >= (c.total_vouchers * (c.max_uses_per_code || 1)) ? "text-red-600 font-bold" : ""}>
@@ -415,7 +415,7 @@ export default function Promotions() {
                       {c.valid_until && <span className="flex items-center gap-1"><Clock className="w-3 h-3" />Hasta: {fmtDate(c.valid_until)}</span>}
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 shrink-0">
+                  <div className="flex items-center gap-2 flex-wrap shrink-0">
                     <Button variant="outline" size="sm" onClick={() => handlePrint(c.id, 'normal')} title="Imprimir vouchers (Normal/PDF)">
                       <Printer className="w-4 h-4" />
                     </Button>
@@ -444,11 +444,11 @@ export default function Promotions() {
                 {showVouchers === c.id && selectedCampaign && (
                   <div className="border-t border-slate-100 bg-slate-50 p-4">
                     <h4 className="text-sm font-semibold text-slate-700 mb-3">Vouchers de la campaña</h4>
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-xs">
+                    <div className="overflow-x-auto -mx-2">
+                      <table className="w-full text-xs min-w-[400px]">
                         <thead>
                           <tr className="text-left text-slate-500 border-b border-slate-200">
-                            <th className="pb-2 pr-4">Código</th>
+                            <th className="pb-2 pr-4 pl-2">Código</th>
                             <th className="pb-2 pr-4">Usos</th>
                             <th className="pb-2 pr-4">Estado</th>
                             <th className="pb-2">Acciones</th>
@@ -457,7 +457,7 @@ export default function Promotions() {
                         <tbody className="divide-y divide-slate-100">
                           {selectedCampaign.vouchers?.slice(0, 30).map((v: any) => (
                             <tr key={v.id} className="hover:bg-white">
-                              <td className="py-1.5 pr-4 font-mono font-bold text-slate-700">{v.code}</td>
+                              <td className="py-1.5 pr-4 pl-2 font-mono font-bold text-slate-700">{v.code}</td>
                               <td className="py-1.5 pr-4 text-slate-600">{v.times_used}/{v.max_uses}</td>
                               <td className="py-1.5 pr-4">
                                 {!v.is_active ? (
@@ -485,19 +485,19 @@ export default function Promotions() {
                       )}
                     </div>
                     {redemptions.length > 0 && (
-                      <div className="mt-4">
-                        <h4 className="text-sm font-semibold text-slate-700 mb-2">Últimos canjes</h4>
-                        <div className="space-y-1">
-                          {redemptions.slice(0, 10).map((r: any) => (
-                            <div key={r.id} className="flex items-center justify-between text-xs text-slate-600 bg-white rounded px-3 py-1.5">
-                              <span className="font-mono font-bold">{r.code}</span>
-                              <span>{r.client_name || "Cliente no registrado"}</span>
-                              <span>{r.redeemed_by_name}</span>
-                              <span>{r.redeemed_at ? new Date(r.redeemed_at).toLocaleString("es-NI") : ""}</span>
+                          <div className="mt-4">
+                            <h4 className="text-sm font-semibold text-slate-700 mb-2">Últimos canjes</h4>
+                            <div className="space-y-1">
+                              {redemptions.slice(0, 10).map((r: any) => (
+                                <div key={r.id} className="flex flex-col sm:flex-row sm:items-center justify-between text-xs text-slate-600 bg-white rounded px-3 py-1.5 gap-0.5">
+                                  <span className="font-mono font-bold">{r.code}</span>
+                                  <span>{r.client_name || "Cliente no registrado"}</span>
+                                  <span>{r.redeemed_by_name}</span>
+                                  <span className="text-slate-400">{r.redeemed_at ? new Date(r.redeemed_at).toLocaleString("es-NI") : ""}</span>
+                                </div>
+                              ))}
                             </div>
-                          ))}
-                        </div>
-                      </div>
+                          </div>
                     )}
                   </div>
                 )}
@@ -526,7 +526,7 @@ export default function Promotions() {
                     className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
                     rows={2} placeholder="Ej. Válido solo fines de semana. No acumulable." />
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">Tipo de beneficio *</label>
                     <select value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value as CampaignType }))}
@@ -544,7 +544,7 @@ export default function Promotions() {
                       placeholder="Ej. 2" required />
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">Cantidad de vouchers *</label>
                     <input type="number" min="1" max="5000" value={form.codeCount}
@@ -558,7 +558,7 @@ export default function Promotions() {
                       className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500" />
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">Válido desde</label>
                     <input type="date" value={form.validFrom}
@@ -572,7 +572,7 @@ export default function Promotions() {
                       className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500" />
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">Audiencia</label>
                     <select value={form.targetAudience} onChange={e => setForm(f => ({ ...f, targetAudience: e.target.value }))}

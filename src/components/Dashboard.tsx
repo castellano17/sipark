@@ -46,6 +46,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const [stats, setStats] = useState({
     totalSales: 0,
     inProgress: 0,
+    childrenInProgress: 0,
     ticketAverage: 0,
     newClients: 0,
     salesCount: 0,
@@ -105,6 +106,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
       setStats({
         totalSales: totalSales,
         inProgress: sessions.length || 0,
+        childrenInProgress: sessions.reduce((sum: number, s: any) => sum + (s.children_count || 0), 0),
         ticketAverage: currentDaySalesCount > 0 ? totalSales / currentDaySalesCount : 0,
         newClients: newClientsCount,
         salesCount: currentDaySalesCount,
@@ -316,9 +318,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
   return (
     <div className="flex flex-col h-full gap-6 p-6 bg-gradient-to-br from-slate-50 to-slate-100">
       {/* Header con Welcome */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 md:gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-slate-900">Dashboard Principal</h1>
+          <h1 className="text-2xl md:text-3xl font-bold text-slate-900">Dashboard Principal</h1>
           <p className="text-slate-600 mt-1">
             {new Date().toLocaleDateString("es-ES", {
               weekday: "long",
@@ -344,18 +346,18 @@ export const Dashboard: React.FC<DashboardProps> = ({
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div className="flex-1">
-                  <h2 className="text-2xl font-bold mb-2">
+                  <h2 className="text-xl md:text-2xl font-bold mb-1 md:mb-2">
                     Bienvenido,{" "}
                     {currentUser?.full_name || currentUser?.username}
                   </h2>
-                  <h3 className="text-3xl font-bold mb-4">Abrir Venta</h3>
+                  <h3 className="text-2xl md:text-3xl font-bold mb-2 md:mb-4">Abrir Venta</h3>
                   <p className="text-blue-100 mb-6 max-w-md">
                     Gestiona tus ventas, productos y servicios de manera rápida
                     y eficiente
                   </p>
                   <Button
                     onClick={() => onNavigate("/pos")}
-                    className="bg-white text-blue-600 hover:bg-blue-50 font-semibold px-6 py-3 rounded-lg shadow-md"
+                    className="bg-white text-blue-600 hover:bg-blue-50 font-semibold px-4 sm:px-6 py-2 sm:py-3 rounded-lg shadow-md w-full sm:w-auto"
                   >
                     Vender
                     <ArrowRight className="w-4 h-4 ml-2" />
@@ -373,7 +375,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </Card>
 
           {/* Stats Cards */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <Card className="shadow-md border-none bg-gradient-to-br from-blue-500 to-blue-600 text-white">
               <CardContent className="p-4">
                 <div className="flex items-center justify-between mb-2">
@@ -393,9 +395,13 @@ export const Dashboard: React.FC<DashboardProps> = ({
               <CardContent className="p-4">
                 <div className="flex items-center justify-between mb-2">
                   <Clock className="w-8 h-8 opacity-80" />
+                  <div className="flex flex-col items-end">
+                    <span className="text-2xl font-bold">{stats.childrenInProgress}</span>
+                    <span className="text-[10px] uppercase opacity-80">Niños</span>
+                  </div>
                 </div>
                 <p className="text-3xl font-bold">{stats.inProgress}</p>
-                <p className="text-sm text-cyan-100">En Progreso</p>
+                <p className="text-sm text-cyan-100">En Progreso (Sesiones)</p>
               </CardContent>
             </Card>
 
@@ -426,7 +432,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </div>
 
           {/* Gráficas */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Membresías Activas de la Semana */}
             <Card className="shadow-md border-none">
               <CardHeader className="flex flex-row items-center justify-between">
@@ -501,8 +507,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 <CardTitle className="text-lg">Membresías del Mes</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="h-48 flex items-center justify-center">
-                  <div className="relative w-40 h-40">
+                <div className="py-4 flex flex-col sm:flex-row items-center justify-center gap-6">
+                  <div className="relative w-32 h-32 sm:w-40 sm:h-40 shrink-0">
                     <svg className="w-full h-full" viewBox="0 0 100 100">
                       {/* Círculo de fondo */}
                       <circle
@@ -581,7 +587,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                       />
                     </svg>
                   </div>
-                  <div className="ml-6 space-y-2">
+                  <div className="space-y-2 w-full sm:w-auto">
                     <div className="flex items-center gap-2">
                       <div className="w-3 h-3 rounded-full bg-blue-500"></div>
                       <span className="text-sm text-slate-600">
@@ -626,17 +632,20 @@ export const Dashboard: React.FC<DashboardProps> = ({
                     <div className="flex items-center gap-2">
                       <Clock className="w-5 h-5 text-blue-600" />
                       <p className="text-sm font-semibold text-blue-900">
-                        Sesiones Activas
+                        Ocupación Actual
                       </p>
                     </div>
-                    <span className="text-2xl font-bold text-blue-600">
-                      {stats.inProgress}
-                    </span>
+                    <div className="text-right">
+                      <span className="text-2xl font-bold text-blue-600">
+                        {stats.childrenInProgress}
+                      </span>
+                      <p className="text-[10px] text-blue-500 font-bold uppercase">Niños Total</p>
+                    </div>
                   </div>
                   <div className="flex items-center justify-between text-xs text-blue-700 mt-2">
-                    <span>En progreso ahora</span>
+                    <span>Sesiones: {stats.inProgress}</span>
                     <span className="font-semibold">
-                      {stats.inProgress > 0 ? "Activo" : "Sin sesiones"}
+                      {stats.childrenInProgress > 0 ? "Sala Ocupada" : "Sala Vacía"}
                     </span>
                   </div>
                 </div>
@@ -669,37 +678,37 @@ export const Dashboard: React.FC<DashboardProps> = ({
         <div className="space-y-6">
           {/* Calendario */}
           <Card className="shadow-md border-none">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-lg">
+            <CardHeader className="px-4 py-4 sm:px-6 sm:py-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <CardTitle className="text-lg text-center sm:text-left">
                   {monthNames[currentDate.getMonth()]}{" "}
                   {currentDate.getFullYear()}
                 </CardTitle>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center justify-center sm:justify-end gap-2">
                   <button
                     onClick={() => changeMonth(-1)}
-                    className="p-1 hover:bg-slate-100 rounded-lg transition-colors"
+                    className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors"
                   >
                     <ChevronLeft className="w-5 h-5 text-slate-600" />
                   </button>
                   <button
                     onClick={() => changeMonth(1)}
-                    className="p-1 hover:bg-slate-100 rounded-lg transition-colors"
+                    className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors"
                   >
                     <ChevronRight className="w-5 h-5 text-slate-600" />
                   </button>
                 </div>
               </div>
             </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-7 gap-1 text-center text-xs mb-2">
+            <CardContent className="px-2 pb-4 sm:px-6 sm:pb-6">
+              <div className="gap-1 text-center text-xs mb-2 w-full" style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))' }}>
                 {["D", "L", "M", "M", "J", "V", "S"].map((day, i) => (
                   <div key={i} className="font-semibold text-slate-600 py-1">
                     {day}
                   </div>
                 ))}
               </div>
-              <div className="grid grid-cols-7 gap-1 text-center text-sm">
+              <div className="gap-1 text-center text-xs sm:text-sm w-full" style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))' }}>
                 {Array.from({ length: startingDayOfWeek }).map((_, i) => (
                   <div key={`empty-${i}`} className="py-2"></div>
                 ))}
@@ -723,21 +732,22 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   );
 
                   return (
-                    <div
-                      key={day}
-                      onClick={() => handleDateSelect(day)}
-                      className={`py-2 rounded-lg cursor-pointer transition-all relative ${
-                        isSelected
-                          ? "bg-blue-600 text-white font-bold shadow-md"
-                          : isToday
-                            ? "bg-blue-100 text-blue-600 font-bold"
-                            : "hover:bg-slate-100 text-slate-700"
-                      }`}
-                    >
-                      {day}
-                      {hasReservations && !isSelected && (
-                        <div className="absolute bottom-1 left-1/2 transform -translate-x-1/2 w-1 h-1 bg-blue-500 rounded-full"></div>
-                      )}
+                    <div key={day} className="flex justify-center flex-col items-center py-0.5">
+                      <div
+                        onClick={() => handleDateSelect(day)}
+                        className={`w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center rounded-lg cursor-pointer transition-all relative ${
+                          isSelected
+                            ? "bg-blue-600 text-white font-bold shadow-md"
+                            : isToday
+                              ? "bg-blue-100 text-blue-600 font-bold"
+                              : "hover:bg-slate-100 text-slate-700"
+                        }`}
+                      >
+                        {day}
+                        {hasReservations && !isSelected && (
+                          <div className="absolute bottom-1 w-1 h-1 bg-blue-500 rounded-full"></div>
+                        )}
+                      </div>
                     </div>
                   );
                 })}

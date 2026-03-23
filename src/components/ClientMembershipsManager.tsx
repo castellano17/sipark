@@ -269,36 +269,88 @@ export function ClientMembershipsManager() {
         </div>
       </Card>
 
-      {/* Tabla de Membresías */}
+      {/* Contenedor Principal de la Lista */}
       <Card className="flex-1 overflow-hidden">
-        <div className="overflow-x-auto h-full">
+        {/* VISTA MÓVIL (Tarjetas) */}
+        <div className="md:hidden flex flex-col gap-4 p-4 overflow-y-auto h-full bg-gray-100">
+          {filteredMemberships.map((membership) => (
+            <div key={membership.id} className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 flex flex-col gap-3">
+              <div className="flex justify-between items-start">
+                <div>
+                  <h3 className="font-bold text-gray-900">{membership.client_name}</h3>
+                  <p className="text-sm font-semibold text-purple-700">{membership.membership_name}</p>
+                </div>
+                {getStatusBadge(membership)}
+              </div>
+              
+              <div className="flex justify-between text-sm text-gray-600 border-b border-gray-100 pb-2">
+                <div>
+                  <span className="block text-xs text-gray-400">Teléfono / ID</span>
+                  <span>{membership.phone || "-"}</span>
+                </div>
+                <div className="text-right">
+                  <span className="block text-xs text-gray-400">Monto Pagado</span>
+                  <span className="font-bold text-gray-900">{formatCurrency(membership.payment_amount)}</span>
+                </div>
+              </div>
+
+              <div className="flex justify-between text-xs text-gray-500 pb-2">
+                <span>Inicia: {new Date(membership.start_date).toLocaleDateString()}</span>
+                <span>Vence: {new Date(membership.end_date).toLocaleDateString()}</span>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handlePrint(membership, "ticket")}
+                  className="flex-1"
+                >
+                  <Printer className="w-4 h-4 mr-2" /> Ticket
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handlePrint(membership, "invoice")}
+                  className="flex-1"
+                >
+                  <FileText className="w-4 h-4 mr-2" /> PDF
+                </Button>
+                {membership.status === "active" && membership.days_remaining > 0 && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleCancelClick(membership.id)}
+                    className="flex-none text-red-600"
+                  >
+                    <XCircle className="w-4 h-4" />
+                  </Button>
+                )}
+              </div>
+            </div>
+          ))}
+
+          {filteredMemberships.length === 0 && (
+            <div className="text-center py-12">
+              <Award className="w-16 h-16 mx-auto mb-4 text-gray-300" />
+              <p className="text-gray-500">No se encontraron membresías</p>
+            </div>
+          )}
+        </div>
+
+        {/* VISTA ESCRITORIO (Tabla) */}
+        <div className="hidden md:block overflow-x-auto h-full">
           <table className="w-full">
-            <thead className="bg-gray-50 sticky top-0">
+            <thead className="bg-gray-50 sticky top-0 border-b border-gray-200">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Cliente
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Membresía
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Cédula / Tel.
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Horas
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Inicio / Vence
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Estado
-                </th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
-                  Monto
-                </th>
-                <th className="w-32 px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">
-                  Acciones
-                </th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Cliente</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Membresía</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Cédula / Tel.</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Horas</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Inicio / Vence</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Estado</th>
+                <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase">Monto</th>
+                <th className="w-32 px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase">Acciones</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
@@ -307,31 +359,21 @@ export function ClientMembershipsManager() {
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
                       <User className="w-4 h-4 text-gray-400" />
-                      <span className="text-sm font-medium text-gray-900">
-                        {membership.client_name}
-                      </span>
+                      <span className="text-sm font-medium text-gray-900">{membership.client_name}</span>
                     </div>
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
                       <Award className="w-4 h-4 text-purple-600" />
-                      <span className="text-sm text-gray-900">
-                        {membership.membership_name}
-                      </span>
+                      <span className="text-sm text-gray-900">{membership.membership_name}</span>
                     </div>
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap">
-                    <div className="text-xs text-gray-900 font-medium">
-                      {membership.id_card || "-"}
-                    </div>
-                    <div className="text-xs text-gray-500">
-                      {membership.phone || "-"}
-                    </div>
+                    <div className="text-xs text-gray-900 font-medium">{membership.id_card || "-"}</div>
+                    <div className="text-xs text-gray-500">{membership.phone || "-"}</div>
                   </td>
                   <td className="px-4 py-3">
-                    <span className="text-xs font-medium text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full">
-                      {membership.total_hours || "-"}
-                    </span>
+                    <span className="text-xs font-medium text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full">{membership.total_hours || "-"}</span>
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex flex-col text-xs text-gray-600">
@@ -345,40 +387,21 @@ export function ClientMembershipsManager() {
                       <DollarSign className="w-3 h-3" />
                       {formatCurrency(membership.payment_amount)}
                     </div>
-                    <div className="text-xs text-gray-500">
-                      {membership.payment_method}
-                    </div>
+                    <div className="text-xs text-gray-500">{membership.payment_method}</div>
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center justify-center gap-0.5">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handlePrint(membership, "ticket")}
-                        title="Imprimir Ticket (Impresora Térmica)"
-                      >
+                      <Button size="sm" variant="outline" onClick={() => handlePrint(membership, "ticket")} title="Imprimir Ticket">
                         <Printer className="w-3 h-3" />
                       </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handlePrint(membership, "invoice")}
-                        title="Generar Factura PDF"
-                      >
+                      <Button size="sm" variant="outline" onClick={() => handlePrint(membership, "invoice")} title="Generar Factura PDF">
                         <FileText className="w-3 h-3" />
                       </Button>
-                      {membership.status === "active" &&
-                        membership.days_remaining > 0 && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleCancelClick(membership.id)}
-                            title="Cancelar Membresía"
-                            className="text-red-600 hover:text-red-700"
-                          >
-                            <XCircle className="w-3 h-3" />
-                          </Button>
-                        )}
+                      {membership.status === "active" && membership.days_remaining > 0 && (
+                        <Button size="sm" variant="outline" onClick={() => handleCancelClick(membership.id)} title="Cancelar Membresía" className="text-red-600 hover:text-red-700">
+                          <XCircle className="w-3 h-3" />
+                        </Button>
+                      )}
                     </div>
                   </td>
                 </tr>

@@ -191,6 +191,7 @@ async function getActiveSessions() {
         s.status,
         s.duration_minutes,
         s.is_paid,
+        s.children_count,
         c.name as client_name,
         c.photo_path,
         p.name as package_name,
@@ -198,7 +199,7 @@ async function getActiveSessions() {
       FROM active_sessions s
       JOIN clients c ON s.client_id = c.id
       LEFT JOIN products_services p ON s.package_id = p.id
-      WHERE s.status IN ('active', 'pending')
+      WHERE s.status = 'active'
       ORDER BY s.start_time DESC
     `;
     const result = await allAsync(sql);
@@ -912,31 +913,32 @@ async function createSession(
   packageId,
   durationMinutes = 60,
   isPaid = false,
+  childrenCount = 1
 ) {
   try {
     let clientId;
 
     // Si no hay teléfono, buscar o crear cliente "Cliente General"
     if (!phone || phone.trim() === "") {
-      const sqlClient = "SELECT id FROM clients WHERE name = ? AND phone = ?";
+      const sqlClient = "SELECT id FROM clients WHERE name = $1 AND phone = $2";
       const generalClient = await getAsync(sqlClient, ["Cliente General", "0000000000"]);
 
       if (generalClient) {
         clientId = generalClient.id;
       } else {
-        const sqlInsert = "INSERT INTO clients (name, parent_name, phone) VALUES (?, ?, ?) RETURNING id";
+        const sqlInsert = "INSERT INTO clients (name, parent_name, phone) VALUES ($1, $2, $3) RETURNING id";
         const result = await runAsync(sqlInsert, ["Cliente General", "Sin Registro", "0000000000"]);
         clientId = result.lastID;
       }
     } else {
       // Cliente con teléfono - buscar o crear
-      const sqlClient = "SELECT id FROM clients WHERE name = ? AND phone = ?";
+      const sqlClient = "SELECT id FROM clients WHERE name = $1 AND phone = $2";
       const existingClient = await getAsync(sqlClient, [clientName, phone]);
 
       if (existingClient) {
         clientId = existingClient.id;
       } else {
-        const sqlInsert = "INSERT INTO clients (name, parent_name, phone) VALUES (?, ?, ?) RETURNING id";
+        const sqlInsert = "INSERT INTO clients (name, parent_name, phone) VALUES ($1, $2, $3) RETURNING id";
         const result = await runAsync(sqlInsert, [clientName, parentName, phone]);
         clientId = result.lastID;
       }
@@ -945,8 +947,8 @@ async function createSession(
     // Crear sesión
     const startTime = getLocalTimestamp();
     const sessionResult = await runAsync(
-      "INSERT INTO active_sessions (client_id, start_time, package_id, duration_minutes, status, is_paid) VALUES (?, ?, ?, ?, ?, ?) RETURNING id",
-      [clientId, startTime, packageId, durationMinutes, "pending", isPaid],
+      "INSERT INTO active_sessions (client_id, start_time, package_id, duration_minutes, status, is_paid, children_count) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id",
+      [clientId, startTime, packageId, durationMinutes, "pending", isPaid, childrenCount],
     );
 
     return {
@@ -958,6 +960,7 @@ async function createSession(
       status: "pending",
       duration_minutes: durationMinutes,
       is_paid: isPaid,
+      children_count: childrenCount
     };
   } catch (error) {
     throw error;
@@ -4441,6 +4444,148 @@ async function fixNegativeCashMovements() {
   }
 }
 
+// ============ WAITER ORDERS ============
+
+async function createWaiterOrder(orderData) {
+  try {
+    console.log("📥 [WaiterAPI] Datos Recibidos:", JSON.stringify(orderData, null, 2));
+    const { table_or_client_name, subtotal, total, items } = orderData;
+    
+    const subtotalVal = parseFloat(subtotal) || 0;
+    const totalVal = parseFloat(total) || 0;
+
+    if (!items || items.length === 0) {
+      throw new Error("El pedido no tiene productos.");
+    }
+
+    // 1. BUSCAR SI YA EXISTE UN PEDIDO PENDIENTE CON ESE NOMBRE
+    const existingOrderSql = `SELECT id, subtotal, total FROM waiter_orders WHERE table_or_client_name = $1 AND status = 'pending' LIMIT 1`;
+    const existingOrder = await getAsync(existingOrderSql, [table_or_client_name]);
+
+    let orderId;
+    
+    if (existingOrder) {
+      // --- ESCENARIO A: ACTUALIZAR PEDIDO EXISTENTE ---
+      orderId = existingOrder.id;
+      console.log(`🔄 [WaiterAPI] Uniendo pedido a ID existente: ${orderId}`);
+
+      const newSubtotal = parseFloat(existingOrder.subtotal) + subtotalVal;
+      const newTotal = parseFloat(existingOrder.total) + totalVal;
+
+      await runAsync(
+        "UPDATE waiter_orders SET subtotal = $1, total = $2, created_at = CURRENT_TIMESTAMP WHERE id = $3",
+        [newSubtotal, newTotal, orderId]
+      );
+    } else {
+      // --- ESCENARIO B: CREAR PEDIDO NUEVO ---
+      const orderSql = `
+        INSERT INTO waiter_orders (table_or_client_name, subtotal, total, status, created_at)
+        VALUES ($1, $2, $3, 'pending', CURRENT_TIMESTAMP)
+        RETURNING id
+      `;
+      const result = await runAsync(orderSql, [table_or_client_name, subtotalVal, totalVal]);
+      orderId = result.lastID;
+    }
+
+    if (!orderId) throw new Error("No se pudo obtener el ID del pedido.");
+
+    // 2. INSERTAR O ACTUALIZAR LOS ITEMS DEL PEDIDO
+    for (const item of items) {
+      // Verificar si el producto ya existe en ESTE pedido
+      const checkItemSql = `SELECT id, quantity, subtotal FROM waiter_order_items WHERE order_id = $1 AND product_id = $2`;
+      const existingItem = await getAsync(checkItemSql, [orderId, item.product_id || 0]);
+
+      if (existingItem && item.product_id) {
+        // Si ya existe el mismo producto, sumamos la cantidad
+        const newQty = parseInt(existingItem.quantity) + (parseInt(item.quantity) || 1);
+        const newSub = parseFloat(existingItem.subtotal) + (parseFloat(item.subtotal) || 0);
+        
+        await runAsync(
+          "UPDATE waiter_order_items SET quantity = $1, subtotal = $2 WHERE id = $3",
+          [newQty, newSub, existingItem.id]
+        );
+      } else {
+        // Si es nuevo, lo insertamos
+        const itemSql = `
+          INSERT INTO waiter_order_items (order_id, product_id, product_name, quantity, unit_price, subtotal)
+          VALUES ($1, $2, $3, $4, $5, $6)
+        `;
+        await runAsync(itemSql, [
+          orderId,
+          item.product_id || null,
+          item.product_name,
+          parseInt(item.quantity) || 1,
+          parseFloat(item.unit_price) || 0,
+          parseFloat(item.subtotal) || 0
+        ]);
+      }
+    }
+
+    return orderId;
+  } catch (error) {
+    console.error("ERROR EN createWaiterOrder:", error);
+    throw error;
+  }
+}
+
+async function getPendingWaiterOrders() {
+  try {
+    const sql = `
+      SELECT *
+      FROM waiter_orders
+      WHERE status = 'pending'
+      ORDER BY created_at ASC
+    `;
+    const orders = await allAsync(sql);
+
+    // Obtener items para cada orden con su tipo real de producto
+    for (let order of orders) {
+      const itemsSql = `
+        SELECT w.*, p.type as product_type 
+        FROM waiter_order_items w
+        LEFT JOIN products_services p ON w.product_id = p.id
+        WHERE w.order_id = $1
+      `;
+      const items = await allAsync(itemsSql, [order.id]);
+      order.items = items;
+    }
+
+    return orders;
+  } catch (error) {
+    throw error;
+  }
+}
+
+async function updateWaiterOrderStatus(arg1, arg2) {
+  try {
+    let orderId, status;
+    if (typeof arg1 === 'object' && arg1 !== null) {
+      orderId = arg1.orderId;
+      status = arg1.status;
+    } else {
+      orderId = arg1;
+      status = arg2;
+    }
+    
+    const sql = "UPDATE waiter_orders SET status = $1 WHERE id = $2";
+    await runAsync(sql, [status, orderId]);
+    return true;
+  } catch (error) {
+    console.error("Error updating waiter order status:", error);
+    throw error;
+  }
+}
+
+async function deleteWaiterOrder(orderId) {
+  try {
+    // cascade delete se manejará automáticamente por la FK constraint
+    await runAsync("DELETE FROM waiter_orders WHERE id = $1", [orderId]);
+    return true;
+  } catch (error) {
+    throw error;
+  }
+}
+
 module.exports = {
   getClients,
   createClient,
@@ -4555,6 +4700,10 @@ module.exports = {
   deletePackageFeatureCategory,
   fixNegativeCashMovements,
   openCashDrawerWithAudit,
+  createWaiterOrder,
+  getPendingWaiterOrders,
+  updateWaiterOrderStatus,
+  deleteWaiterOrder,
 };
 
 async function openCashDrawerWithAudit(userId, printerName, reason = "Apertura manual") {

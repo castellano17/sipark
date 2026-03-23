@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { Card, CardContent } from "./ui/card";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
-import { Save, Printer, Eye, Upload, X } from "lucide-react";
+import { Save, Eye, Upload, X } from "lucide-react";
 import { useNotification } from "@/hooks/useNotification";
 
 interface InvoiceSettings {
@@ -360,30 +360,31 @@ export const InvoiceConfig: React.FC = () => {
   return (
     <div className="flex flex-col h-full gap-6 p-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-semibold text-slate-900">
+          <h1 className="text-2xl md:text-3xl font-semibold text-slate-900">
             Configuración de Facturas
           </h1>
           <p className="text-slate-600 mt-1">
             Personaliza el diseño de tus facturas
           </p>
         </div>
-        <div className="flex gap-3">
+        <div className="flex flex-wrap sm:flex-nowrap gap-3 w-full md:w-auto">
           <Button
             onClick={() => setShowPreview(!showPreview)}
             variant="outline"
-            size="lg"
-            className="gap-2"
+            size="default"
+            className="flex-1 sm:flex-none gap-2"
           >
             <Eye className="w-5 h-5" />
-            {showPreview ? "Ocultar" : "Mostrar"} Vista Previa
+            <span className="hidden sm:inline">{showPreview ? "Ocultar" : "Mostrar"} Vista Previa</span>
+            <span className="sm:hidden">{showPreview ? "Ocultar" : "Vista"}</span>
           </Button>
           <Button
             onClick={handleSave}
             disabled={loading}
-            size="lg"
-            className="gap-2 bg-blue-600 hover:bg-blue-700"
+            size="default"
+            className="flex-1 sm:flex-none gap-2 bg-blue-600 hover:bg-blue-700 w-full sm:w-auto mt-2 sm:mt-0"
           >
             <Save className="w-5 h-5" />
             {loading ? "Guardando..." : "Guardar"}

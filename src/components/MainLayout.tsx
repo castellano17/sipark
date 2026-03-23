@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import { Sidebar } from "./Sidebar";
 import { StatusBar } from "./StatusBar";
 import { Dashboard } from "./Dashboard";
+import { Menu, X } from "lucide-react";
+import { Button } from "./ui/button";
 import { TimingDashboard } from "./TimingDashboard";
 import { Settings } from "./Settings";
 import { TicketConfig } from "./TicketConfig";
@@ -26,6 +28,7 @@ import { Reservaciones } from "./Reservaciones";
 import { Cotizaciones } from "./Cotizaciones";
 import { SuppliesInventory } from "./SuppliesInventory";
 import { EquipmentInventory } from "./EquipmentInventory";
+import { WaiterPOS } from "./WaiterPOS";
 import Promotions from "./Promotions";
 import { SystemStatus, SystemUser } from "@/types";
 
@@ -37,11 +40,14 @@ interface MainLayoutProps {
 import { useGlobalScanner } from "../hooks/useGlobalScanner";
 
 export default function MainLayout({ currentUser, onLogout }: MainLayoutProps) {
-  const [currentPath, setCurrentPath] = useState("/dashboard");
+  const [currentPath, setCurrentPath] = useState(currentUser.role === "mesero" ? "/mesero" : "/dashboard");
   const [checkoutData, setCheckoutData] = useState<any>(null);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
   // Oído Global NFC
   useGlobalScanner(currentPath);
+
+
 
   const [systemStatus, setSystemStatus] = useState<SystemStatus>({
     database: "loading",
@@ -105,6 +111,7 @@ export default function MainLayout({ currentUser, onLogout }: MainLayoutProps) {
 
   const handleNavigate = (path: string) => {
     setCurrentPath(path);
+    setIsMobileMenuOpen(false);
   };
 
   const handleCheckout = async (sessionId: number) => {
@@ -157,6 +164,58 @@ export default function MainLayout({ currentUser, onLogout }: MainLayoutProps) {
   };
 
   const renderContent = () => {
+    // Verificar permisos dinámicamente según la ruta
+    const moduleMap: Record<string, string> = {
+      "/dashboard": "dashboard",
+      "/operaciones": "operations",
+      "/pos": "pos",
+      "/pos/historial": "pos",
+      "/pos/caja": "pos",
+      "/mesero": "waiter",
+      "/clientes": "clients",
+      "/membresias": "memberships",
+      "/membresias/vender": "memberships",
+      "/membresias/renovar": "memberships",
+      "/membresias/gestion": "memberships",
+      "/cotizaciones": "quotations",
+      "/reservaciones": "reservations",
+      "/promociones": "promotions",
+      "/inventario": "inventory",
+      "/productos": "inventory",
+      "/proveedores": "inventory",
+      "/categorias": "inventory",
+      "/compras": "inventory",
+      "/insumos": "internal",
+      "/equipo": "internal",
+      "/reportes": "reports",
+      "/usuarios": "users",
+      "/configuracion": "settings",
+      "/configuracion/facturas": "settings",
+    };
+
+    const module = moduleMap[currentPath];
+    const hasPermission = (mod: string) => {
+      if (currentUser.role === "admin") return true;
+      return currentUser.permissions?.find((p: any) => p.module === mod)?.can_view;
+    };
+
+    if (module && !hasPermission(module)) {
+      return (
+        <div className="flex flex-col items-center justify-center h-full text-slate-500">
+          <X className="w-16 h-16 mb-4 opacity-20" />
+          <h2 className="text-xl font-bold">Acceso Denegado</h2>
+          <p>No tienes permisos para ver este módulo.</p>
+          <Button 
+            variant="outline" 
+            className="mt-4"
+            onClick={() => setCurrentPath(currentUser.role === "mesero" ? "/mesero" : "/dashboard")}
+          >
+            Ir al inicio
+          </Button>
+        </div>
+      );
+    }
+
     switch (currentPath) {
       case "/dashboard":
         return (
@@ -189,6 +248,8 @@ export default function MainLayout({ currentUser, onLogout }: MainLayoutProps) {
             onCheckoutComplete={() => setCheckoutData(null)}
           />
         );
+      case "/mesero":
+        return <WaiterPOS />;
       case "/pos/historial":
         return <SalesHistory />;
       case "/pos/caja":
@@ -242,16 +303,41 @@ export default function MainLayout({ currentUser, onLogout }: MainLayoutProps) {
   };
 
   return (
-    <div className="flex flex-col h-screen bg-background">
+    <div className="flex flex-col h-screen bg-background text-foreground">
+      {/* Mobile Top App Bar */}
+      <header className="md:hidden flex items-center justify-between p-4 bg-slate-950 border-b border-slate-800 z-40 relative shadow-sm">
+        <h1 className="text-xl font-bold tracking-tight text-white">SIPARK</h1>
+        <Button variant="ghost" size="icon" onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="text-white hover:bg-slate-800">
+          {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+        </Button>
+      </header>
+
       {/* Main Container */}
-      <div className="flex flex-1 overflow-hidden">
-        {/* Sidebar */}
-        <Sidebar
-          onNavigate={handleNavigate}
-          currentPath={currentPath}
-          onLogout={onLogout}
-          currentUser={currentUser}
-        />
+      <div className="flex flex-1 overflow-hidden relative">
+        {/* Sidebar Desktop */}
+        <div className="hidden md:flex h-full">
+          <Sidebar
+            onNavigate={handleNavigate}
+            currentPath={currentPath}
+            onLogout={onLogout}
+            currentUser={currentUser}
+          />
+        </div>
+
+        {/* Sidebar Mobile Overlay */}
+        {isMobileMenuOpen && (
+          <div className="absolute inset-0 z-50 bg-slate-950/80 backdrop-blur-sm md:hidden flex">
+            <div className="w-[80vw] max-w-sm h-full bg-slate-950 shadow-2xl flex flex-col animate-in slide-in-from-left">
+              <Sidebar
+                onNavigate={handleNavigate}
+                currentPath={currentPath}
+                onLogout={onLogout}
+                currentUser={currentUser}
+              />
+            </div>
+            <div className="flex-1" onClick={() => setIsMobileMenuOpen(false)} />
+          </div>
+        )}
 
         {/* Main Content */}
         <main className="flex-1 overflow-auto">{renderContent()}</main>

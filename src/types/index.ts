@@ -14,7 +14,7 @@ export interface User {
   id: string;
   name: string;
   email: string;
-  role: "admin" | "cajero" | "monitor";
+  role: "admin" | "cajero" | "monitor" | "mesero";
   permissions: string[];
 }
 
@@ -161,7 +161,7 @@ export interface SystemUser {
   email?: string;
   phone?: string;
   photo_path?: string;
-  role: "admin" | "gerente" | "cajero" | "monitor";
+  role: "admin" | "gerente" | "cajero" | "monitor" | "mesero";
   is_active: boolean;
   last_login?: string;
   created_at: string;

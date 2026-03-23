@@ -4,7 +4,6 @@ import {
   Plus,
   Edit,
   Trash2,
-  Hash,
   FileDown,
   FileText,
   Printer,
@@ -262,8 +261,9 @@ export function Products() {
         <Input placeholder="Buscar por nombre o código de barras..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full" />
       </div>
 
-      <Card className="mx-6 mb-6">
-        <table className="w-full">
+      <Card className="mx-6 mb-6 overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full">
           <thead className="bg-gray-50 border-b">
             <tr>
               <th className="px-4 py-3 text-left text-xs font-semibold">Nombre</th>
@@ -304,6 +304,7 @@ export function Products() {
             <p className="text-gray-500">No hay productos registrados</p>
           </div>
         )}
+        </div>
       </Card>
 
       {showModal && (

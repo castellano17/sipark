@@ -612,6 +612,27 @@ async function createTables() {
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (equipment_id) REFERENCES equipment(id),
       FOREIGN KEY (created_by) REFERENCES users(id)
+    )`,
+
+    `CREATE TABLE IF NOT EXISTS waiter_orders (
+      id SERIAL PRIMARY KEY,
+      table_or_client_name VARCHAR(255) NOT NULL,
+      subtotal DECIMAL(10,2) NOT NULL,
+      total DECIMAL(10,2) NOT NULL,
+      status VARCHAR(50) DEFAULT 'pending',
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )`,
+
+    `CREATE TABLE IF NOT EXISTS waiter_order_items (
+      id SERIAL PRIMARY KEY,
+      order_id INTEGER NOT NULL,
+      product_id INTEGER,
+      product_name VARCHAR(255) NOT NULL,
+      quantity INTEGER NOT NULL,
+      unit_price DECIMAL(10,2) NOT NULL,
+      subtotal DECIMAL(10,2) NOT NULL,
+      FOREIGN KEY (order_id) REFERENCES waiter_orders(id) ON DELETE CASCADE,
+      FOREIGN KEY (product_id) REFERENCES products_services(id)
     )`
   ];
 
@@ -832,8 +853,24 @@ function convertSqliteToPostgres(sql) {
   return pgSql;
 }
 
+// Función para asegurar que el pool esté inicializado
+async function checkPool() {
+  if (!pool) {
+    const config = getConfig();
+    pool = new Pool(config);
+    try {
+      await pool.query("SELECT 1");
+    } catch (err) {
+      console.error("❌ Fallo crítico de conexión a Postgres:", err.message);
+      pool = null;
+      throw err;
+    }
+  }
+}
+
 async function runAsync(sql, params = []) {
   try {
+    await checkPool();
     // Convertir sintaxis SQLite a PostgreSQL
     const pgSql = convertSqliteToPostgres(sql);
 
@@ -851,24 +888,28 @@ async function runAsync(sql, params = []) {
 
 async function getAsync(sql, params = []) {
   try {
+    await checkPool();
     // Convertir sintaxis SQLite a PostgreSQL
     const pgSql = convertSqliteToPostgres(sql);
 
     const result = await pool.query(pgSql, params);
     return result.rows[0] || null;
   } catch (error) {
+    console.error("Database query error:", error);
     throw error;
   }
 }
 
 async function allAsync(sql, params = []) {
   try {
+    await checkPool();
     // Convertir sintaxis SQLite a PostgreSQL
     const pgSql = convertSqliteToPostgres(sql);
 
     const result = await pool.query(pgSql, params);
     return result.rows || [];
   } catch (error) {
+    console.error("Database query error:", error);
     throw error;
   }
 }

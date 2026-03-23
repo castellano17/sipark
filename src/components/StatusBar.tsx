@@ -70,9 +70,9 @@ export const StatusBar: React.FC<StatusBarProps> = ({
   };
 
   return (
-    <footer className="h-10 bg-white border-t border-slate-200 flex items-center px-4 gap-4 text-xs overflow-x-auto">
+    <footer className="h-10 bg-white border-t border-slate-200 flex items-center px-2 sm:px-4 gap-2 sm:gap-4 text-xs overflow-x-auto scrollbar-hide">
       {/* Database Status */}
-      <div className="flex items-center gap-2 whitespace-nowrap">
+      <div className="hidden md:flex items-center gap-2 whitespace-nowrap">
         <div
           className={`w-2 h-2 rounded-full ${getStatusColor(status.database)}`}
         />
@@ -84,11 +84,16 @@ export const StatusBar: React.FC<StatusBarProps> = ({
       {/* User */}
       <div className="flex items-center gap-2 whitespace-nowrap">
         <User className="w-4 h-4 text-slate-600" />
-        <span className="text-slate-700">{currentUser}</span>
+        <span className="text-slate-700 font-medium truncate max-w-[100px] sm:max-w-none">{currentUser}</span>
+      </div>
+
+      {/* Database Dot (Mobile only) */}
+      <div className="flex md:hidden items-center gap-1">
+        <div className={`w-2 h-2 rounded-full ${getStatusColor(status.database)}`} title="Base de Datos" />
       </div>
 
       {/* Printer Status */}
-      <div className="flex items-center gap-2 whitespace-nowrap">
+      <div className="hidden lg:flex items-center gap-2 whitespace-nowrap">
         <div
           className={`w-2 h-2 rounded-full ${getStatusColor(status.printer)}`}
         />
@@ -98,7 +103,7 @@ export const StatusBar: React.FC<StatusBarProps> = ({
       </div>
 
       {/* Cash Box Status */}
-      <div className="flex items-center gap-2 whitespace-nowrap">
+      <div className="hidden md:flex items-center gap-2 whitespace-nowrap">
         <div
           className={`w-2 h-2 rounded-full ${getStatusColor(status.cashBox)}`}
         />
@@ -108,7 +113,7 @@ export const StatusBar: React.FC<StatusBarProps> = ({
       </div>
 
       {/* Cash Drawer Status */}
-      <div className="flex items-center gap-2 whitespace-nowrap">
+      <div className="hidden lg:flex items-center gap-2 whitespace-nowrap">
         <div
           className={`w-2 h-2 rounded-full ${
             status.drawer === "loading"
@@ -129,7 +134,7 @@ export const StatusBar: React.FC<StatusBarProps> = ({
       </div>
 
       {/* NFC Reader Status */}
-      <div className="flex items-center gap-2 whitespace-nowrap">
+      <div className="hidden sm:flex items-center gap-2 whitespace-nowrap">
         <div
           className={`w-2 h-2 rounded-full ${
             status.nfcReaders > 0 ? "bg-emerald-500" : "bg-amber-500"
@@ -137,14 +142,17 @@ export const StatusBar: React.FC<StatusBarProps> = ({
         />
         <span className="text-slate-700">
           NFC:{" "}
+          <span className="hidden lg:inline">
           {status.nfcReaders > 0
             ? `${status.nfcReaders} lector${status.nfcReaders > 1 ? "es" : ""}`
             : "No detectado"}
+          </span>
+          <span className="inline lg:hidden">{status.nfcReaders > 0 ? "OK" : "No"}</span>
         </span>
       </div>
 
       {/* Separator */}
-      <div className="h-4 w-px bg-slate-300" />
+      <div className="hidden sm:block h-4 w-px bg-slate-300" />
 
       {/* Clock */}
       <div className="flex items-center gap-2 whitespace-nowrap">

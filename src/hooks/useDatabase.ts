@@ -65,6 +65,7 @@ declare global {
         packageId: number,
         durationMinutes: number,
         isPaid?: boolean,
+        childrenCount?: number,
       ) => Promise<any>;
       startTimerSession: (sessionId: number) => Promise<boolean>;
       updateSessionPaidStatus: (
@@ -433,6 +434,7 @@ export function useDatabase() {
       packageId: number,
       durationMinutes: number,
       isPaid: boolean = false,
+      childrenCount: number = 1,
     ) => {
       try {
         setLoading(true);
@@ -444,6 +446,7 @@ export function useDatabase() {
           packageId,
           durationMinutes,
           isPaid,
+          childrenCount,
         );
         return result;
       } catch (err) {

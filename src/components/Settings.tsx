@@ -58,6 +58,7 @@ export const Settings: React.FC = () => {
   const [currency, setCurrency] = useState("NIO");
   const [exchangeRate, setExchangeRate] = useState("1.00");
   const [nfcEntryPrice, setNfcEntryPrice] = useState("100.00");
+  const [extraMinutePrice, setExtraMinutePrice] = useState("1.00");
 
   // Contabilidad
   const [enableTax, setEnableTax] = useState(false);
@@ -188,6 +189,9 @@ export const Settings: React.FC = () => {
               break;
             case "nfc_entry_price":
               setNfcEntryPrice(setting.value);
+              break;
+            case "extra_minute_price":
+              setExtraMinutePrice(setting.value);
               break;
             case "enable_tax":
               setEnableTax(setting.value === "true");
@@ -381,6 +385,7 @@ export const Settings: React.FC = () => {
       await setSetting("currency_primary", currency);
       await setSetting("exchange_rate", exchangeRate);
       await setSetting("nfc_entry_price", nfcEntryPrice.toString());
+      await setSetting("extra_minute_price", extraMinutePrice.toString());
       success("Configuración de operaciones guardada correctamente");
     } catch (err) {
       errorNotification("Error al guardar la configuración");
@@ -450,22 +455,26 @@ export const Settings: React.FC = () => {
         onValueChange={setActiveTab}
         className="flex-1 flex flex-col"
       >
-        <TabsList className="grid w-full grid-cols-4 bg-slate-100">
-          <TabsTrigger value="empresa" className="gap-2">
+        <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 bg-slate-100 h-auto">
+          <TabsTrigger value="empresa" className="gap-2 py-2">
             <Building2 className="w-4 h-4" />
             <span className="hidden sm:inline">Empresa</span>
+            <span className="sm:hidden text-xs">Empresa</span>
           </TabsTrigger>
-          <TabsTrigger value="operaciones" className="gap-2">
+          <TabsTrigger value="operaciones" className="gap-2 py-2">
             <SettingsIcon className="w-4 h-4" />
             <span className="hidden sm:inline">Operaciones</span>
+            <span className="sm:hidden text-xs">Oper.</span>
           </TabsTrigger>
-          <TabsTrigger value="contabilidad" className="gap-2">
+          <TabsTrigger value="contabilidad" className="gap-2 py-2">
             <Calculator className="w-4 h-4" />
-            <span className="hidden sm:inline">Contabilidad</span>
+            <span className="hidden sm:inline">Contabilid.</span>
+            <span className="sm:hidden text-xs">Contab.</span>
           </TabsTrigger>
-          <TabsTrigger value="hardware" className="gap-2">
+          <TabsTrigger value="hardware" className="gap-2 py-2">
             <HardDrive className="w-4 h-4" />
             <span className="hidden sm:inline">Hardware</span>
+            <span className="sm:hidden text-xs">Hardw.</span>
           </TabsTrigger>
         </TabsList>
 
@@ -797,6 +806,23 @@ export const Settings: React.FC = () => {
                       className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       placeholder="100.00"
                     />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-900 mb-2">
+                      Precio de Minuto Extra
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={extraMinutePrice}
+                      onChange={(e) => setExtraMinutePrice(e.target.value)}
+                      className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="1.00"
+                    />
+                    <p className="text-xs text-slate-500 mt-1 italic">
+                      Se cobrará por cada minuto adicional al terminar el paquete.
+                    </p>
                   </div>
                 </div>
 

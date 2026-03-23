@@ -14,6 +14,7 @@ import {
   Calendar,
   FileText,
   Gift,
+  Utensils,
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { cn } from "@/lib/utils";
@@ -140,6 +141,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
           label: "Nueva Venta",
           icon: <CreditCard className="w-4 h-4" />,
           path: "/pos",
+        },
+        {
+          id: "pos-mesero",
+          label: "Toma de Pedidos",
+          icon: <Utensils className="w-4 h-4" />,
+          path: "/mesero",
         },
         {
           id: "pos-historial",
@@ -320,98 +327,104 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       {/* Menu Items */}
       <nav className="flex-1 overflow-y-auto p-2 space-y-1">
-        {menuItems
-          .filter((item) => {
-            // Mapeo de IDs de menú a módulos de permisos
-            const moduleMap: Record<string, string> = {
-              dashboard: "dashboard",
-              operaciones: "operations",
-              membresias: "memberships",
-              pos: "pos",
-              clientes: "clients",
-              reservaciones: "reservations",
-              cotizaciones: "quotations",
-              inventario: "inventory",
-              "inventario-interno": "internal",
-              reportes: "reports",
-              configuracion: "settings",
-              usuarios: "users",
-              promociones: "promotions",
-            };
+        {(() => {
+          // Mapeo de IDs de menú a módulos de permisos
+          const moduleMap: Record<string, string> = {
+            dashboard: "dashboard",
+            operaciones: "operations",
+            membresias: "memberships",
+            pos: "pos",
+            clientes: "clients",
+            reservaciones: "reservations",
+            cotizaciones: "quotations",
+            inventario: "inventory",
+            "inventario-interno": "internal",
+            reportes: "reports",
+            configuracion: "settings",
+            usuarios: "users",
+            promociones: "promotions",
+            "pos-mesero": "waiter",
+          };
 
-            const module = moduleMap[item.id];
-            return module ? hasPermission(module) : true;
-          })
-          .map((item) => {
-            const isActive = currentPath === item.path;
-            const isExpanded = expandedMenus.includes(item.id);
-            const hasChildren = item.children && item.children.length > 0;
+          return menuItems
+            .filter((item) => {
+              const module = moduleMap[item.id];
+              return module ? hasPermission(module) : true;
+            })
+            .map((item) => {
+              const isActive = currentPath === item.path;
+              const isExpanded = expandedMenus.includes(item.id);
+              const hasChildren = item.children && item.children.length > 0;
 
-            return (
-              <div key={item.id}>
-                <Button
-                  variant="sidebar"
-                  className={cn(
-                    "w-full justify-start gap-3 transition-all duration-200",
-                    isCollapsed && "justify-center",
-                    isActive
-                      ? "bg-slate-800 text-blue-400 border-l-2 border-blue-500"
-                      : "",
+              return (
+                <div key={item.id}>
+                  <Button
+                    variant="sidebar"
+                    className={cn(
+                      "w-full justify-start gap-3 transition-all duration-200",
+                      isCollapsed && "justify-center",
+                      isActive
+                        ? "bg-slate-800 text-blue-400 border-l-2 border-blue-500"
+                        : "",
+                    )}
+                    onClick={() => {
+                      if (hasChildren && !isCollapsed) {
+                        toggleMenu(item.id);
+                      } else if (item.path) {
+                        onNavigate(item.path);
+                      }
+                    }}
+                    title={isCollapsed ? item.label : undefined}
+                  >
+                    {item.icon}
+                    {!isCollapsed && (
+                      <>
+                        <span className="text-sm flex-1 text-left">
+                          {item.label}
+                        </span>
+                        {hasChildren && (
+                          <ChevronRight
+                            className={cn(
+                              "w-4 h-4 transition-transform",
+                              isExpanded && "rotate-90",
+                            )}
+                          />
+                        )}
+                      </>
+                    )}
+                  </Button>
+
+                  {/* Submenú */}
+                  {hasChildren && isExpanded && !isCollapsed && (
+                    <div className="ml-4 mt-1 space-y-1">
+                      {item.children?.filter(child => {
+                        const module = moduleMap[child.id];
+                        return module ? hasPermission(module) : true;
+                      }).map((child) => {
+                        const isChildActive = currentPath === child.path;
+                        return (
+                          <Button
+                            key={child.id}
+                            variant="sidebar"
+                            className={cn(
+                              "w-full justify-start gap-2 text-xs transition-all duration-200",
+                              isChildActive
+                                ? "bg-slate-800 text-blue-400"
+                                : "text-slate-400",
+                            )}
+                            onClick={() => child.path && onNavigate(child.path)}
+                          >
+                            {child.icon}
+                            <span>{child.label}</span>
+                          </Button>
+                        );
+                      })}
+                    </div>
                   )}
-                  onClick={() => {
-                    if (hasChildren && !isCollapsed) {
-                      toggleMenu(item.id);
-                    } else if (item.path) {
-                      onNavigate(item.path);
-                    }
-                  }}
-                  title={isCollapsed ? item.label : undefined}
-                >
-                  {item.icon}
-                  {!isCollapsed && (
-                    <>
-                      <span className="text-sm flex-1 text-left">
-                        {item.label}
-                      </span>
-                      {hasChildren && (
-                        <ChevronRight
-                          className={cn(
-                            "w-4 h-4 transition-transform",
-                            isExpanded && "rotate-90",
-                          )}
-                        />
-                      )}
-                    </>
-                  )}
-                </Button>
-
-                {/* Submenú */}
-                {hasChildren && isExpanded && !isCollapsed && (
-                  <div className="ml-4 mt-1 space-y-1">
-                    {item.children?.map((child) => {
-                      const isChildActive = currentPath === child.path;
-                      return (
-                        <Button
-                          key={child.id}
-                          variant="sidebar"
-                          className={cn(
-                            "w-full justify-start gap-2 text-xs transition-all duration-200",
-                            isChildActive
-                              ? "bg-slate-800 text-blue-400"
-                              : "text-slate-400",
-                          )}
-                          onClick={() => child.path && onNavigate(child.path)}
-                        >
-                          {child.icon}
-                          <span>{child.label}</span>
-                        </Button>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            );
-          })}
+                </div>
+              );
+            });
+        })()}
       </nav>
 
       {/* Footer - Logout */}

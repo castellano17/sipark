@@ -12,7 +12,8 @@ const AVAILABLE_MODULES = [
   "clients",
   "inventory",
   "reports",
-  "settings",
+  "promotions",
+  "waiter",
   "users", // Solo admin
 ];
 
@@ -85,11 +86,32 @@ async function authenticateUser(username, password) {
       [user.id],
     );
 
-    // Obtener permisos
-    const permissions = await allAsync(
-      "SELECT * FROM user_permissions WHERE user_id = ?",
+    // Obtener permisos existentes
+    let permissions = await allAsync(
+      "SELECT * FROM user_permissions WHERE user_id = $1",
       [user.id],
     );
+
+    // AUTO-REPARAR: Si faltan módulos en los permisos del usuario (módulos nuevos)
+    const existingModules = permissions.map(p => p.module);
+    const missingModules = AVAILABLE_MODULES.filter(m => !existingModules.includes(m));
+
+    if (missingModules.length > 0) {
+      for (const module of missingModules) {
+        // Si el usuario es admin, le damos permiso total por defecto al nuevo módulo
+        const isDefaultTrue = user.role === 'admin' || user.role === 'gerente';
+        await runAsync(
+          `INSERT INTO user_permissions (user_id, module, can_view, can_create, can_edit, can_delete, can_open_drawer)
+           VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+          [user.id, module, isDefaultTrue, isDefaultTrue, isDefaultTrue, isDefaultTrue, false]
+        );
+      }
+      // Recargar permisos después de reparar
+      permissions = await allAsync(
+        "SELECT * FROM user_permissions WHERE user_id = $1",
+        [user.id],
+      );
+    }
 
     // No devolver el password
     delete user.password;

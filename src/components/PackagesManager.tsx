@@ -258,32 +258,34 @@ export const PackagesManager: React.FC = () => {
   return (
     <div className="flex flex-col h-full gap-6 p-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-semibold text-slate-900">
+          <h1 className="text-2xl md:text-3xl font-semibold text-slate-900">
             Gestión de Paquetes
           </h1>
           <p className="text-slate-600 mt-1">
             {packages.length} paquete(s) disponible(s)
           </p>
         </div>
-        <div className="flex gap-3">
+        <div className="flex flex-wrap sm:flex-nowrap gap-3 w-full md:w-auto">
           <Button
             onClick={() => setShowFeaturesManager(true)}
-            size="lg"
+            size="default"
             variant="outline"
-            className="gap-2"
+            className="flex-1 md:flex-none gap-2"
           >
             <Settings className="w-5 h-5" />
-            Gestionar Características
+            <span className="hidden sm:inline">Gestionar Características</span>
+            <span className="sm:hidden">Características</span>
           </Button>
           <Button
             onClick={abrirModalCrear}
-            size="lg"
-            className="gap-2 bg-blue-600 hover:bg-blue-700"
+            size="default"
+            className="flex-1 md:flex-none gap-2 bg-blue-600 hover:bg-blue-700"
           >
             <Plus className="w-5 h-5" />
-            Nuevo Paquete
+            <span className="hidden sm:inline">Nuevo Paquete</span>
+            <span className="sm:hidden">Nuevo</span>
           </Button>
         </div>
       </div>
@@ -407,7 +409,7 @@ export const PackagesManager: React.FC = () => {
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Precio */}
               <div>
                 <label className="block text-sm font-semibold text-slate-900 mb-2">

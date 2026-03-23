@@ -102,12 +102,18 @@ export function Users() {
       label: "Monitor",
       color: "bg-green-100 text-green-800",
     },
+    {
+      value: "mesero",
+      label: "Mesero",
+      color: "bg-orange-100 text-orange-800",
+    },
   ];
 
   const modules = [
     { id: "dashboard",        name: "Dashboard" },
     { id: "operations",       name: "Operaciones" },
     { id: "pos",              name: "Punto de Venta",   hasDrawer: true },
+    { id: "waiter",           name: "Toma de Pedidos (Mesero)" },
     { id: "clients",          name: "Clientes" },
     { id: "memberships",      name: "Membresías" },
     { id: "quotations",       name: "Cotizaciones" },
@@ -381,7 +387,7 @@ export function Users() {
     <div className="h-full flex flex-col bg-gray-50">
       {/* Header */}
       <div className="bg-white border-b px-6 py-4">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">
               Gestión de Usuarios
@@ -390,16 +396,16 @@ export function Users() {
               Control de acceso y permisos del sistema
             </p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 w-full md:w-auto flex-wrap">
             <Button
               onClick={handleOpenAudit}
               variant="outline"
-              className="gap-2"
+              className="gap-2 flex-1 md:flex-none"
             >
               <FileText className="w-4 h-4" />
               Auditoría
             </Button>
-            <Button onClick={() => handleOpenModal()} className="gap-2">
+            <Button onClick={() => handleOpenModal()} className="gap-2 flex-1 md:flex-none">
               <Plus className="w-4 h-4" />
               Nuevo Usuario
             </Button>
@@ -408,9 +414,10 @@ export function Users() {
       </div>
 
       {/* Users Table */}
-      <div className="flex-1 overflow-auto p-6">
-        <Card>
-          <table className="w-full">
+      <div className="flex-1 p-4 md:p-6 pb-20 md:pb-6">
+        <Card className="overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full">
             <thead className="bg-gray-50 border-b">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-semibold">
@@ -541,6 +548,7 @@ export function Users() {
               <p className="text-gray-500">No hay usuarios registrados</p>
             </div>
           )}
+        </div>
         </Card>
       </div>
 
@@ -764,8 +772,9 @@ export function Users() {
                 </div>
               </div>
 
-              <div className="flex-1 overflow-auto p-6">
-                <table className="w-full">
+              <div className="flex-1 overflow-auto p-4 md:p-6">
+                <div className="overflow-x-auto">
+                  <table className="w-full">
                   <thead className="bg-gray-50 border-b">
                     <tr>
                       <th className="px-4 py-3 text-left text-sm font-semibold">
@@ -850,6 +859,7 @@ export function Users() {
                     ))}
                   </tbody>
                 </table>
+                </div>
               </div>
 
               <div className="p-6 border-t bg-gray-50 flex justify-end gap-3">

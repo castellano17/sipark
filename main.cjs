@@ -17,6 +17,66 @@ const reservationsApi = require("./src-electron/reservations-api.cjs");
 const nfcApi = require("./src-electron/nfc-api.cjs");
 const promotionsApi = require("./src-electron/promotions-api.cjs");
 
+// =========== SERVIDOR LOCAL WIFI (EXPRESS) ===========
+const express = require('express');
+const cors = require('cors');
+
+// Interceptar ipcMain.handle para poder usarlos en el backend de Express
+const registeredHandlers = {};
+const originalHandle = ipcMain.handle.bind(ipcMain);
+ipcMain.handle = function(channel, listener) {
+  registeredHandlers[channel] = listener;
+  return originalHandle(channel, listener);
+};
+
+function startLocalServer() {
+  try {
+    const server = express();
+    server.use(cors());
+    server.use(express.json({ limit: '50mb' }));
+
+    // Endpoint universal que conecta fetch() de la web con ipcMain de Electron
+    server.post('/api/rpc/:method', async (req, res) => {
+      // El frontend mandará el método sin 'api:', se lo agregamos
+      const channel = "api:" + req.params.method;
+      const args = req.body.args || [];
+      const handler = registeredHandlers[channel];
+      
+      if (handler) {
+        try {
+          // Inyectamos un objeto evento vacío como primer parámetro, igual que Electron
+          const mockEvent = { sender: null };
+          const result = await handler(mockEvent, ...args);
+          res.json({ success: true, data: result });
+        } catch (err) {
+          console.error(`[RPC Error] ${channel}:`, err);
+          res.status(500).json({ success: false, error: err.message });
+        }
+      } else {
+        res.status(404).json({ success: false, error: 'Endpoint no encontrado: ' + channel });
+      }
+    });
+
+    // Servir archivos estáticos del build de React (la carpeta 'dist')
+    const distPath = path.join(__dirname, 'dist');
+    server.use(express.static(distPath));
+
+    // Fallback para React Router (usando middleware global en vez de '*')
+    server.use((req, res) => res.sendFile(path.join(distPath, 'index.html')));
+
+    // El puerto 80 es el puerto por defecto de internet, por lo que desaparece de la URL (no hay que escribir :80 ni :9595)
+    // En desarrollo (isDev) mantenemos 9595 porque Mac/Linux bloquean el puerto 80 sin permisos sudo.
+    // NOTA PARA WINDOWS: Si el .exe falla al abrir, es porque otro programa (ej. Skype/XAMPP/IIS) ya usa el puerto 80.
+    const HTTP_PORT = isDev ? 9595 : 80;
+    server.listen(HTTP_PORT, '0.0.0.0', () => {
+      console.log(`✅ Servidor de RED LOCAL activado en http://LOCAL_IP:${HTTP_PORT}`);
+    });
+  } catch(e) {
+    console.error("Error iniciando servidor Express:", e.message);
+  }
+}
+// =====================================================
+
 // Hot reload en desarrollo
 if (isDev) {
   try {
@@ -129,6 +189,9 @@ app.on("ready", async () => {
 
     setupIpcHandlers();
     createWindow();
+
+    // Iniciar Servidor Red Local
+    startLocalServer();
 
     // Iniciar programador de respaldos automáticos
     // TODO: Implementar backups para PostgreSQL
@@ -678,6 +741,20 @@ function setupIpcHandlers() {
   );
   ipcMain.handle("api:getSaleWithItems", (event, saleId) =>
     api.getSaleWithItems(saleId),
+  );
+
+  // Waiter Orders
+  ipcMain.handle("api:createWaiterOrder", (event, orderData) =>
+    api.createWaiterOrder(orderData),
+  );
+  ipcMain.handle("api:getPendingWaiterOrders", () =>
+    api.getPendingWaiterOrders(),
+  );
+  ipcMain.handle("api:updateWaiterOrderStatus", (event, data) =>
+    api.updateWaiterOrderStatus(data.orderId, data.status),
+  );
+  ipcMain.handle("api:deleteWaiterOrder", (event, orderId) =>
+    api.deleteWaiterOrder(orderId),
   );
 
   // Inventory

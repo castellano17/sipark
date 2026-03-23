@@ -6,7 +6,7 @@ import { Input } from "./ui/input";
 import { Dialog } from "./ui/dialog";
 import { useNotification } from "../hooks/useNotification";
 import { useReportExport } from "../hooks/useReportExport";
-import { usePermissions } from "../hooks/usePermissions";
+
 
 interface EquipmentCategory {
   id: number;
@@ -241,7 +241,7 @@ export function EquipmentInventory() {
   return (
     <div className="h-full flex flex-col bg-gray-50">
       <div className="bg-white border-b px-6 py-4">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold text-gray-900 border-l-4 border-indigo-500 pl-3">
               Mobiliario y Equipos
@@ -250,8 +250,8 @@ export function EquipmentInventory() {
               Gestión de activos internos (Muebles, Electrónicos, Enseres)
             </p>
           </div>
-          <div className="flex gap-2 items-center flex-wrap justify-end">
-            <div className="flex gap-2 mr-4 border-r pr-4">
+          <div className="flex gap-2 items-center flex-wrap md:justify-end w-full md:w-auto">
+            <div className="flex gap-2 mr-2 md:mr-4 border-r pr-2 md:pr-4">
               <Button variant="outline" size="sm" onClick={() => exportToExcel(reportConfig())} title="Exportar a Excel">
                 <FileDown className="w-4 h-4 text-indigo-600" />
               </Button>
@@ -304,9 +304,10 @@ export function EquipmentInventory() {
       </div>
 
       <div className="flex-1 overflow-auto p-6">
-        <Card className="shadow-sm">
-          <table className="w-full">
-            <thead className="bg-gray-50 border-b">
+        <Card className="shadow-sm overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gray-50 border-b">
               <tr>
                 <th className="px-4 py-3 text-left text-xs font-semibold">Cód. Barras</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold">Equipo</th>
@@ -382,6 +383,7 @@ export function EquipmentInventory() {
               )}
             </tbody>
           </table>
+          </div>
         </Card>
       </div>
 

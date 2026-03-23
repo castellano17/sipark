@@ -691,4 +691,14 @@ contextBridge.exposeInMainWorld("api", {
   updateQuotationStatus: (id, status) =>
     ipcRenderer.invoke("api:updateQuotationStatus", { id, status }),
   deleteQuotation: (id) => ipcRenderer.invoke("api:deleteQuotation", id),
+
+  // Waiter Orders (POS Mesero)
+  createWaiterOrder: (orderData) =>
+    ipcRenderer.invoke("api:createWaiterOrder", orderData),
+  getPendingWaiterOrders: () =>
+    ipcRenderer.invoke("api:getPendingWaiterOrders"),
+  updateWaiterOrderStatus: (data) =>
+    ipcRenderer.invoke("api:updateWaiterOrderStatus", data),
+  deleteWaiterOrder: (orderId) =>
+    ipcRenderer.invoke("api:deleteWaiterOrder", orderId),
 });

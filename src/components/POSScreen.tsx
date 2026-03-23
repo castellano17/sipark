@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Search, Scan, User, Trash2, Plus, Minus, CreditCard, Wifi } from "lucide-react";
+import { Search, Scan, User, Trash2, Plus, Minus, CreditCard, Wifi, Utensils } from "lucide-react";
 import { Button } from "./ui/button";
 import { Card } from "./ui/card";
 import { Input } from "./ui/input";
@@ -11,6 +11,7 @@ import { useCashBox } from "../hooks/useCashBox";
 import { usePermissions } from "../hooks/usePermissions";
 import { ClientSelectorModal } from "./ClientSelectorModal";
 import { PaymentModal } from "./PaymentModal";
+import { PendingOrdersModal } from "./PendingOrdersModal";
 import type {
   ProductService,
   SaleItem,
@@ -60,6 +61,7 @@ export function POSScreen({
   const [cashBoxOpen, setCashBoxOpen] = useState(false);
   const [isCheckingCashBox, setIsCheckingCashBox] = useState(true);
   const [activeSessionId, setActiveSessionId] = useState<number | null>(null);
+  const [isMobileCartOpen, setIsMobileCartOpen] = useState(false);
   // Voucher modal state
   const [voucherInfo, setVoucherInfo] = useState<any>(null);
   const [showVoucherModal, setShowVoucherModal] = useState(false);
@@ -71,6 +73,9 @@ export function POSScreen({
     total: 0,
   });
   const [isCheckIn, setIsCheckIn] = useState(false);
+  // Waiter pending orders
+  const [showPendingOrders, setShowPendingOrders] = useState(false);
+  const [activeWaiterOrderId, setActiveWaiterOrderId] = useState<number | null>(null);
 
   // NFC state
   type NfcMode = 'charge' | 'recharge' | null;
@@ -103,15 +108,16 @@ export function POSScreen({
 
   // Manejar datos de checkout (cuando viene desde TimingDashboard)
   useEffect(() => {
-    if (checkoutData && products.length > 0 && cashBoxOpen) {
-      const product = products.find((p) => p.id === checkoutData.packageId);
-      
-      setActiveSessionId(checkoutData.sessionId);
-      setIsCheckIn(!!checkoutData.isCheckIn);
+    const processCheckout = async () => {
+      if (checkoutData && products.length > 0 && cashBoxOpen) {
+        const product = products.find((p) => p.id === checkoutData.packageId);
+        
+        setActiveSessionId(checkoutData.sessionId);
+        setIsCheckIn(!!checkoutData.isCheckIn);
 
-      setCurrentSale((prev) => {
         let updatedItems: SaleItem[] = [];
         
+        // 1. Añadir el paquete base (si no está pagado)
         if (product && !checkoutData.isPaid) {
           updatedItems.push({
             id: crypto.randomUUID(),
@@ -119,12 +125,14 @@ export function POSScreen({
             product_name: product.name,
             product_type: product.type,
             quantity: 1,
-            unit_price: product.price,
-            subtotal: product.price,
+            unit_price: Number(product.price),
+            subtotal: Number(product.price),
             duration_minutes: product.duration_minutes,
           });
         }
 
+        // 2. Calcular Tiempo Extra
+        let extraMins = 0;
         if (checkoutData.startTime && checkoutData.durationMinutes) {
           const start = new Date(checkoutData.startTime);
           const duration = checkoutData.durationMinutes;
@@ -132,35 +140,45 @@ export function POSScreen({
           const now = new Date();
           
           if (now > end) {
-            const extraMins = Math.floor((now.getTime() - end.getTime()) / 60000);
+            extraMins = Math.floor((now.getTime() - end.getTime()) / 60000);
             if (extraMins > 0) {
+              // Obtener precio por minuto extra de los ajustes
+              const extraPriceStr = await (window as any).api.getSetting('extra_minute_price');
+              const extraPricePerMin = parseFloat(extraPriceStr || "1.0");
+              const totalExtraPrice = extraMins * extraPricePerMin;
+
               updatedItems.push({
                 id: crypto.randomUUID(),
                 product_id: -1, 
                 product_name: `Tiempo Extra (${extraMins} min)`,
                 product_type: "time",
                 quantity: 1,
-                unit_price: 0,
-                subtotal: 0,
+                unit_price: extraPricePerMin,
+                subtotal: totalExtraPrice,
               });
-              warning(`Se han detectado ${extraMins} minutos de tiempo extra.`);
+              
+              // Disparamos la alerta fuera del render
+              warning(`¡Tiempo Excedido! ${extraMins} min extra registrados.`);
             }
           }
         }
 
         const subtotal = updatedItems.reduce((sum, item) => sum + item.subtotal, 0);
-        return {
+        
+        setCurrentSale((prev) => ({
           ...prev,
           client_id: checkoutData.clientId,
           client_name: checkoutData.clientName,
           items: updatedItems,
           subtotal,
           total: Math.max(0, subtotal - prev.discount),
-        };
-      });
+        }));
 
-      if (onCheckoutComplete) onCheckoutComplete();
-    }
+        if (onCheckoutComplete) onCheckoutComplete();
+      }
+    };
+
+    processCheckout();
   }, [checkoutData, products, cashBoxOpen, onCheckoutComplete, warning]);
 
   const loadProducts = async () => {
@@ -478,6 +496,7 @@ export function POSScreen({
       total: 0,
     });
     setActiveSessionId(null); // Limpiar sessionId también
+    setActiveWaiterOrderId(null); // Limpiar waiter order también
   };
 
   const handleSelectClient = (client: Client) => {
@@ -487,6 +506,34 @@ export function POSScreen({
       client_name: client.name,
     });
     setShowClientSelector(false);
+  };
+
+  // Cargar un pedido pendiente del mesero al carrito del cajero
+  const handleLoadPendingOrder = (order: any) => {
+    if (!cashBoxOpen) {
+      warning("Debe abrir la caja antes de cargar un pedido pendiente.");
+      return;
+    }
+    const items: SaleItem[] = order.items.map((item: any) => ({
+      id: crypto.randomUUID(),
+      product_id: item.product_id ?? -1,
+      product_name: item.product_name,
+      product_type: item.product_type || "service",
+      quantity: item.quantity,
+      unit_price: parseFloat(item.unit_price),
+      subtotal: parseFloat(item.subtotal),
+    }));
+    const subtotal = items.reduce((sum: number, i: SaleItem) => sum + i.subtotal, 0);
+    setCurrentSale({
+      items,
+      subtotal,
+      discount: 0,
+      total: subtotal,
+      client_name: order.table_or_client_name,
+    });
+    setActiveWaiterOrderId(order.id);
+    setShowPendingOrders(false);
+    success(`Pedido "${order.table_or_client_name}" cargado al carrito`);
   };
 
   // Procesar pago
@@ -554,6 +601,14 @@ export function POSScreen({
         } catch { /* silencioso en producción */ }
       }
 
+      // Si vino de un pedido de mesero, marcarlo como completado
+      if (activeWaiterOrderId) {
+        try {
+          await (window as any).api.updateWaiterOrderStatus({ orderId: activeWaiterOrderId, status: 'completed' });
+          setActiveWaiterOrderId(null);
+        } catch { /* silencioso */ }
+      }
+
       // Imprimir ticket
       await printTicket({
         saleId,
@@ -592,7 +647,7 @@ export function POSScreen({
       )}
 
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <h1 className="text-2xl font-bold">Punto de Venta</h1>
           {!isCheckingCashBox && (
@@ -607,42 +662,56 @@ export function POSScreen({
             )
           )}
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap md:flex-nowrap gap-2">
           {canOpenDrawer("pos") && (
             <Button
               variant="outline"
-              className="gap-2 bg-slate-100 font-semibold text-slate-700 hover:bg-slate-200"
+              className="flex-1 md:flex-none gap-2 bg-slate-100 font-semibold text-slate-700 hover:bg-slate-200"
               onClick={() => openDrawer("Apertura manual desde Punto de Venta")}
               disabled={!cashBoxOpen}
               title="Abrir cajón de dinero manualmente"
             >
-              💰 Abrir Cajón
+              💰 <span className="hidden md:inline">Abrir Cajón</span>
             </Button>
           )}
+          {/* Pedidos Pendientes de Meseros */}
+          <Button
+            variant="outline"
+            className="flex-1 md:flex-none gap-2 border-orange-400 text-orange-700 hover:bg-orange-50 font-semibold relative"
+            onClick={() => setShowPendingOrders(true)}
+            disabled={!cashBoxOpen}
+            title="Ver pedidos pendientes de los meseros"
+          >
+            <Utensils className="w-4 h-4" />
+            <span className="hidden md:inline">Pedidos Mesas</span>
+            {activeWaiterOrderId && (
+              <span className="absolute -top-1.5 -right-1.5 bg-orange-500 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center">1</span>
+            )}
+          </Button>
           {/* NFC Buttons */}
           <Button
             variant="outline"
-            className="gap-2 border-purple-400 text-purple-700 hover:bg-purple-50 font-semibold"
+            className="flex-1 md:flex-none gap-2 border-purple-400 text-purple-700 hover:bg-purple-50 font-semibold"
             onClick={() => openNfcModal('charge')}
             disabled={!cashBoxOpen}
             title="Cobrar entrada con tarjeta NFC"
           >
             <Wifi className="w-4 h-4" />
-            Cobrar NFC
+            <span className="hidden md:inline">Cobrar NFC</span>
           </Button>
           <Button
             variant="outline"
-            className="gap-2 border-blue-400 text-blue-700 hover:bg-blue-50 font-semibold"
+            className="flex-1 md:flex-none gap-2 border-blue-400 text-blue-700 hover:bg-blue-50 font-semibold"
             onClick={() => openNfcModal('recharge')}
             disabled={!cashBoxOpen}
             title="Recargar membresía con tarjeta NFC"
           >
             <CreditCard className="w-4 h-4" />
-            Recargar NFC
+            <span className="hidden md:inline">Recargar NFC</span>
           </Button>
           <Button
             variant="outline"
-            className="gap-2"
+            className="w-full md:w-auto gap-2"
             onClick={() => setShowClientSelector(true)}
             disabled={!cashBoxOpen}
           >
@@ -653,11 +722,11 @@ export function POSScreen({
       </div>
 
       {/* Búsqueda */}
-      <div className="flex gap-2">
+      <div className="flex flex-col sm:flex-row gap-2">
         <div className="flex-1 relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <Input
-            placeholder="Buscar producto por nombre..."
+            placeholder="Buscar producto..."
             value={searchQuery}
             onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
               setSearchQuery(e.target.value)
@@ -666,7 +735,7 @@ export function POSScreen({
             disabled={!cashBoxOpen}
           />
         </div>
-        <div className="w-64 relative">
+        <div className="w-full sm:w-64 relative">
           <Scan className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <Input
             ref={barcodeInputRef}
@@ -719,9 +788,9 @@ export function POSScreen({
       </div>
 
       {/* Contenido Principal */}
-      <div className="flex-1 flex gap-4 overflow-hidden">
+      <div className="flex-1 flex gap-4 overflow-hidden relative">
         {/* Grid de Productos */}
-        <div className="flex-1 overflow-auto">
+        <div className="flex-1 overflow-auto pb-24 md:pb-0">
           {!cashBoxOpen ? (
             <div className="flex items-center justify-center h-full">
               <div className="text-center text-gray-400">
@@ -733,11 +802,11 @@ export function POSScreen({
               </div>
             </div>
           ) : (
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
               {filteredProducts.map((product) => (
                 <Card
                   key={product.id}
-                  className="p-4 cursor-pointer hover:bg-gray-50 transition-colors"
+                  className="p-3 sm:p-4 cursor-pointer hover:bg-gray-50 transition-colors flex flex-col justify-between"
                   onClick={() => addItemToSale(product)}
                 >
                   <div className="font-semibold text-sm mb-1">
@@ -762,8 +831,8 @@ export function POSScreen({
           )}
         </div>
 
-        {/* Ticket Actual */}
-        <Card className="w-96 p-4 flex flex-col">
+        {/* Ticket Actual (Desktop) */}
+        <Card className="hidden md:flex w-96 p-4 flex-col">
           <h2 className="text-lg font-bold mb-4">Ticket Actual</h2>
 
           {/* Items */}
@@ -807,14 +876,14 @@ export function POSScreen({
                       <Plus className="w-3 h-3" />
                     </Button>
                   </div>
-                  <div className="w-16 text-right font-semibold">
+                  <div className="w-16 text-right font-semibold text-sm">
                     {formatCurrency(item.subtotal)}
                   </div>
                   <Button
                     size="sm"
                     variant="ghost"
                     onClick={() => removeItem(item.id)}
-                    className="h-6 w-6 p-0"
+                    className="h-6 w-6 p-0 text-red-500"
                   >
                     <Trash2 className="w-3 h-3" />
                   </Button>
@@ -857,7 +926,7 @@ export function POSScreen({
               Limpiar
             </Button>
             <Button
-              className="flex-1"
+              className="flex-1 bg-blue-600 hover:bg-blue-700 font-bold"
               disabled={currentSale.items.length === 0 || !cashBoxOpen}
               onClick={() => setShowPaymentModal(true)}
             >
@@ -865,9 +934,91 @@ export function POSScreen({
             </Button>
           </div>
         </Card>
+
+        {/* Floating Cart Button (Mobile) style "Rappi" / "UberEats" */}
+        {currentSale.items.length > 0 && cashBoxOpen && (
+          <div 
+            className="md:hidden absolute bottom-4 left-4 right-4 bg-blue-600 hover:bg-blue-700 text-white p-4 rounded-xl shadow-2xl flex items-center justify-between cursor-pointer active:scale-95 transition-transform" 
+            onClick={() => setIsMobileCartOpen(true)}
+          >
+            <div className="font-bold flex items-center gap-2">
+              <div className="bg-blue-700 px-3 py-1 rounded-full">{currentSale.items.reduce((acc, item) => acc + item.quantity, 0)}</div>
+              <span className="text-sm">Ver Carrito</span>
+            </div>
+            <div className="flex items-center gap-3 font-bold">
+              <span>{formatCurrency(currentSale.total)}</span>
+              <span className="bg-white text-blue-600 rounded-full w-6 h-6 flex items-center justify-center text-xs">&gt;</span>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Modales */}
+      {/* Mobile Cart Modal */}
+      {isMobileCartOpen && (
+        <div className="md:hidden fixed inset-0 z-50 bg-black/60 flex flex-col justify-end">
+          <div className="bg-white rounded-t-2xl w-full max-h-[85vh] flex flex-col animate-in slide-in-from-bottom-full duration-300">
+            <div className="p-4 border-b flex items-center justify-between">
+              <h2 className="text-xl font-bold">Resumen de Compra</h2>
+              <button 
+                onClick={() => setIsMobileCartOpen(false)}
+                className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 text-gray-500 font-bold"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="flex-1 overflow-auto p-4 space-y-3">
+              {currentSale.items.map((item) => (
+                <div key={item.id} className="flex items-center gap-2 p-3 bg-gray-50 rounded-xl">
+                  <div className="flex-1">
+                    <div className="font-bold text-sm text-gray-900">{item.product_name}</div>
+                    <div className="text-xs text-gray-500">{formatCurrency(item.unit_price)} c/u</div>
+                  </div>
+                  <div className="flex items-center gap-1 bg-white border rounded-lg p-1">
+                    <button onClick={() => updateQuantity(item.id, -1)} className="w-8 h-8 rounded hover:bg-gray-100 flex items-center justify-center text-gray-700 font-bold">-</button>
+                    <span className="w-6 text-center text-sm font-bold">{item.quantity}</span>
+                    <button onClick={() => updateQuantity(item.id, 1)} className="w-8 h-8 rounded hover:bg-gray-100 flex items-center justify-center text-gray-700 font-bold">+</button>
+                  </div>
+                  <div className="w-16 text-right font-bold text-sm text-gray-900">
+                    {formatCurrency(item.subtotal)}
+                  </div>
+                  <button onClick={() => removeItem(item.id)} className="w-8 h-8 ml-1 flex items-center justify-center text-red-500 hover:bg-red-50 rounded">
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+            <div className="p-4 border-t bg-gray-50 space-y-3">
+              <div className="flex justify-between text-sm text-gray-600">
+                <span>Subtotal:</span>
+                <span>{formatCurrency(currentSale.subtotal)}</span>
+              </div>
+              <div className="flex justify-between items-center bg-white p-2 rounded-lg border">
+                <span className="text-sm font-semibold text-gray-700">Descuento:</span>
+                <Input
+                  type="number"
+                  value={currentSale.discount}
+                  onChange={(e) => applyDiscount(Number(e.target.value))}
+                  className="w-24 h-8 text-right font-bold"
+                />
+              </div>
+              <div className="flex justify-between text-2xl font-black text-blue-600 pt-2">
+                <span>Total:</span>
+                <span>{formatCurrency(currentSale.total)}</span>
+              </div>
+              <div className="flex gap-2 pt-2">
+                <Button variant="outline" onClick={() => { clearSale(); setIsMobileCartOpen(false); }} className="w-1/3 p-6 text-gray-600 font-bold">Limpiar</Button>
+                <Button 
+                  className="w-2/3 bg-blue-600 p-6 text-lg font-bold shadow-lg" 
+                  onClick={() => { setIsMobileCartOpen(false); setShowPaymentModal(true); }}
+                >
+                  💳 COBRAR
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       {showClientSelector && (
         <ClientSelectorModal
           onClose={() => setShowClientSelector(false)}
@@ -1070,6 +1221,13 @@ export function POSScreen({
           </Card>
         </div>
       )}
+
+      {/* ── Pending Orders Modal (Mesero) ── */}
+      <PendingOrdersModal
+        isOpen={showPendingOrders}
+        onClose={() => setShowPendingOrders(false)}
+        onSelectOrder={handleLoadPendingOrder}
+      />
     </div>
   );
 }
