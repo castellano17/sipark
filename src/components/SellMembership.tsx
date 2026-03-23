@@ -253,8 +253,12 @@ export function SellMembership() {
       // Si se leyó una tarjeta física, asociarla a la membresía
       if (nfcUid) {
         try {
-          // format: assignNfcCard(clientId, membershipId, uid)
-          await (window as any).api.assignNfcCard(selectedClient.id, membershipId, nfcUid);
+          // format: assignNfcCard({ clientMembershipId, uid, clientId })
+          await (window as any).api.assignNfcCard({
+            clientId: selectedClient.id,
+            clientMembershipId: membershipId,
+            uid: nfcUid
+          });
         } catch (nfcErr: any) {
           error("Advertencia: No se pudo asignar la tarjeta NFC: " + (nfcErr.message || "Ya está en uso"));
         }
