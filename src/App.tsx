@@ -2,11 +2,21 @@ import { useState, useEffect } from "react";
 import { SnackbarProvider } from "notistack";
 import MainLayout from "./components/MainLayout";
 import { Login } from "./components/Login";
+import { CustomerDisplay } from "./components/CustomerDisplay";
 import type { SystemUser } from "./types";
 
 function App() {
   const [currentUser, setCurrentUser] = useState<SystemUser | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // Detección de Monitor Secundario (Pantalla Cliente)
+  const isCustomerDisplay = window.location.search.includes('view=customer');
+
+  if (isCustomerDisplay) {
+    document.body.style.backgroundColor = "transparent";
+    document.documentElement.style.backgroundColor = "transparent";
+    return <CustomerDisplay />;
+  }
 
   useEffect(() => {
     // Verificar si hay usuario en localStorage

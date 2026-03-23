@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { User, Clock } from "lucide-react";
+import { User, Clock, Monitor } from "lucide-react";
 import { SystemStatus } from "@/types";
 
 interface StatusBarProps {
@@ -12,6 +12,7 @@ export const StatusBar: React.FC<StatusBarProps> = ({
   currentUser,
 }) => {
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [tvActive, setTvActive] = useState(true);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -153,8 +154,24 @@ export const StatusBar: React.FC<StatusBarProps> = ({
         </span>
       </div>
 
+      {/* Display Toggle Action */}
+      <button 
+        onClick={() => {
+          setTvActive(prev => {
+            const nv = !prev;
+            (window as any).api.toggleAdsWindow(!nv);
+            return nv;
+          });
+        }}
+        className={`flex items-center gap-2 px-3 py-1 ml-auto rounded transition-colors ${tvActive ? 'hover:bg-slate-100' : 'bg-slate-200'}`}
+        title="Ocultar/Mostrar Publicidad en Segunda Pantalla"
+      >
+        <Monitor className={`w-4 h-4 ${tvActive ? 'text-emerald-500' : 'text-slate-500'}`} />
+        <span className="text-slate-700 hidden sm:inline">TV</span>
+      </button>
+
       {/* Online Status */}
-      <div className="flex items-center gap-2 whitespace-nowrap ml-auto">
+      <div className="flex items-center gap-2 whitespace-nowrap ml-4">
         {status.isOnline ? (
           <>
             <div className="w-2 h-2 rounded-full bg-emerald-500" />

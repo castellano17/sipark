@@ -280,6 +280,21 @@ export function POSScreen({
     success(`Voucher ${pendingVoucherCode} agregado al carrito`);
   };
 
+  // NFC: Interceptar al Oído Global
+  useEffect(() => {
+    const handleGlobalNfc = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      if (nfcMode !== null) {
+         e.preventDefault(); // Detenemos el cobro rápido
+         setNfcInput(customEvent.detail.uid);
+         handleNfcScan(customEvent.detail.uid);
+         success(`¡Tarjeta escaneada automáticamente! (${customEvent.detail.uid})`);
+      }
+    };
+    window.addEventListener('nfc-scanned', handleGlobalNfc);
+    return () => window.removeEventListener('nfc-scanned', handleGlobalNfc);
+  }, [nfcMode, success]);
+
   // NFC: abrir modal
   const openNfcModal = useCallback((mode: 'charge' | 'recharge') => {
     setNfcMode(mode);

@@ -302,6 +302,15 @@ contextBridge.exposeInMainWorld("api", {
   checkDatabaseConnection: () =>
     ipcRenderer.invoke("api:checkDatabaseConnection"),
 
+  // Customer Display
+  broadcastToCustomer: (payload) => ipcRenderer.invoke("api:broadcastToCustomer", payload),
+  toggleAdsWindow: (hidden) => ipcRenderer.invoke("api:toggleAdsWindow", hidden),
+  getAdFiles: () => ipcRenderer.invoke("api:getAdFiles"),
+  onCustomerEvent: (callback) => {
+    ipcRenderer.on("customer-event", (_event, payload) => callback(payload));
+    return () => ipcRenderer.removeAllListeners("customer-event"); // cleanup
+  },
+
   // Printers
   getPrinters: () => ipcRenderer.invoke("api:getPrinters"),
   getDefaultPrinter: () => ipcRenderer.invoke("api:getDefaultPrinter"),

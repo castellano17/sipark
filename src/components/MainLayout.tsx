@@ -34,9 +34,15 @@ interface MainLayoutProps {
   onLogout: () => void;
 }
 
+import { useGlobalScanner } from "../hooks/useGlobalScanner";
+
 export default function MainLayout({ currentUser, onLogout }: MainLayoutProps) {
   const [currentPath, setCurrentPath] = useState("/dashboard");
   const [checkoutData, setCheckoutData] = useState<any>(null);
+  
+  // Oído Global NFC
+  useGlobalScanner(currentPath);
+
   const [systemStatus, setSystemStatus] = useState<SystemStatus>({
     database: "loading",
     printer: "loading",

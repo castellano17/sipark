@@ -67,6 +67,7 @@ export function SellMembership() {
   // Nuevos campos de membresía
   const [phone, setPhone] = useState<string>("");
   const [idCard, setIdCard] = useState<string>("");
+  const [nfcUid, setNfcUid] = useState<string>(""); // ADDED para Tarjeta NFC
   const [acquisitionDate, setAcquisitionDate] = useState<string>(
     new Date().toLocaleDateString("sv-SE"), // sv-SE format is YYYY-MM-DD
   );
@@ -85,6 +86,19 @@ export function SellMembership() {
   const { formatCurrency } = useCurrency();
   const { success, error } = useNotification();
   const { printMembershipTicket, printMembershipInvoice } = usePrinter();
+
+  useEffect(() => {
+    // Escuchar el evento del Oído Global
+    const handleGlobalNfc = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      // Prevenimos que el Escáner Global haga un "Cobro Rápido" indicando que esta pantalla lo atrapó
+      e.preventDefault(); 
+      setNfcUid(customEvent.detail.uid);
+      success(`Tarjeta física ID [${customEvent.detail.uid}] asociada lista para guardar.`);
+    };
+    window.addEventListener('nfc-scanned', handleGlobalNfc);
+    return () => window.removeEventListener('nfc-scanned', handleGlobalNfc);
+  }, [success]);
 
   useEffect(() => {
     loadData();
@@ -235,6 +249,16 @@ export function SellMembership() {
         acquisitionDate,
         totalHours
       );
+
+      // Si se leyó una tarjeta física, asociarla a la membresía
+      if (nfcUid) {
+        try {
+          // format: assignNfcCard(clientId, membershipId, uid)
+          await (window as any).api.assignNfcCard(selectedClient.id, membershipId, nfcUid);
+        } catch (nfcErr: any) {
+          error("Advertencia: No se pudo asignar la tarjeta NFC: " + (nfcErr.message || "Ya está en uso"));
+        }
+      }
 
       // Guardar datos para impresión
       const membershipData = {
@@ -582,6 +606,18 @@ export function SellMembership() {
                         placeholder="Ej: 10 horas"
                         className="bg-gray-50 cursor-not-allowed"
                       />
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-2 flex justify-between">
+                    <span>Tarjeta Física NFC (Opcional)</span>
+                    <span className="text-xs text-blue-500 font-normal mt-1">Acerca la tarjeta para escanear...</span>
+                  </label>
+                  <Input
+                    value={nfcUid}
+                    onChange={(e) => setNfcUid(e.target.value)}
+                    placeholder="Escanear tarjeta..."
+                    className="border-blue-200 bg-blue-50 focus:border-blue-500"
+                  />
                 </div>
               </div>
 

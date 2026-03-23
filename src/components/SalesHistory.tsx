@@ -6,6 +6,7 @@ import { Card } from "./ui/card";
 import { useNotification } from "../hooks/useNotification";
 import { useCurrency } from "../hooks/useCurrency";
 import { SaleDetailModal } from "./SaleDetailModal";
+import { usePrinter } from "../hooks/usePrinter";
 import type { Sale } from "../types";
 
 export function SalesHistory() {
@@ -53,6 +54,8 @@ export function SalesHistory() {
     setFilteredSales(filtered);
   }, [searchQuery, dateFilter, sales]);
 
+  const { printTicket } = usePrinter();
+
   const loadSales = async () => {
     try {
       const data = await window.api.getSales(100);
@@ -63,8 +66,35 @@ export function SalesHistory() {
     }
   };
 
-  const handleReprint = (saleId: number) => {
-    info(`Reimprimiendo ticket #${saleId}`);
+  const handleReprint = async (saleId: number) => {
+    try {
+      info(`Reimprimiendo ticket #${saleId}...`);
+      const saleFull = await window.api.getSaleWithItems(saleId);
+      if (!saleFull) {
+        error("No se encontraron los detalles de la venta");
+        return;
+      }
+      
+      const currentUser = JSON.parse(localStorage.getItem("currentUser") || "{}");
+
+      await printTicket({
+        saleId: saleFull.id,
+        clientName: saleFull.client_name,
+        cashierName: currentUser.name || currentUser.username || "Admin",
+        items: saleFull.items.map((i: any) => ({
+          product_name: i.product_name,
+          quantity: i.quantity,
+          unit_price: i.unit_price,
+          subtotal: i.subtotal,
+        })),
+        subtotal: saleFull.subtotal,
+        discount: saleFull.discount || 0,
+        total: saleFull.total,
+        paymentMethod: saleFull.payment_method,
+      });
+    } catch (err) {
+      error("Error al reimprimir el ticket");
+    }
   };
 
   const formatDate = (timestamp: string) => {

@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, shell } = require("electron");
+const { app, BrowserWindow, ipcMain, shell, screen } = require("electron");
 const path = require("path");
 // Detectar si estamos en desarrollo sin dependencias externas
 const isDev = !app.isPackaged;
@@ -27,6 +27,7 @@ if (isDev) {
 }
 
 let mainWindow;
+let customerWindow = null;
 
 async function initializeApp() {
   try {
@@ -77,7 +78,41 @@ function createWindow() {
 
   mainWindow.on("closed", () => {
     mainWindow = null;
+    if (customerWindow) {
+      customerWindow.close();
+    }
   });
+
+  // Configurar Segunda Pantalla (Customer Display)
+  const displays = screen.getAllDisplays();
+  const externalDisplay = displays.find((display) => display.bounds.x !== 0 || display.bounds.y !== 0);
+
+  if (externalDisplay) {
+    customerWindow = new BrowserWindow({
+      x: externalDisplay.bounds.x,
+      y: externalDisplay.bounds.y,
+      width: externalDisplay.bounds.width,
+      height: externalDisplay.bounds.height,
+      frame: false,
+      transparent: true,
+      backgroundColor: '#00000000',
+      hasShadow: false,
+      alwaysOnTop: false,
+      webPreferences: {
+        preload: path.join(__dirname, "preload.cjs"),
+        nodeIntegration: false,
+        contextIsolation: true,
+        webSecurity: false,
+      },
+    });
+
+    const customerUrl = startUrl + (startUrl.includes("?") ? "&" : "?") + "view=customer";
+    customerWindow.loadURL(customerUrl);
+
+    customerWindow.on("closed", () => {
+      customerWindow = null;
+    });
+  }
 }
 
 // Inicializar BD antes de crear ventana
@@ -120,6 +155,58 @@ app.on("activate", () => {
 });
 
 // ============ IPC HANDLERS ============
+
+// Función para transmitir eventos a la pantalla secundaria
+ipcMain.handle("api:broadcastToCustomer", async (event, payload) => {
+  if (customerWindow && !customerWindow.isDestroyed()) {
+    customerWindow.webContents.send("customer-event", payload);
+    return true;
+  }
+  return false;
+});
+
+// Función para mostrar/ocultar interfaz de anuncios haciendo transparente la TV
+ipcMain.handle("api:toggleAdsWindow", async (event, hidden) => {
+  if (customerWindow && !customerWindow.isDestroyed()) {
+    if (hidden) {
+      customerWindow.setIgnoreMouseEvents(true, { forward: true });
+      customerWindow.webContents.send("customer-event", { action: 'TOGGLE_ADS', hidden: true });
+    } else {
+      customerWindow.setIgnoreMouseEvents(false);
+      customerWindow.webContents.send("customer-event", { action: 'TOGGLE_ADS', hidden: false });
+    }
+    return true;
+  }
+  return false;
+});
+
+ipcMain.handle("api:getAdFiles", async () => {
+  const fs = require('fs');
+  const path = require('path');
+  const docsPath = app.getPath('documents');
+  const adsDir = path.join(docsPath, 'SIPARK_Publicidad');
+
+  try {
+    if (!fs.existsSync(adsDir)) {
+      fs.mkdirSync(adsDir, { recursive: true });
+    }
+    const files = fs.readdirSync(adsDir);
+    const mediaFiles = files
+      .filter((file) => /\.(mp4|webm|jpg|jpeg|png|webp|gif)$/i.test(file))
+      .map((file) => {
+        const type = /\.(mp4|webm)$/i.test(file) ? 'video' : 'image';
+        return {
+          type,
+          src: `file://${path.join(adsDir, file)}`,
+          duration: type === 'image' ? 10000 : undefined
+        };
+      });
+    return mediaFiles;
+  } catch (error) {
+    console.error("Error leyendo directorio de publicidad:", error);
+    return [];
+  }
+});
 
 function setupIpcHandlers() {
   // Detectar dispositivos USB conectados (cajón + lectores NFC)

@@ -157,20 +157,20 @@ export function usePrinter() {
       // Items
       ticketData.items.forEach((item) => {
         text += `${item.product_name}\n`;
-        text += `  ${item.quantity} x $${Number(item.unit_price).toFixed(2)} = $${Number(item.subtotal).toFixed(2)}\n`;
+        text += `  ${item.quantity} x C$${Number(item.unit_price).toFixed(2)} = C$${Number(item.subtotal).toFixed(2)}\n`;
       });
 
       text += dash + "\n";
-      text += `Subtotal:        $${Number(ticketData.subtotal).toFixed(2)}\n`;
+      text += `Subtotal:        C$${Number(ticketData.subtotal).toFixed(2)}\n`;
       if (ticketData.discount > 0) {
-        text += `Descuento:      -$${Number(ticketData.discount).toFixed(2)}\n`;
+        text += `Descuento:      -C$${Number(ticketData.discount).toFixed(2)}\n`;
       }
-      text += `TOTAL:           $${Number(ticketData.total).toFixed(2)}\n`;
+      text += `TOTAL:           C$${Number(ticketData.total).toFixed(2)}\n`;
       text += dash + "\n";
       text += `Método: ${methodLabel}\n`;
       if (ticketData.amountReceived) {
-        text += `Recibido:        $${Number(ticketData.amountReceived).toFixed(2)}\n`;
-        text += `Cambio:          $${Number(ticketData.change || 0).toFixed(2)}\n`;
+        text += `Recibido:        C$${Number(ticketData.amountReceived).toFixed(2)}\n`;
+        text += `Cambio:          C$${Number(ticketData.change || 0).toFixed(2)}\n`;
       }
       text += line + "\n";
       if (showThankYou) text += center(thankYouMsg) + "\n";
