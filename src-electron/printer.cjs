@@ -149,7 +149,7 @@ async function printTestTicket(printerName) {
         execSync(printCommand);
       } catch (e) {
         console.error(`Error de impresión Windows: ${e.message}`);
-        throw new Error(`Error de impresión Windows: ${e.message}`);
+        throw new Error(`Error al acceder a la impresora "${printerName}". Si es una impresora virtual, PDF o de demostración, puede no soportar impresión en segundo plano. (Detalle: ${e.message})`);
       }
     } else if (platform === "darwin" || platform === "linux") {
       // Usar la ruta absoluta a lp para evitar problemas de PATH
@@ -197,7 +197,7 @@ async function printTicket(printerName, content) {
         execSync(printCommand);
       } catch (e) {
         console.error(`Error de impresión Windows: ${e.message}`);
-        throw new Error(`Error de impresión Windows: ${e.message}`);
+        throw new Error(`Error al acceder a la impresora "${printerName}". Si es una impresora virtual, PDF o de demostración, puede no soportar impresión en segundo plano. (Detalle: ${e.message})`);
       }
     } else if (platform === "darwin" || platform === "linux") {
       const lpPath = "/usr/bin/lp";
@@ -496,7 +496,7 @@ SOPORTE TÉCNICO SIPARK
       try {
         execSync(printCommand);
       } catch (e) {
-        throw new Error(`Error Windows: ${e.message}`);
+        throw new Error(`Error al acceder a la impresora "${printerName}". Si es una impresora virtual, PDF o de demostración, puede no soportar impresión en segundo plano. (Detalle: ${e.message})`);
       }
     } else if (platform === "darwin" || platform === "linux") {
       const lpPath = "/usr/bin/lp";
