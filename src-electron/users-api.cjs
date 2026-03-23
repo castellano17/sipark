@@ -14,6 +14,11 @@ const AVAILABLE_MODULES = [
   "reports",
   "promotions",
   "waiter",
+  "memberships",
+  "quotations",
+  "reservations",
+  "internal",
+  "settings",
   "users", // Solo admin
 ];
 
@@ -82,7 +87,7 @@ async function authenticateUser(username, password) {
 
     // Actualizar último login
     await runAsync(
-      "UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = ?",
+      "UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = $1",
       [user.id],
     );
 
@@ -501,17 +506,15 @@ async function checkPermission(userId, module, action) {
 
     switch (action) {
       case "view":
-        return permission.can_view === 1;
+        return !!permission.can_view;
       case "create":
-        return permission.can_create === 1;
+        return !!permission.can_create;
       case "edit":
-        return permission.can_edit === 1;
+        return !!permission.can_edit;
       case "delete":
-        return permission.can_delete === true || permission.can_delete === 1;
+        return !!permission.can_delete;
       case "open_drawer":
-        return (
-          permission.can_open_drawer === true || permission.can_open_drawer === 1
-        );
+        return !!permission.can_open_drawer;
       default:
         return false;
     }

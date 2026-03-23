@@ -364,21 +364,33 @@ export function SalesByPeriod({ onBack }: SalesByPeriodProps) {
           <Card className="p-6">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-semibold text-lg">Detalle de Ventas</h3>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <Button
-                        className="h-8 w-8 p-0" variant="outline" size="sm" onClick={handleExportExcel}>
-                  <FileDown className="w-4 h-4 mr-2" />
-                  Exportar Excel
+                  variant="outline"
+                  size="sm"
+                  onClick={handleExportExcel}
+                  className="flex items-center gap-2"
+                >
+                  <FileDown className="w-4 h-4" />
+                  <span className="hidden sm:inline">Exportar Excel</span>
                 </Button>
                 <Button
-                        className="h-8 w-8 p-0" variant="outline" size="sm" onClick={handleExportPDF}>
-                  <FileDown className="w-4 h-4 mr-2" />
-                  Exportar PDF
+                  variant="outline"
+                  size="sm"
+                  onClick={handleExportPDF}
+                  className="flex items-center gap-2"
+                >
+                  <FileDown className="w-4 h-4" />
+                  <span className="hidden sm:inline">Exportar PDF</span>
                 </Button>
                 <Button
-                        className="h-8 w-8 p-0" variant="outline" size="sm" onClick={handlePrint}>
-                  <Printer className="w-4 h-4 mr-2" />
-                  Imprimir
+                  variant="outline"
+                  size="sm"
+                  onClick={handlePrint}
+                  className="flex items-center gap-2"
+                >
+                  <Printer className="w-4 h-4" />
+                  <span className="hidden sm:inline">Imprimir</span>
                 </Button>
               </div>
             </div>

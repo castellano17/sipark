@@ -329,8 +329,7 @@ export function CashBoxReport({ onBack }: CashBoxReportProps) {
                         </span>
                       </td>
                       <td className="px-4 py-3 text-center">
-                        <Button
-                        className="h-8 w-8 p-0" size="sm" onClick={() => loadReport(box.id)}>
+                        <Button size="sm" onClick={() => loadReport(box.id)}>
                           Ver Reporte
                         </Button>
                       </td>
@@ -538,21 +537,33 @@ export function CashBoxReport({ onBack }: CashBoxReportProps) {
           <Card className="p-6 mb-6">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-semibold text-lg">Detalle de Ventas</h3>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <Button
-                        className="h-8 w-8 p-0" variant="outline" size="sm" onClick={handleExportExcel}>
-                  <FileDown className="w-4 h-4 mr-2" />
-                  Excel
+                  variant="outline"
+                  size="sm"
+                  onClick={handleExportExcel}
+                  className="flex items-center gap-2"
+                >
+                  <FileDown className="w-4 h-4" />
+                  <span className="hidden sm:inline">Excel</span>
                 </Button>
                 <Button
-                        className="h-8 w-8 p-0" variant="outline" size="sm" onClick={handleExportPDF}>
-                  <FileDown className="w-4 h-4 mr-2" />
-                  PDF
+                  variant="outline"
+                  size="sm"
+                  onClick={handleExportPDF}
+                  className="flex items-center gap-2"
+                >
+                  <FileDown className="w-4 h-4" />
+                  <span className="hidden sm:inline">PDF</span>
                 </Button>
                 <Button
-                        className="h-8 w-8 p-0" variant="outline" size="sm" onClick={handlePrint}>
-                  <Printer className="w-4 h-4 mr-2" />
-                  Imprimir
+                  variant="outline"
+                  size="sm"
+                  onClick={handlePrint}
+                  className="flex items-center gap-2"
+                >
+                  <Printer className="w-4 h-4" />
+                  <span className="hidden sm:inline">Imprimir</span>
                 </Button>
               </div>
             </div>

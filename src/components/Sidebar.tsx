@@ -334,16 +334,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
       </div>
 
       {/* Quick Action */}
-      <div className="p-4 border-b border-slate-800">
-        <Button
-          className="w-full bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center gap-2"
-          onClick={() => onNavigate("/pos")}
-          title={isCollapsed ? "Nueva Venta" : undefined}
-        >
-          <CreditCard className="w-4 h-4" />
-          {!isCollapsed && <span>Nueva Venta</span>}
-        </Button>
-      </div>
+      {hasPermission("pos") && (
+        <div className="p-4 border-b border-slate-800">
+          <Button
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center gap-2"
+            onClick={() => onNavigate("/pos")}
+            title={isCollapsed ? "Nueva Venta" : undefined}
+          >
+            <CreditCard className="w-4 h-4" />
+            {!isCollapsed && <span>Nueva Venta</span>}
+          </Button>
+        </div>
+      )}
 
       {/* Menu Items */}
       <nav className="flex-1 overflow-y-auto p-2 space-y-1">

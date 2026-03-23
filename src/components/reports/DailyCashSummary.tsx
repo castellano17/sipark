@@ -186,20 +186,22 @@ export function DailyCashSummary({ onBack }: DailyCashSummaryProps) {
       {data && (
         <>
           {/* Action Buttons */}
-          <div className="flex gap-2 mb-4 print:hidden">
+          <div className="flex flex-wrap gap-2 mb-4 print:hidden">
             <Button
               onClick={handlePrint}
-              className="bg-blue-600 hover:bg-blue-700"
+              className="bg-blue-600 hover:bg-blue-700 flex items-center gap-2"
             >
-              <Printer className="w-4 h-4 mr-2" />
-              Imprimir Ticket
+              <Printer className="w-4 h-4" />
+              <span className="hidden sm:inline">Imprimir Ticket</span>
+              <span className="sm:hidden">Imprimir</span>
             </Button>
             <Button
               onClick={handleExportPDF}
-              className="bg-green-600 hover:bg-green-700"
+              className="bg-green-600 hover:bg-green-700 flex items-center gap-2"
             >
-              <FileDown className="w-4 h-4 mr-2" />
-              Guardar PDF
+              <FileDown className="w-4 h-4" />
+              <span className="hidden sm:inline">Guardar PDF</span>
+              <span className="sm:hidden">PDF</span>
             </Button>
           </div>
 

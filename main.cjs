@@ -132,6 +132,9 @@ function createWindow() {
     : `file://${path.join(__dirname, "dist", "index.html")}`;
 
   mainWindow.loadURL(startUrl);
+  
+  // Maximizar ventana al iniciar
+  mainWindow.maximize();
 
   if (isDev) {
     mainWindow.webContents.openDevTools();
@@ -146,7 +149,8 @@ function createWindow() {
 
   // Configurar Segunda Pantalla (Customer Display)
   const displays = screen.getAllDisplays();
-  const externalDisplay = displays.find((display) => display.bounds.x !== 0 || display.bounds.y !== 0);
+  const primaryDisplay = screen.getPrimaryDisplay();
+  const externalDisplay = displays.find((display) => display.id !== primaryDisplay.id);
 
   if (externalDisplay) {
     customerWindow = new BrowserWindow({
@@ -158,7 +162,8 @@ function createWindow() {
       transparent: true,
       backgroundColor: '#00000000',
       hasShadow: false,
-      alwaysOnTop: false,
+      alwaysOnTop: true,
+      skipTaskbar: true,
       webPreferences: {
         preload: path.join(__dirname, "preload.cjs"),
         nodeIntegration: false,

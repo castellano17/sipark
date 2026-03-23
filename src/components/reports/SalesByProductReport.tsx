@@ -402,21 +402,33 @@ export function SalesByProductReport({ onBack }: SalesByProductReportProps) {
               <h3 className="font-semibold text-lg">
                 Detalle de Todos los Productos
               </h3>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <Button
-                        className="h-8 w-8 p-0" variant="outline" size="sm" onClick={handleExportExcel}>
-                  <FileDown className="w-4 h-4 mr-2" />
-                  Excel
+                  variant="outline"
+                  size="sm"
+                  onClick={handleExportExcel}
+                  className="flex items-center gap-2"
+                >
+                  <FileDown className="w-4 h-4" />
+                  <span className="hidden sm:inline">Excel</span>
                 </Button>
                 <Button
-                        className="h-8 w-8 p-0" variant="outline" size="sm" onClick={handleExportPDF}>
-                  <FileDown className="w-4 h-4 mr-2" />
-                  PDF
+                  variant="outline"
+                  size="sm"
+                  onClick={handleExportPDF}
+                  className="flex items-center gap-2"
+                >
+                  <FileDown className="w-4 h-4" />
+                  <span className="hidden sm:inline">PDF</span>
                 </Button>
                 <Button
-                        className="h-8 w-8 p-0" variant="outline" size="sm" onClick={handlePrint}>
-                  <Printer className="w-4 h-4 mr-2" />
-                  Imprimir
+                  variant="outline"
+                  size="sm"
+                  onClick={handlePrint}
+                  className="flex items-center gap-2"
+                >
+                  <Printer className="w-4 h-4" />
+                  <span className="hidden sm:inline">Imprimir</span>
                 </Button>
               </div>
             </div>
