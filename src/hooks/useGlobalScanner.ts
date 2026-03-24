@@ -20,12 +20,12 @@ export function useGlobalScanner(currentPath: string) {
       const timeDiff = currentTime - lastKeyTimeRef.current;
       lastKeyTimeRef.current = currentTime;
 
-      // Si es una ráfaga de teclas muy rápida (limite 35ms), es el lector
-      if (timeDiff < 35 && (e.key.length === 1 || e.key === 'Enter')) {
+      // Si es una ráfaga de teclas muy rápida (limite 50ms), es el lector
+      if (timeDiff < 50 && (e.key.length === 1 || e.key === 'Enter')) {
         e.preventDefault();
         e.stopPropagation();
       } else if (timeDiff > 100) {
-        // Si el tiempo entre letras es humano, reseteamos el buffer de escaneo
+        // Si el tiempo entre teclas es humano, reseteamos el buffer de escaneo
         keysRef.current = [];
       }
 
@@ -34,6 +34,8 @@ export function useGlobalScanner(currentPath: string) {
         keysRef.current = [];
 
         if (scannedUid.length >= 6) {
+          console.log(`[NFC DEBUG] Captado UID: "${scannedUid}"`);
+          
           // Primero intentamos que la pantalla actual (POS o Membresías) maneje el código
           const customEvent = new CustomEvent('nfc-scanned', { 
             detail: { uid: scannedUid },

@@ -111,11 +111,10 @@ async function chargeNfcEntry(uid, amount, userId) {
     const currentBalance = parseFloat(cardInfo.balance || 0);
     let chargeAmount = parseFloat(amount);
 
-    // Si no se pasó monto (cobro rápido NFC), buscamos el precio por defecto en ajustes
+    // Si no se pasó monto (cobro rápido NFC), buscamos el precio por defecto en ajustes directamente
     if (isNaN(chargeAmount) || amount === null) {
-      const { getSetting } = require('./api.cjs');
-      const entryPrice = await getSetting("nfc_entry_price");
-      chargeAmount = parseFloat(entryPrice || "100");
+      const entryPriceRow = await getAsync("SELECT value FROM settings WHERE key = $1", ['nfc_entry_price']);
+      chargeAmount = parseFloat(entryPriceRow?.value || "100");
     }
 
     if (currentBalance < chargeAmount) {
