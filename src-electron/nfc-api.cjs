@@ -122,7 +122,7 @@ async function chargeNfcEntry(uid, amount, userId) {
     }
 
     if (currentBalance < chargeAmount) {
-      throw new Error("Saldo insuficiente en la membresía.");
+      throw new Error(`Saldo insuficiente en la membresía de ${cardInfo.client_name}`);
     }
 
     const newBalance = currentBalance - chargeAmount;
@@ -158,7 +158,7 @@ async function chargeNfcEntry(uid, amount, userId) {
       success: true, 
       clientName: cardInfo.client_name,
       newBalance,
-      chargedAmount
+      chargedAmount: chargeAmount
     };
   } catch (error) {
     throw error;

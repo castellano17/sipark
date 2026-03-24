@@ -61,6 +61,8 @@ export const Settings: React.FC = () => {
   const [nfcEntryPrice, setNfcEntryPrice] = useState("100.00");
   const [extraMinutePrice, setExtraMinutePrice] = useState("1.00");
   const [nfcCustomMessage, setNfcCustomMessage] = useState("¡Bienvenido a SIPARK!");
+  const [nfcSystemMode, setNfcSystemMode] = useState("production");
+  const [nfcAlertDuration, setNfcAlertDuration] = useState("5");
 
   // Contabilidad
   const [enableTax, setEnableTax] = useState(false);
@@ -199,6 +201,12 @@ export const Settings: React.FC = () => {
               break;
             case "nfc_custom_message":
               setNfcCustomMessage(setting.value);
+              break;
+            case "nfc_system_mode":
+              setNfcSystemMode(setting.value);
+              break;
+            case "nfc_alert_duration":
+              setNfcAlertDuration(setting.value);
               break;
             case "enable_tax":
               setEnableTax(setting.value === "true");
@@ -398,6 +406,8 @@ export const Settings: React.FC = () => {
       await setSetting("nfc_entry_price", nfcEntryPrice.toString());
       await setSetting("extra_minute_price", extraMinutePrice.toString());
       await setSetting("nfc_custom_message", nfcCustomMessage);
+      await setSetting("nfc_system_mode", nfcSystemMode);
+      await setSetting("nfc_alert_duration", nfcAlertDuration.toString());
       success("Configuración de operaciones guardada correctamente");
     } catch (err) {
       errorNotification("Error al guardar la configuración");
@@ -866,20 +876,61 @@ export const Settings: React.FC = () => {
                   </div>
                 </div>
 
+                <div className="mt-4 border-t border-slate-100 pt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-900 mb-2">
+                      Mensaje personalizado en Pantalla TV (Ventas/NFC)
+                    </label>
+                    <input
+                      type="text"
+                      value={nfcCustomMessage}
+                      onChange={(e) => setNfcCustomMessage(e.target.value)}
+                      className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="Ej: ¡Disfruta tu estancia! / ¡Feliz día!"
+                    />
+                    <p className="text-[11px] text-slate-500 mt-1">
+                      Aparecerá en la pantalla al cobrar con éxito.
+                    </p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-900 mb-2">
+                      Duración del Mensaje de Éxito (Segundos)
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="60"
+                      value={nfcAlertDuration}
+                      onChange={(e) => setNfcAlertDuration(e.target.value)}
+                      className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="5"
+                    />
+                    <p className="text-[11px] text-slate-500 mt-1">
+                      Tiempo que se mostrará antes de volver la publicidad.
+                    </p>
+                  </div>
+                </div>
+                
                 <div className="mt-4 border-t border-slate-100 pt-4">
                   <label className="block text-sm font-semibold text-slate-900 mb-2">
-                    Mensaje personalizado para Clientes NFC (Pantalla TV)
+                     Modo de Lector NFC
                   </label>
-                  <input
-                    type="text"
-                    value={nfcCustomMessage}
-                    onChange={(e) => setNfcCustomMessage(e.target.value)}
-                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="Ej: ¡Disfruta tu estancia! / ¡Feliz día!"
-                  />
-                  <p className="text-[11px] text-slate-500 mt-1">
-                    Este mensaje aparecerá en la segunda pantalla cuando el cliente escanee su tarjeta para entrar.
-                  </p>
+                  <div className="flex flex-col gap-2">
+                    <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+                      <input type="radio" name="nfcMode" value="production" checked={nfcSystemMode === "production"} onChange={(e) => setNfcSystemMode(e.target.value)} className="w-4 h-4 text-blue-600" />
+                      <div>
+                        <p className="font-semibold">Modo Producción</p>
+                        <p className="text-xs text-slate-500">Usa Hardware USB Real (Node-HID). Previene bloqueos de teclado.</p>
+                      </div>
+                    </label>
+                    <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer mt-2">
+                      <input type="radio" name="nfcMode" value="development" checked={nfcSystemMode === "development"} onChange={(e) => setNfcSystemMode(e.target.value)} className="w-4 h-4 text-blue-600" />
+                      <div>
+                        <p className="font-semibold">Modo Desarrollo</p>
+                        <p className="text-xs text-slate-500">Muestra un botón flotante en POS para simular inserción manual de UIDs NFC.</p>
+                      </div>
+                    </label>
+                  </div>
                 </div>
 
                 <Button

@@ -84,6 +84,9 @@ export function POSScreen({
   const [nfcRechargeAmount, setNfcRechargeAmount] = useState("");
   const [nfcStatus, setNfcStatus] = useState<'idle' | 'scanning' | 'found' | 'error'>('idle');
   const [nfcCardInfo, setNfcCardInfo] = useState<any | null>(null);
+  const [nfcSystemMode, setNfcSystemMode] = useState("production");
+  const [showNfcSim, setShowNfcSim] = useState(false);
+  const [nfcSimUid, setNfcSimUid] = useState("04:4A:21:7C:5F:61:81");
   const nfcInputRef = useRef<HTMLInputElement>(null);
 
   const barcodeInputRef = useRef<HTMLInputElement>(null);
@@ -93,6 +96,14 @@ export function POSScreen({
     loadProducts();
     loadCategories();
     checkCashBoxStatus();
+
+    const loadSettings = async () => {
+      try {
+        const mode = await (window as any).api.getSetting('nfc_system_mode');
+        if (mode) setNfcSystemMode(mode);
+      } catch (e) {}
+    };
+    loadSettings();
 
     // Enfocar automáticamente el input de código de barras al cargar
     setTimeout(() => {
@@ -395,14 +406,21 @@ export function POSScreen({
       const nfcMsgSetting = Array.isArray(settings)
         ? settings.find((s: any) => s.key === 'nfc_custom_message')
         : null;
+      const nfcDurationSetting = Array.isArray(settings)
+        ? settings.find((s: any) => s.key === 'nfc_alert_duration')
+        : null;
+      const duration = nfcDurationSetting && !isNaN(parseInt(nfcDurationSetting.value))
+        ? parseInt(nfcDurationSetting.value) * 1000
+        : 5000;
 
       await (window as any).api.broadcastToCustomer({
         action: "SHOW_NFC_ALERT",
         type: "success",
-        title: `¡Entrada Autorizada!`,
-        message: `${result.clientName || 'Cliente'}`,
-        subMessage: `Saldo Restante: C$ ${result.newBalance.toFixed(2)}`,
-        customMessage: nfcMsgSetting?.value || "¡Bienvenido a SIPARK!"
+        title: nfcMsgSetting?.value || "¡Bienvenido a SIPARK!",
+        clientName: result.clientName || 'Cliente',
+        chargedAmount: result.chargedAmount,
+        newBalance: result.newBalance,
+        duration: duration
       });
 
       success(`Entrada cobrada. Nuevo saldo: C$ ${result.newBalance.toFixed(2)}`);
@@ -669,6 +687,31 @@ export function POSScreen({
       clearSale();
       setShowPaymentModal(false);
       success("Venta procesada exitosamente");
+
+      // Avisar a la pantalla secundaria (TV) para mostrar el overlay premium de cobro
+      try {
+        const settings = await window.api.getAllSettings();
+        const nfcMsgSetting = Array.isArray(settings)
+          ? settings.find((s: any) => s.key === 'nfc_custom_message')
+          : null;
+        const nfcDurationSetting = Array.isArray(settings)
+          ? settings.find((s: any) => s.key === 'nfc_alert_duration')
+          : null;
+        const duration = nfcDurationSetting && !isNaN(parseInt(nfcDurationSetting.value))
+          ? parseInt(nfcDurationSetting.value) * 1000
+          : 5000;
+
+        await (window as any).api.broadcastToCustomer({
+          action: "SHOW_NFC_ALERT",
+          type: "success",
+          title: nfcMsgSetting?.value || "¡Gracias por su compra!",
+          clientName: currentSale.client_name || "Estimado Cliente",
+          chargedAmount: currentSale.total,
+          duration: duration
+        });
+      } catch (err) {
+        console.error("No se pudo enviar la alerta de cobro a la pantalla secundaria:", err);
+      }
     } catch {
       error("Error al procesar la venta");
     }
@@ -1277,10 +1320,41 @@ export function POSScreen({
         onClose={() => setShowPendingOrders(false)}
         onSelectOrder={handleLoadPendingOrder}
       />
-      {(import.meta as any).env?.DEV && (
-        <div className="fixed bottom-6 right-6 z-50">
+      {nfcSystemMode === "development" && (
+        <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-3">
+          {showNfcSim && (
+            <div className="bg-white p-4 rounded-xl shadow-2xl border border-blue-100 flex flex-col gap-2 w-72 animate-in fade-in slide-in-from-bottom-4">
+              <p className="text-sm font-bold text-slate-700">Ingrese el UID a simular:</p>
+              <div className="flex gap-2">
+                <Input
+                  value={nfcSimUid}
+                  onChange={(e) => setNfcSimUid(e.target.value)}
+                  placeholder="04:4A:21..."
+                  className="font-mono text-sm uppercase"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && nfcSimUid.trim()) {
+                       window.dispatchEvent(new CustomEvent('simulate-nfc-scan', { detail: { uid: nfcSimUid.trim() } }));
+                       setShowNfcSim(false);
+                    }
+                  }}
+                  autoFocus
+                />
+                <Button 
+                  onClick={() => {
+                    if (nfcSimUid.trim()) {
+                      window.dispatchEvent(new CustomEvent('simulate-nfc-scan', { detail: { uid: nfcSimUid.trim() } }));
+                      setShowNfcSim(false);
+                    }
+                  }}
+                  className="bg-purple-600 hover:bg-purple-700 text-white shrink-0"
+                >
+                  Enviar
+                </Button>
+              </div>
+            </div>
+          )}
           <button 
-            onClick={() => window.dispatchEvent(new CustomEvent('nfc-scanned', { detail: { uid: "04:4A:21:7C:5F:61:81" }, cancelable: true }))}
+            onClick={() => setShowNfcSim(!showNfcSim)}
             className="flex items-center gap-2 px-6 py-4 bg-purple-600 hover:bg-purple-700 text-white rounded-full font-bold shadow-2xl transition-transform hover:scale-105 animate-bounce shadow-purple-500/50"
           >
             <Wifi className="w-5 h-5" />

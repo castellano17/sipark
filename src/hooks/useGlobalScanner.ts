@@ -23,6 +23,8 @@ export function useGlobalScanner(currentPath: string) {
         });
 
         const customMsg = await api.getSetting('nfc_custom_message').catch(() => "");
+        const durationStr = await api.getSetting('nfc_alert_duration').catch(() => "5");
+        const duration = parseInt(durationStr || "5") * 1000;
 
         api.broadcastToCustomer({
           action: "SHOW_NFC_ALERT",
@@ -30,7 +32,8 @@ export function useGlobalScanner(currentPath: string) {
           title: customMsg || "¡Bienvenido a SIPARK!",
           clientName: result.clientName || 'Cliente',
           chargedAmount: result.chargedAmount,
-          newBalance: result.newBalance
+          newBalance: result.newBalance,
+          duration: duration
         });
         
         success(`NFC: ${result.clientName}. Nuevo saldo: C$ ${result.newBalance.toFixed(2)}`);
@@ -38,32 +41,55 @@ export function useGlobalScanner(currentPath: string) {
 
       } catch (err: any) {
         const cleanMessage = err.message.replace(/Error invoking remote method '.*': /i, "");
-        error("Error NFC: " + cleanMessage);
+        
+        if (cleanMessage.includes("Saldo insuficiente")) {
+          const durationStr = await api.getSetting('nfc_alert_duration').catch(() => "5");
+          const duration = parseInt(durationStr || "5") * 1000;
+          
+          api.broadcastToCustomer({
+            action: "SHOW_NFC_ALERT",
+            type: "info",
+            title: "¡Aviso!",
+            message: "Saldo insuficiente en la membresía.",
+            duration: duration
+          });
+          
+          error(cleanMessage); // Alerta local (POS)
+        } else {
+          error("Error NFC: " + cleanMessage);
+        }
       } finally {
         setTimeout(() => { activeProcessingRef.current = false; }, 2000);
       }
     };
 
-    const cleanup = api.onNfcData((scannedUid: string) => {
-      console.log(`\n\n>>> HARDWARE HID SCANNER DETECTED: "${scannedUid}" <<<\n\n`);
-      
+    const handleScan = (scannedUid: string) => {
       const customEvent = new CustomEvent('nfc-scanned', { 
         detail: { uid: scannedUid },
         cancelable: true 
       });
-      // Despachamos evento al DOM. Si alguien llama preventDefault (ej. POSScreen),
-      // handled será false.
       const handled = !window.dispatchEvent(customEvent);
 
       if (!handled && !activeProcessingRef.current) {
-        // En este punto, no revisamos "activeElement" porque el lector corre 
-        // a nivel de hardware, por lo que NUNCA interfiere con inputs.
         processScan(scannedUid);
       }
+    };
+
+    const cleanup = api.onNfcData((scannedUid: string) => {
+      console.log(`\n\n>>> HARDWARE HID SCANNER DETECTED: "${scannedUid}" <<<\n\n`);
+      handleScan(scannedUid);
     });
+
+    const handleSimulate = (e: any) => {
+      console.log(`\n\n>>> SIMULATED SCANNER DETECTED: "${e.detail.uid}" <<<\n\n`);
+      handleScan(e.detail.uid);
+    };
+
+    window.addEventListener('simulate-nfc-scan', handleSimulate as EventListener);
 
     return () => {
       cleanup(); // Limpiar el listener IPC
+      window.removeEventListener('simulate-nfc-scan', handleSimulate as EventListener);
     };
   }, [currentPath]);
 }
