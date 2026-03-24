@@ -109,7 +109,14 @@ async function chargeNfcEntry(uid, amount, userId) {
     }
 
     const currentBalance = parseFloat(cardInfo.balance || 0);
-    const chargeAmount = parseFloat(amount);
+    let chargeAmount = parseFloat(amount);
+
+    // Si no se pasó monto (cobro rápido NFC), buscamos el precio por defecto en ajustes
+    if (isNaN(chargeAmount) || amount === null) {
+      const { getSetting } = require('./api.cjs');
+      const entryPrice = await getSetting("nfc_entry_price");
+      chargeAmount = parseFloat(entryPrice || "100");
+    }
 
     if (currentBalance < chargeAmount) {
       throw new Error("Saldo insuficiente en la membresía.");
@@ -150,7 +157,6 @@ async function chargeNfcEntry(uid, amount, userId) {
       newBalance 
     };
   } catch (error) {
-    throw error;
     throw error;
   }
 }

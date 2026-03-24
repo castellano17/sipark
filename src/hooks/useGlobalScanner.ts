@@ -20,16 +20,13 @@ export function useGlobalScanner(currentPath: string) {
       const timeDiff = currentTime - lastKeyTimeRef.current;
       lastKeyTimeRef.current = currentTime;
 
-      // Si el tiempo entre teclas es humano (lento), limpiamos el buffer
-      if (timeDiff > 60) {
+      // Si es una ráfaga de teclas muy rápida (limite 35ms), es el lector
+      if (timeDiff < 35 && (e.key.length === 1 || e.key === 'Enter')) {
+        e.preventDefault();
+        e.stopPropagation();
+      } else if (timeDiff > 100) {
+        // Si el tiempo entre letras es humano, reseteamos el buffer de escaneo
         keysRef.current = [];
-      } else {
-        // PERO si es rápido (lector), bloqueamos que la tecla llegue al campo de texto enfocado
-        // Así evitamos que el código se "pegue" en nombres de clientes, búsquedas, etc.
-        if (e.key.length === 1 || e.key === 'Enter') {
-          e.preventDefault();
-          e.stopPropagation();
-        }
       }
 
       if (e.key === "Enter") {
@@ -37,17 +34,15 @@ export function useGlobalScanner(currentPath: string) {
         keysRef.current = [];
 
         if (scannedUid.length >= 6) {
-          console.log(`[NFC GLOBAL] Disparando: ${scannedUid}`);
-          
-          // Lanzamos el evento DOM por si alguna pantalla específica quiere interceptarlo
+          // Primero intentamos que la pantalla actual (POS o Membresías) maneje el código
           const customEvent = new CustomEvent('nfc-scanned', { 
             detail: { uid: scannedUid },
             cancelable: true 
           });
           const handled = !window.dispatchEvent(customEvent);
 
+          // Si nadie lo manejó, hacemos el cobro automático de entrada
           if (!handled && !activeProcessingRef.current) {
-            // Procesamos el cobro de forma asíncrona pero sin bloquear el hilo de ejecución
             processScan(scannedUid);
           }
         }
@@ -56,13 +51,12 @@ export function useGlobalScanner(currentPath: string) {
       }
     };
 
-    // Función interna para procesamiento pesado (fuera del hilo de las teclas)
     const processScan = async (uid: string) => {
       activeProcessingRef.current = true;
       try {
         const result = await (window as any).api.chargeNfcEntry({
           uid,
-          amount: null, // Dejamos que el backend use el precio por defecto de settings
+          amount: null,
           userId: null
         });
 
@@ -77,12 +71,12 @@ export function useGlobalScanner(currentPath: string) {
           customMessage: customMsg || "¡Bienvenido a SIPARK!"
         });
         
-        success(`Lectura NFC: ${result.clientName}. Nuevo saldo: C$ ${result.newBalance.toFixed(2)}`);
+        success(`NFC: ${result.clientName}. Nuevo saldo: C$ ${result.newBalance.toFixed(2)}`);
         window.dispatchEvent(new CustomEvent('memberships-updated'));
 
       } catch (err: any) {
         const cleanMessage = err.message.replace(/Error invoking remote method '.*': /i, "");
-        error("NFC: " + cleanMessage);
+        error("Error NFC: " + cleanMessage);
       } finally {
         setTimeout(() => { activeProcessingRef.current = false; }, 2000);
       }
