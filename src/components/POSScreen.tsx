@@ -298,15 +298,39 @@ export function POSScreen({
     success(`Voucher ${pendingVoucherCode} agregado al carrito`);
   };
 
+  const handlersRef = useRef({ handleBarcodeSearch, products });
+  useEffect(() => {
+    handlersRef.current = { handleBarcodeSearch, products };
+  });
+
   // NFC: Interceptar al Oído Global
   useEffect(() => {
     const handleGlobalNfc = (e: Event) => {
       const customEvent = e as CustomEvent;
+      const uid = customEvent.detail.uid;
+
       if (nfcMode !== null) {
          e.preventDefault(); // Detenemos el cobro rápido
-         setNfcInput(customEvent.detail.uid);
-         handleNfcScan(customEvent.detail.uid);
-         success(`¡Tarjeta escaneada automáticamente! (${customEvent.detail.uid})`);
+         setNfcInput(uid);
+         handleNfcScan(uid);
+         success(`¡Tarjeta escaneada automáticamente! (${uid})`);
+         return;
+      }
+
+      const { handleBarcodeSearch: searchFn, products: currentProducts } = handlersRef.current;
+      const cleanBarcode = uid.trim();
+      const VOUCHER_OLD = "SIPARK-VOUCHER:";
+      const VOUCHER_NEW = "SIPARK-VOUCHER-";
+      
+      const isVoucher = cleanBarcode.toUpperCase().startsWith(VOUCHER_OLD) || cleanBarcode.toUpperCase().startsWith(VOUCHER_NEW);
+      // Solo interceptamos como producto si el barcode coincide
+      const isProduct = currentProducts.some(p => p.barcode === cleanBarcode);
+
+      if (isProduct || isVoucher) {
+         e.preventDefault(); // Detenemos el cobro NFC global
+         if (document.activeElement !== barcodeInputRef.current) {
+             searchFn(cleanBarcode);
+         }
       }
     };
     window.addEventListener('nfc-scanned', handleGlobalNfc);

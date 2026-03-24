@@ -113,8 +113,12 @@ async function chargeNfcEntry(uid, amount, userId) {
 
     // Si no se pasó monto (cobro rápido NFC), buscamos el precio por defecto en ajustes directamente
     if (isNaN(chargeAmount) || amount === null) {
-      const entryPriceRow = await getAsync("SELECT value FROM settings WHERE key = $1", ['nfc_entry_price']);
-      chargeAmount = parseFloat(entryPriceRow?.value || "100");
+      try {
+        const row = await getAsync("SELECT value FROM settings WHERE key = $1", ['nfc_entry_price']);
+        chargeAmount = parseFloat(row?.value || "100");
+      } catch (e) {
+        chargeAmount = 100; // Fallback extremo
+      }
     }
 
     if (currentBalance < chargeAmount) {

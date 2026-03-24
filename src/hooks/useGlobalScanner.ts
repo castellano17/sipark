@@ -14,37 +14,37 @@ export function useGlobalScanner(currentPath: string) {
     // significa que la pantalla actual se hizo cargo (ej. POS o Membresias).
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Shift' || e.key === 'Control' || e.key === 'Alt') return;
+      // Ignorar teclas modificadoras o de control largas
+      if (e.key.length > 1 && e.key !== 'Enter') return;
 
       const currentTime = window.performance.now();
       const timeDiff = currentTime - lastKeyTimeRef.current;
       lastKeyTimeRef.current = currentTime;
 
-      // Si es una ráfaga de teclas muy rápida (limite 50ms), es el lector
-      if (timeDiff < 50 && (e.key.length === 1 || e.key === 'Enter')) {
-        e.preventDefault();
-        e.stopPropagation();
-      } else if (timeDiff > 100) {
-        // Si el tiempo entre teclas es humano, reseteamos el buffer de escaneo
+      // Si ha pasado mucho tiempo (>500ms), es un humano o inicio de escaneo. Reseteamos buffer.
+      if (timeDiff > 500) {
         keysRef.current = [];
       }
 
       if (e.key === "Enter") {
         const scannedUid = keysRef.current.join("");
-        keysRef.current = [];
+        keysRef.current = []; // Limpiar para el siguiente
 
-        if (scannedUid.length >= 6) {
-          console.log(`[NFC DEBUG] Captado UID: "${scannedUid}"`);
+        if (scannedUid.length >= 4) {
+          console.log(`\n\n>>> DIGITAL SCANNER DETECTED: "${scannedUid}" <<<\n\n`);
           
-          // Primero intentamos que la pantalla actual (POS o Membresías) maneje el código
           const customEvent = new CustomEvent('nfc-scanned', { 
             detail: { uid: scannedUid },
             cancelable: true 
           });
           const handled = !window.dispatchEvent(customEvent);
 
-          // Si nadie lo manejó, hacemos el cobro automático de entrada
           if (!handled && !activeProcessingRef.current) {
+            const activeTagName = document.activeElement?.tagName.toUpperCase();
+            if (activeTagName === 'INPUT' || activeTagName === 'TEXTAREA') {
+              console.log("Input focused, ignoring global NFC charge.");
+              return;
+            }
             processScan(scannedUid);
           }
         }
