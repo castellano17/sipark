@@ -157,7 +157,8 @@ async function chargeNfcEntry(uid, amount, userId) {
     return { 
       success: true, 
       clientName: cardInfo.client_name,
-      newBalance 
+      newBalance,
+      chargedAmount
     };
   } catch (error) {
     throw error;

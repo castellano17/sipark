@@ -32,16 +32,14 @@ export function CustomerDisplay() {
     visible: boolean;
     type: 'success' | 'error' | 'info';
     title: string;
-    message: string;
-    subMessage?: string;
-    customMessage?: string;
+    clientName?: string;
+    chargedAmount?: number;
+    newBalance?: number;
+    message?: string;
   }>({
     visible: false,
     type: 'info',
     title: '',
-    message: '',
-    subMessage: '',
-    customMessage: ''
   });
 
   // Ciclo del carrusel de publicidad
@@ -79,18 +77,18 @@ export function CustomerDisplay() {
       if (payload.action === "SHOW_NFC_ALERT") {
         setNfcAlert({
           visible: true,
-          type: payload.type || 'info', // success, error
+          type: payload.type || 'info',
           title: payload.title || 'Atención',
+          clientName: payload.clientName,
+          chargedAmount: payload.chargedAmount,
+          newBalance: payload.newBalance,
           message: payload.message || '',
-          subMessage: payload.subMessage || '',
-          customMessage: payload.customMessage || ''
         });
 
-        // Ocultar alerta automáticamente después de 6 segundos
         clearTimeout(timeoutId);
         timeoutId = setTimeout(() => {
           setNfcAlert((prev) => ({ ...prev, visible: false }));
-        }, 6000);
+        }, 5000);
       }
     });
 
@@ -135,35 +133,46 @@ export function CustomerDisplay() {
         </div>
       )}
 
-      {/* ── Capa Superior: Alerta NFC (Superpuesta) ── */}
-      <div className={`absolute inset-0 flex items-center justify-center transition-all duration-500 transform ${nfcAlert.visible ? 'scale-100 opacity-100' : 'scale-90 opacity-0 pointer-events-none'}`}>
+      {/* ── Capa Superior: Alerta Premium NFC (Superpuesta) ── */}
+      <div className={`absolute inset-0 flex items-center justify-center transition-all duration-700 transform ${nfcAlert.visible ? 'scale-100 opacity-100 backdrop-blur-md bg-black/60' : 'scale-95 opacity-0 pointer-events-none'}`}>
         {nfcAlert.visible && (
-          <div className={`shadow-2xl rounded-3xl p-12 max-w-2xl w-full text-center border-4 ${
-            nfcAlert.type === 'success' ? 'bg-green-50 border-green-400' :
-            nfcAlert.type === 'error' ? 'bg-red-50 border-red-400' : 'bg-white border-blue-400'
-          }`}>
+          <div className="relative overflow-hidden shadow-[0_0_60px_rgba(59,130,246,0.5)] rounded-[2.5rem] p-16 max-w-4xl w-full text-center bg-slate-900/80 backdrop-blur-3xl border border-white/20">
+            {/* Destellos y luces de fondo animadas */}
+            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-blue-400 to-transparent opacity-70 animate-pulse"></div>
+            <div className="absolute -top-32 -left-32 w-80 h-80 bg-blue-500 rounded-full mix-blend-screen filter blur-[100px] opacity-40 animate-pulse"></div>
+            <div className="absolute -bottom-32 -right-32 w-80 h-80 bg-indigo-500 rounded-full mix-blend-screen filter blur-[100px] opacity-40 animate-pulse" style={{ animationDelay: '2s' }}></div>
             
-            <div className="mb-6 flex justify-center">
-              {nfcAlert.type === 'success' && <div className="w-32 h-32 bg-green-100 text-green-600 rounded-full flex items-center justify-center text-7xl font-bold">✓</div>}
-              {nfcAlert.type === 'error' && <div className="w-32 h-32 bg-red-100 text-red-600 rounded-full flex items-center justify-center text-7xl font-bold">✗</div>}
-              {nfcAlert.type === 'info' && <div className="w-32 h-32 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-7xl font-bold">!</div>}
+            <div className="relative z-10">
+              {nfcAlert.type === 'success' && (
+                <div className="mx-auto mb-8 w-28 h-28 bg-gradient-to-tr from-green-400 to-emerald-600 shadow-[0_0_40px_rgba(52,211,153,0.6)] text-white rounded-full flex items-center justify-center text-7xl font-bold">✓</div>
+              )}
+              {nfcAlert.type === 'error' && (
+                <div className="mx-auto mb-8 w-28 h-28 bg-gradient-to-tr from-rose-500 to-red-600 shadow-[0_0_40px_rgba(244,63,94,0.6)] text-white rounded-full flex items-center justify-center text-7xl font-bold">✗</div>
+              )}
+
+              <h1 className="text-6xl font-black mb-6 text-transparent bg-clip-text bg-gradient-to-r from-white to-blue-100 drop-shadow-xl tracking-tight leading-tight">{nfcAlert.title}</h1>
+              
+              {nfcAlert.clientName && (
+                <p className="text-5xl font-bold text-blue-300 mb-12 drop-shadow-lg">{nfcAlert.clientName}</p>
+              )}
+
+              {nfcAlert.chargedAmount !== undefined && nfcAlert.newBalance !== undefined ? (
+                <div className="grid grid-cols-2 gap-8 mt-12">
+                  <div className="bg-black/50 rounded-3xl p-8 border border-white/10 flex flex-col items-center justify-center transform transition-transform hover:scale-105 duration-300">
+                    <span className="text-slate-400 text-lg font-bold uppercase tracking-[0.25em] mb-3">Monto Cobrado</span>
+                    <span className="text-5xl font-black text-rose-400 drop-shadow-md">C$ {nfcAlert.chargedAmount.toFixed(2)}</span>
+                  </div>
+                  <div className="bg-gradient-to-b from-blue-900/60 to-blue-950/80 rounded-3xl p-8 border border-blue-400/40 flex flex-col items-center justify-center transform transition-transform hover:scale-105 duration-300 shadow-[0_0_50px_rgba(59,130,246,0.3)]">
+                    <span className="text-blue-200 text-lg font-bold uppercase tracking-[0.25em] mb-3">Saldo Restante</span>
+                    <span className="text-7xl font-black text-white drop-shadow-[0_0_20px_rgba(255,255,255,0.6)]">C$ {nfcAlert.newBalance.toFixed(2)}</span>
+                  </div>
+                </div>
+              ) : (
+                nfcAlert.message && (
+                  <p className="text-4xl text-white mt-8 font-medium">{nfcAlert.message}</p>
+                )
+              )}
             </div>
-
-            <h1 className="text-5xl font-black mb-4 text-slate-800 tracking-tight">{nfcAlert.title}</h1>
-            <p className="text-3xl font-medium text-slate-600 mb-2 leading-snug">{nfcAlert.message}</p>
-            {nfcAlert.subMessage && (
-              <p className="text-2xl font-bold text-slate-800 mt-6 bg-slate-100 py-4 px-6 rounded-2xl inline-block">
-                {nfcAlert.subMessage}
-              </p>
-            )}
-
-            {nfcAlert.customMessage && (
-              <div className="mt-8 pt-8 border-t border-slate-200">
-                <p className="text-4xl font-extrabold text-blue-700 italic animate-pulse">
-                   {nfcAlert.customMessage}
-                </p>
-              </div>
-            )}
           </div>
         )}
       </div>

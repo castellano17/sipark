@@ -1277,6 +1277,17 @@ export function POSScreen({
         onClose={() => setShowPendingOrders(false)}
         onSelectOrder={handleLoadPendingOrder}
       />
+      {(import.meta as any).env?.DEV && (
+        <div className="fixed bottom-6 right-6 z-50">
+          <button 
+            onClick={() => window.dispatchEvent(new CustomEvent('nfc-scanned', { detail: { uid: "04:4A:21:7C:5F:61:81" }, cancelable: true }))}
+            className="flex items-center gap-2 px-6 py-4 bg-purple-600 hover:bg-purple-700 text-white rounded-full font-bold shadow-2xl transition-transform hover:scale-105 animate-bounce shadow-purple-500/50"
+          >
+            <Wifi className="w-5 h-5" />
+            SIMULAR CONEXION NFC
+          </button>
+        </div>
+      )}
     </div>
   );
 }

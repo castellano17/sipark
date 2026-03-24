@@ -27,10 +27,10 @@ export function useGlobalScanner(currentPath: string) {
         api.broadcastToCustomer({
           action: "SHOW_NFC_ALERT",
           type: "success",
-          title: `¡Entrada Autorizada!`,
-          message: `${result.clientName || 'Cliente'}`,
-          subMessage: `Saldo Restante: C$ ${result.newBalance.toFixed(2)}`,
-          customMessage: customMsg || "¡Bienvenido a SIPARK!"
+          title: customMsg || "¡Bienvenido a SIPARK!",
+          clientName: result.clientName || 'Cliente',
+          chargedAmount: result.chargedAmount,
+          newBalance: result.newBalance
         });
         
         success(`NFC: ${result.clientName}. Nuevo saldo: C$ ${result.newBalance.toFixed(2)}`);
