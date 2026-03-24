@@ -3,68 +3,28 @@ import { useNotification } from "./useNotification";
 
 export function useGlobalScanner(currentPath: string) {
   const { error, success } = useNotification();
-  const keysRef = useRef<string[]>([]);
-  const lastKeyTimeRef = useRef<number>(window.performance.now());
   const activeProcessingRef = useRef<boolean>(false);
 
   useEffect(() => {
-    // Si estamos en pantallas que piden que las dejemos manejar sus propios eventos manuales
-    // podemos evitar el hook global, o simplemente disparamos el CustomEvent y que ellos lo atrapen
-    // Dejaremos que dispare siempre un CustomEvent. Si alguien lo atrapa y llama event.preventDefault(),
-    // significa que la pantalla actual se hizo cargo (ej. POS o Membresias).
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Ignorar teclas modificadoras o de control largas
-      if (e.key.length > 1 && e.key !== 'Enter') return;
-
-      const currentTime = window.performance.now();
-      const timeDiff = currentTime - lastKeyTimeRef.current;
-      lastKeyTimeRef.current = currentTime;
-
-      // Si ha pasado mucho tiempo (>500ms), es un humano o inicio de escaneo. Reseteamos buffer.
-      if (timeDiff > 500) {
-        keysRef.current = [];
-      }
-
-      if (e.key === "Enter") {
-        const scannedUid = keysRef.current.join("");
-        keysRef.current = []; // Limpiar para el siguiente
-
-        if (scannedUid.length >= 4) {
-          console.log(`\n\n>>> DIGITAL SCANNER DETECTED: "${scannedUid}" <<<\n\n`);
-          
-          const customEvent = new CustomEvent('nfc-scanned', { 
-            detail: { uid: scannedUid },
-            cancelable: true 
-          });
-          const handled = !window.dispatchEvent(customEvent);
-
-          if (!handled && !activeProcessingRef.current) {
-            const activeTagName = document.activeElement?.tagName.toUpperCase();
-            if (activeTagName === 'INPUT' || activeTagName === 'TEXTAREA') {
-              console.log("Input focused, ignoring global NFC charge.");
-              return;
-            }
-            processScan(scannedUid);
-          }
-        }
-      } else if (e.key.length === 1) {
-        keysRef.current.push(e.key);
-      }
-    };
+    // Escuchar directamente los datos del lector NFC a través de node-hid (Hardware)
+    const api = (window as any).api;
+    if (!api || !api.onNfcData) {
+      console.warn("API de hardware NFC no disponible.");
+      return;
+    }
 
     const processScan = async (uid: string) => {
       activeProcessingRef.current = true;
       try {
-        const result = await (window as any).api.chargeNfcEntry({
+        const result = await api.chargeNfcEntry({
           uid,
           amount: null,
           userId: null
         });
 
-        const customMsg = await (window as any).api.getSetting('nfc_custom_message').catch(() => "");
+        const customMsg = await api.getSetting('nfc_custom_message').catch(() => "");
 
-        (window as any).api.broadcastToCustomer({
+        api.broadcastToCustomer({
           action: "SHOW_NFC_ALERT",
           type: "success",
           title: `¡Entrada Autorizada!`,
@@ -84,7 +44,26 @@ export function useGlobalScanner(currentPath: string) {
       }
     };
 
-    window.addEventListener("keydown", handleKeyDown, { capture: true }); // capture true para ser los primeros en oir
-    return () => window.removeEventListener("keydown", handleKeyDown, { capture: true });
+    const cleanup = api.onNfcData((scannedUid: string) => {
+      console.log(`\n\n>>> HARDWARE HID SCANNER DETECTED: "${scannedUid}" <<<\n\n`);
+      
+      const customEvent = new CustomEvent('nfc-scanned', { 
+        detail: { uid: scannedUid },
+        cancelable: true 
+      });
+      // Despachamos evento al DOM. Si alguien llama preventDefault (ej. POSScreen),
+      // handled será false.
+      const handled = !window.dispatchEvent(customEvent);
+
+      if (!handled && !activeProcessingRef.current) {
+        // En este punto, no revisamos "activeElement" porque el lector corre 
+        // a nivel de hardware, por lo que NUNCA interfiere con inputs.
+        processScan(scannedUid);
+      }
+    });
+
+    return () => {
+      cleanup(); // Limpiar el listener IPC
+    };
   }, [currentPath]);
 }

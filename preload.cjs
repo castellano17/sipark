@@ -568,6 +568,14 @@ contextBridge.exposeInMainWorld("api", {
   getNfcTransactions: (clientMembershipId) => 
     ipcRenderer.invoke("api:getNfcTransactions", clientMembershipId),
 
+  // NFC Hardware Integration
+  getHidDevices: () => ipcRenderer.invoke("api:getHidDevices"),
+  restartNfcListener: () => ipcRenderer.invoke("api:restartNfcListener"),
+  onNfcData: (callback) => {
+    ipcRenderer.on("nfc-data", (_event, uid) => callback(uid));
+    return () => ipcRenderer.removeAllListeners("nfc-data");
+  },
+
   // Promotions
   createCampaign: (data) => ipcRenderer.invoke("api:createCampaign", data),
   getCampaigns: (status) => ipcRenderer.invoke("api:getCampaigns", status),

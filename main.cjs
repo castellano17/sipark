@@ -17,6 +17,7 @@ const quotationsApi = require("./src-electron/quotations-api.cjs");
 const reservationsApi = require("./src-electron/reservations-api.cjs");
 const nfcApi = require("./src-electron/nfc-api.cjs");
 const promotionsApi = require("./src-electron/promotions-api.cjs");
+const nfcHid = require("./src-electron/nfc-hid.cjs");
 
 // =========== SERVIDOR LOCAL WIFI (EXPRESS) ===========
 const express = require('express');
@@ -277,6 +278,9 @@ app.on("ready", async () => {
 
     setupIpcHandlers();
     createWindow();
+    
+    // Iniciar listener de node-hid para el lector NFC Exclusivo
+    nfcHid.startListening(mainWindow, customerWindow);
 
     // Iniciar Servidor Red Local
     startLocalServer();
@@ -527,6 +531,13 @@ function setupIpcHandlers() {
     nfcApi.getNfcTransactions(clientMembershipId)
   );
   ipcMain.handle("api:applyBranding", () => applyBranding());
+  
+  // NFC Hardware Devices
+  ipcMain.handle("api:getHidDevices", () => nfcHid.getAvailableDevices());
+  ipcMain.handle("api:restartNfcListener", async () => {
+    // restart global listener
+    return nfcHid.startListening(mainWindow, customerWindow);
+  });
 
   // Promotions
   ipcMain.handle("api:createCampaign", (event, data) => promotionsApi.createCampaign(data));
