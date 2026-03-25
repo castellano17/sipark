@@ -176,7 +176,12 @@ export function usePrinter() {
       text += `TOTAL:           C$${Number(ticketData.total).toFixed(2)}\n`;
       text += dash + "\n";
       text += `Método: ${methodLabel}\n`;
-      if (ticketData.amountReceived) {
+      if (ticketData.paymentMethod.toLowerCase() === 'cash' || ticketData.paymentMethod.toLowerCase() === 'efectivo') {
+        const received = ticketData.amountReceived !== undefined && !isNaN(ticketData.amountReceived) ? ticketData.amountReceived : ticketData.total;
+        const changeAmount = ticketData.change !== undefined && !isNaN(ticketData.change) ? ticketData.change : 0;
+        text += `Recibido:        C$${Number(received).toFixed(2)}\n`;
+        text += `Cambio:          C$${Number(changeAmount).toFixed(2)}\n`;
+      } else if (ticketData.amountReceived !== undefined && !isNaN(ticketData.amountReceived)) {
         text += `Recibido:        C$${Number(ticketData.amountReceived).toFixed(2)}\n`;
         text += `Cambio:          C$${Number(ticketData.change || 0).toFixed(2)}\n`;
       }
