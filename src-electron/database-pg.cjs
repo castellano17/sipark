@@ -11,57 +11,56 @@ function getConfig() {
   const fs = require('fs');
   const path = require('path');
   
-  // En Electron, usar app.getPath('userData') para consistencia entre dev y prod
+  // Lista de posibles ubicaciones para el db-config.json (para que funcione en Windows build y dev)
   let configDir;
   try {
     const { app } = require('electron');
     configDir = app.getPath('userData');
   } catch (e) {
-    // Si no estamos en el proceso principal de Electron, usar el directorio del usuario
     configDir = path.join(os.homedir(), '.sipark');
   }
 
-  if (!fs.existsSync(configDir)) {
-    try { fs.mkdirSync(configDir, { recursive: true }); } catch(e) {}
-  }
+  const possiblePaths = [
+    path.join(configDir, "db-config.json"),
+    path.join(process.cwd(), "db-config.json"),
+    path.join(path.dirname(process.execPath), "db-config.json") // En caso de ser el .exe
+  ];
 
-  const configPath = path.join(configDir, "db-config.json");
+  let config = null;
+  let finalPath = "";
 
-  // Intentar leer configuración desde archivo
-  if (fs.existsSync(configPath)) {
-    try {
-      const config = JSON.parse(fs.readFileSync(configPath, "utf8"));
-      return config;
-    } catch (error) {
-      console.warn(
-        "⚠️ Error leyendo db-config.json, usando valores por defecto",
-      );
+  for (const p of possiblePaths) {
+    if (fs.existsSync(p)) {
+      try {
+        config = JSON.parse(fs.readFileSync(p, "utf8"));
+        finalPath = p;
+        break;
+      } catch (e) { }
     }
   }
 
-  // Configuración por defecto para PostgreSQL del sistema
+  // Configuración por defecto si no se encontró nada
   const defaultConfig = {
-    host: process.env.DB_HOST || "127.0.0.1", // Usar IPv4 explícitamente
+    host: process.env.DB_HOST || "127.0.0.1",
     port: parseInt(process.env.DB_PORT || "5432"),
     database: process.env.DB_NAME || "ludoteca_pos",
     user: process.env.DB_USER || "ludoteca_user",
     password: process.env.DB_PASSWORD || "ludoteca2024",
     max: 20,
     idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 10000, // 10 segundos para dar más tiempo
+    connectionTimeoutMillis: 10000,
   };
 
-  // Crear el archivo de configuración automáticamente si no existe
+  const selectedConfig = config || defaultConfig;
+  
+  // LOGEAR A QUE BD NOS ESTAMOS CONECTANDO REALMENTE
+  const logFile = path.join(os.homedir(), "sipark_api_debug.txt");
   try {
-    fs.writeFileSync(
-      configPath,
-      JSON.stringify(defaultConfig, null, 2),
-      "utf8",
-    );
-  } catch (error) {
-  }
+    const logMsg = `[${new Date().toISOString()}] DB CONEXION: host=${selectedConfig.host}, db=${selectedConfig.database}, user=${selectedConfig.user}, path=${finalPath || 'DEFAULT'}\n`;
+    fs.appendFileSync(logFile, logMsg);
+  } catch(e) {}
 
-  return defaultConfig;
+  return selectedConfig;
 }
 
 async function initializeDatabase() {
