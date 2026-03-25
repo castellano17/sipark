@@ -929,11 +929,15 @@ async function runAsync(sql, params = []) {
 async function getAsync(sql, params = []) {
   try {
     await checkPool();
-    // Convertir sintaxis SQLite a PostgreSQL
     const pgSql = convertSqliteToPostgres(sql);
-
     const result = await pool.query(pgSql, params);
-    return result.rows[0] || null;
+    if (!result.rows[0]) return null;
+    
+    const normalizedRow = {};
+    for (const key in result.rows[0]) {
+      normalizedRow[key.toLowerCase()] = result.rows[0][key];
+    }
+    return normalizedRow;
   } catch (error) {
     console.error("Database query error:", error);
     throw error;
@@ -943,11 +947,16 @@ async function getAsync(sql, params = []) {
 async function allAsync(sql, params = []) {
   try {
     await checkPool();
-    // Convertir sintaxis SQLite a PostgreSQL
     const pgSql = convertSqliteToPostgres(sql);
-
     const result = await pool.query(pgSql, params);
-    return result.rows || [];
+    
+    return (result.rows || []).map(row => {
+      const normalizedRow = {};
+      for (const key in row) {
+        normalizedRow[key.toLowerCase()] = row[key];
+      }
+      return normalizedRow;
+    });
   } catch (error) {
     console.error("Database query error:", error);
     throw error;
