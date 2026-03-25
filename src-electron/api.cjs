@@ -201,7 +201,7 @@ async function getActiveSessions() {
       FROM active_sessions s
       LEFT JOIN clients c ON s.client_id = c.id
       LEFT JOIN products_services p ON s.package_id = p.id
-      WHERE (s.status = 'active' OR s.status = 'pending')
+      WHERE (LOWER(s.status) = 'active' OR LOWER(s.status) = 'pending')
       ORDER BY s.id DESC
     `);
     
