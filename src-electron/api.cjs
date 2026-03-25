@@ -206,7 +206,13 @@ async function getActiveSessions() {
 
     try { fs.appendFileSync(logFile, `[${new Date().toISOString()}] Dashboard: Total DB=${sessions.length}, Activos=${activeOnes.length}\n`); } catch(e) {}
     
-    return activeOnes;
+    // EXTREMADAMENTE IMPORTANTE PARA WINDOWS / ELECTRON IPC:
+    // Destruir cualquier rastro de objetos nativos (Dates de Postgres, Buffers, etc.)
+    // transformándolos forzosamente en strings puros de JSON.
+    // Si Electron detecta un objeto desconocido de C++, aborta la transmisión en silencio y devuelve [].
+    const safePayload = JSON.parse(JSON.stringify(activeOnes));
+
+    return safePayload;
   } catch (error) {
     try { fs.appendFileSync(logFile, `[${new Date().toISOString()}] FALLO CRITICO: ${error.message}\n`); } catch(e) {}
     throw error;
