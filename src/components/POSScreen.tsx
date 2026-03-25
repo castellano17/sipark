@@ -468,12 +468,22 @@ export function POSScreen({
       return;
     }
 
+    if (["snack", "drink", "food"].includes(product.type) && product.stock !== undefined && product.stock !== null && product.stock <= 0) {
+      warning("Este producto no tiene stock disponible.");
+      return;
+    }
+
     const existingItem = currentSale.items.find(
       (item) => item.product_id === product.id,
     );
 
     let updatedItems: SaleItem[];
     if (existingItem) {
+      if (["snack", "drink", "food"].includes(product.type) && product.stock !== undefined && product.stock !== null && (existingItem.quantity + 1) > product.stock) {
+        warning(`Solo hay ${product.stock} unidades disponibles de este producto.`);
+        return;
+      }
+
       updatedItems = currentSale.items.map((item) =>
         item.product_id === product.id
           ? {
@@ -507,6 +517,16 @@ export function POSScreen({
         if (item.id === itemId) {
           const newQuantity = item.quantity + delta;
           if (newQuantity <= 0) return null;
+          
+          if (delta > 0) {
+            const prodRef = products.find(p => p.id === item.product_id);
+            if (prodRef && ["snack", "drink", "food"].includes(prodRef.type) && prodRef.stock !== undefined && prodRef.stock !== null) {
+              if (newQuantity > prodRef.stock) {
+                // Return same item array element (UI warning could be dispatched)
+                return item; 
+              }
+            }
+          }
           return {
             ...item,
             quantity: newQuantity,

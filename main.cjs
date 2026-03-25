@@ -793,7 +793,8 @@ function setupIpcHandlers() {
           win.webContents.print({
             silent: true,
             deviceName: ticketPrinter,
-            margins: { marginType: 'custom', top: 0, bottom: 0, left: 0, right: 0 }
+            margins: { marginType: 'custom', top: 0, bottom: 0, left: 0, right: 0 },
+            pageSize: { width: 80000, height: 297000 }
           }, (success) => {
             win.close();
             resolve(success);
