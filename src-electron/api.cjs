@@ -217,15 +217,16 @@ async function getActiveSessions() {
     );
     const safePayload = JSON.parse(safePayloadJson);
 
-    // DIAGNÓSTICO DEFINITIVO: Si el motor cree que hay 0, enviará esta tarjeta falsa.
-    // Si esta tarjeta aparece en pantalla, significa que el cable IPC funciona 100% y el problema está en la BD.
-    // Si NO aparece, significa que el cable IPC sigue rompiéndose.
+    // DIAGNÓSTICO DEFINITIVO 2: Comprobar la tabla cruda sin JOINs.
     if (safePayload.length === 0) {
+      const rawCount = await getAsync("SELECT COUNT(*) as total FROM active_sessions");
+      const raw5 = await allAsync("SELECT id, status, is_paid FROM active_sessions ORDER BY id DESC LIMIT 5");
+
       safePayload.push({
          id: -999,
          client_id: 1,
-         client_name: `Motor DB=${sessions.length}, Activos=${activeOnes.length}`,
-         package_name: 'DIAGNOSTICO',
+         client_name: `DB=${sessions.length}, C=${rawCount?.total}, R=${raw5.map(r=>r.id+':'+r.status).join(',')}`,
+         package_name: 'DIAGNOSTICO PROFUNDO',
          start_time: new Date().toISOString(),
          duration_minutes: 60,
          status: 'pending'
