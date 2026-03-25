@@ -181,7 +181,10 @@ async function startSession(clientId, packageId, durationMinutes = 60) {
 }
 
 async function getActiveSessions() {
+  const os = require('os');
   const fs = require('fs');
+  const path = require('path');
+  const logFile = path.join(os.tmpdir(), "sipark_api_logs.txt");
   try {
     const sessions = await allAsync(`
       SELECT 
@@ -198,15 +201,17 @@ async function getActiveSessions() {
         p.name as package_name,
         p.duration_minutes as package_duration
       FROM active_sessions s
-      JOIN clients c ON s.client_id = c.id
+      LEFT JOIN clients c ON s.client_id = c.id
       LEFT JOIN products_services p ON s.package_id = p.id
       WHERE s.status IN ('active', 'pending')
       ORDER BY s.start_time DESC
     `);
-    fs.appendFileSync('/tmp/api_logs.txt', `[${new Date().toISOString()}] getActiveSessions returned ${sessions.length} sessions\n`);
+    
+    try { fs.appendFileSync(logFile, `[${new Date().toISOString()}] getActiveSessions returned ${sessions.length} sessions\n`); } catch(e) {}
+    
     return sessions;
   } catch (error) {
-    fs.appendFileSync('/tmp/api_logs.txt', `[${new Date().toISOString()}] getActiveSessions error: ${error.message}\n`);
+    try { fs.appendFileSync(logFile, `[${new Date().toISOString()}] getActiveSessions error: ${error.message}\n`); } catch(e) {}
     throw error;
   }
 }
@@ -940,8 +945,11 @@ async function createSession(
   isPaid = false,
   childrenCount = 1
 ) {
+  const os = require('os');
   const fs = require('fs');
-  fs.appendFileSync('/tmp/api_logs.txt', `[${new Date().toISOString()}] createSession called with: ${JSON.stringify({clientName, parentName, phone, packageId, durationMinutes, isPaid, childrenCount})}\n`);
+  const path = require('path');
+  const logFile = path.join(os.tmpdir(), "sipark_api_logs.txt");
+  try { fs.appendFileSync(logFile, `[${new Date().toISOString()}] createSession called: ${clientName}, ${packageId}\n`); } catch(e) {}
   try {
     let clientId;
 
@@ -995,8 +1003,11 @@ async function createSession(
 }
 
 async function startTimerSession(sessionId) {
+  const os = require('os');
   const fs = require('fs');
-  fs.appendFileSync('/tmp/api_logs.txt', `[${new Date().toISOString()}] startTimerSession called with: ${sessionId}\n`);
+  const path = require('path');
+  const logFile = path.join(os.tmpdir(), "sipark_api_logs.txt");
+  try { fs.appendFileSync(logFile, `[${new Date().toISOString()}] startTimerSession: ${sessionId}\n`); } catch(e) {}
   try {
     const startTime = getLocalTimestamp();
     await runAsync(
