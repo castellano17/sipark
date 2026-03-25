@@ -492,7 +492,8 @@ async function generateMembershipPDF(pdfData) {
 
     const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
     const isTicket = pdfData.type === "membership_ticket";
-    const filename = `membresia_${isTicket ? "ticket" : "factura"}_${timestamp}.pdf`;
+    const isHistory = pdfData.type === "membership_history";
+    const filename = `membresia_${isHistory ? "historial" : isTicket ? "ticket" : "factura"}_${timestamp}.pdf`;
     const filepath = path.join(pdfDir, filename);
 
     return new Promise((resolve, reject) => {
@@ -525,7 +526,7 @@ async function generateMembershipPDF(pdfData) {
           footerCenter: `ID Membresía: #${membership.id || "N/A"} - ¡Gracias por su preferencia!` 
         };
 
-        drawPDFHeader(doc, companySettings, { title: isTicket ? "TICKET DE MEMBRESÍA" : "FACTURA DE MEMBRESÍA" });
+        drawPDFHeader(doc, companySettings, { title: isHistory ? "HISTORIAL DE MEMBRESÍA" : isTicket ? "TICKET DE MEMBRESÍA" : "FACTURA DE MEMBRESÍA" });
 
         // Información del cliente
         doc.fontSize(12).font("Helvetica-Bold");
@@ -600,6 +601,74 @@ async function generateMembershipPDF(pdfData) {
           doc.fontSize(10).font("Helvetica").fillColor("#666666");
           doc.text(`Notas: ${membership.notes}`);
           doc.moveDown();
+        }
+
+        // Historial de Transacciones
+        if (isHistory && Array.isArray(pdfData.transactions)) {
+          doc.moveDown();
+          doc.fontSize(12).font("Helvetica-Bold").fillColor("black");
+          doc.text("HISTORIAL DE TRANSACCIONES", { underline: true });
+          doc.moveDown(0.5);
+
+          if (pdfData.transactions.length === 0) {
+            doc.fontSize(10).font("Helvetica-Oblique").fillColor("#666666");
+            doc.text("No existen transacciones para esta membresía.");
+          } else {
+            const tableTop = doc.y;
+            const dateX = 50;
+            const typeX = 180;
+            const amountX = 280;
+            const balanceX = 380;
+            const userX = 480;
+
+            doc.fontSize(10).font("Helvetica-Bold").fillColor("#333333");
+            doc.text("Fecha", dateX, tableTop);
+            doc.text("Tipo", typeX, tableTop);
+            doc.text("Monto", amountX, tableTop, { width: 80, align: "right" });
+            doc.text("Saldo", balanceX, tableTop, { width: 80, align: "right" });
+            doc.text("Cajero", userX, tableTop);
+
+            doc.moveTo(dateX, tableTop + 15).lineTo(550, tableTop + 15).stroke();
+            let yPosition = tableTop + 25;
+
+            doc.fontSize(9).font("Helvetica");
+            pdfData.transactions.forEach((t) => {
+              if (yPosition > 700) {
+                doc.addPage();
+                yPosition = 50;
+              }
+              const tDate = new Date(t.created_at).toLocaleString("es-ES", { dateStyle: "short", timeStyle: "short" });
+              let op = "";
+              let amountStr = "";
+              let amountColor = "black";
+              if (t.type === "charge") {
+                op = "Cobro";
+                amountStr = `-${formatCurrency(t.amount)}`;
+                amountColor = "#dc2626";
+              } else if (t.type === "recharge") {
+                op = "Recarga";
+                amountStr = `+${formatCurrency(t.amount)}`;
+                amountColor = "#16a34a";
+              } else if (t.type === "refund") {
+                op = "Reembolso";
+                amountStr = `+${formatCurrency(t.amount)}`;
+                amountColor = "#16a34a";
+              } else {
+                op = t.type;
+                amountStr = formatCurrency(t.amount);
+              }
+
+              doc.fillColor("#333333").text(tDate, dateX, yPosition);
+              doc.text(op, typeX, yPosition);
+              doc.fillColor(amountColor).text(amountStr, amountX, yPosition, { width: 80, align: "right" });
+              doc.fillColor("#2563eb").text(formatCurrency(t.new_balance), balanceX, yPosition, { width: 80, align: "right" });
+              doc.fillColor("#666666").text(t.first_name ? `${t.first_name} ${t.last_name}` : "Sistema", userX, yPosition);
+
+              yPosition += 20;
+            });
+          }
+          doc.moveDown(2);
+          doc.fillColor("black");
         }
 
         // Línea separadora

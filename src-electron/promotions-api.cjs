@@ -61,8 +61,8 @@ async function generateQRBase64(code, campaignInfo = {}) {
     if (validUntil) parts.push(`Válido hasta: ${validUntil}`);
     
     const rawText = parts.join(" - ");
-    // Limpiar tildes para no tener problemas con diferentes encoding de lectores/impresoras
-    const qrText = rawText.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    // Los QR soportan UTF-8 completo: tildes, ñ, etc. No es necesario limpiarlos.
+    const qrText = rawText;
     return await QRCode.toDataURL(qrText, {
       errorCorrectionLevel: "M",
       width: 220,

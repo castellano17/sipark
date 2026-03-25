@@ -250,9 +250,12 @@ export default function Promotions() {
           const qrRawText = `${pCampaignName} - ${pBenefit}${pTill ? " - " + pTill : ""}`;
           const qrText = removeAccents(qrRawText);
 
+          const pDescription = removeAccents(v.campaign_description || "");
+
           let t = INIT + CENTER;
           t += BOLD_ON + DOUBLE + pBusinessLine + "\n" + NORMAL + BOLD_OFF;
           t += DOUBLE + pCampaignName + "\n" + NORMAL;
+          if (pDescription) t += CENTER + pDescription + "\n";
           t += "--------------------------------\n";
           t += DOUBLE + BOLD_ON + pBenefit + "\n" + NORMAL + BOLD_OFF;
           t += "\n";
@@ -339,13 +342,13 @@ export default function Promotions() {
         <div class="voucher" style="max-width:${voucherWidth}">
           ${businessHeader}
           <h2 class="campaign-name">${v.campaign_name}</h2>
+          ${v.campaign_description ? `<p class="desc">${v.campaign_description}</p>` : ""}
           <p class="benefit">${benefit}</p>
           <div class="voucher-images">
             ${qrImg}
             <div class="barcode-wrap">${barcodeHtml}</div>
           </div>
           <div class="voucher-code">${v.code}</div>
-          ${v.campaign_description ? `<p class="desc">${v.campaign_description}</p>` : ""}
           ${validUntilStr ? `<p class="valid">${validUntilStr}</p>` : ""}
           <p class="uses">Usos: ${v.max_uses === 1 ? "1 uso" : `${v.max_uses} usos`}</p>
           <p class="footer">Nicaragua — Hora de Managua (GMT-6)</p>
@@ -364,18 +367,18 @@ export default function Promotions() {
         .biz-info{font-size:13px;color:#444;margin:1px 0}
         .biz-divider{border:none;border-top:1px solid #999;margin:6px 0}
         .voucher{border:2px dashed #666;border-radius:12px;padding:16px;margin:12px auto;
-          text-align:center;page-break-inside:avoid;max-width:160mm}
+          text-align:center;page-break-inside:avoid;max-width:160mm;overflow:hidden}
         h2.campaign-name{margin:0 0 4px;font-size:18px;color:#1a1a2e}
         .benefit{font-size:24px;font-weight:bold;color:#4f46e5;margin:4px 0}
         .voucher-images{display:flex;flex-direction:column;align-items:center;gap:10px;margin:12px 0}
         .qr{width:50mm;height:50mm;object-fit:contain}
-        .barcode-wrap{width:100%;display:block;text-align:center}
-        .barcode{width:130mm;height:18mm;object-fit:contain;display:block;margin:0 auto}
-        .barcode-svg{width:130mm;height:18mm;overflow:hidden;margin:0 auto}
-        .barcode-svg svg{width:100%;height:100%}
+        .barcode-wrap{width:100%;max-width:100%;display:block;text-align:center;overflow:hidden;padding:0 4px}
+        .barcode{width:100%;max-width:100%;height:18mm;object-fit:contain;display:block;margin:0 auto}
+        .barcode-svg{width:100%;max-width:100%;height:18mm;overflow:hidden;margin:0 auto}
+        .barcode-svg svg{width:100%;height:100%;display:block}
         .no-img{font-size:10px;color:#999}
         .voucher-code{font-family:monospace;font-size:22px;font-weight:bold;letter-spacing:4px;color:#333;margin:8px 0}
-        .desc{font-size:13px;color:#666;margin:3px 0}
+        .desc{font-size:14px;color:#333;margin:3px 0 8px;font-style:italic}
         .valid{font-size:14px;color:#555;margin:2px 0;font-weight:bold}
         .uses{font-size:12px;color:#888;margin:2px 0}
         .footer{font-size:10px;color:#aaa;margin:4px 0 0}

@@ -455,6 +455,79 @@ export function usePrinter() {
     }
   };
 
+  const printMembershipHistoryTicket = async (membership: any, transactions: any[]) => {
+    try {
+      if (!ticketPrinter) return false;
+
+      let config: any = null;
+      let currencySymbol = "C$";
+      try {
+        const saved = await window.api.getSetting("ticket_config");
+        if (saved) config = JSON.parse(saved);
+        const primary = await window.api.getSetting("currency_primary");
+        if (primary === "USD") currencySymbol = "$";
+        else if (primary === "NIO") currencySymbol = "C$";
+      } catch {}
+
+      const businessName = config?.businessName || "SIPARK LUDOTECA";
+      let width = config?.paperWidth || 48;
+      if (width < 32) width = 32;
+
+      const INIT_SEQ = "\x1B\x40\x1C\x2E\x1B\x74\x10";
+      const CUT_SEQ = "\x1D\x56\x00";
+
+      const line = "=".repeat(width);
+      const dash = "-".repeat(width);
+      const center = (text: string) => {
+        const pad = Math.max(0, Math.floor((width - text.length) / 2));
+        return " ".repeat(pad) + text;
+      };
+
+      let text = INIT_SEQ + "\n";
+      text += line + "\n";
+      text += center(businessName.toUpperCase()) + "\n";
+      text += center("HISTORIAL DE MEMBRESÍA") + "\n";
+      text += line + "\n";
+      text += `Cliente: ${membership.client_name}\n`;
+      text += `Membresía: ${membership.membership_name}\n`;
+      if (membership.total_hours) text += `Horas Restantes: ${membership.total_hours}\n`;
+      text += `Saldo: ${currencySymbol}${Number(membership.balance || 0).toFixed(2)}\n`;
+      text += dash + "\n";
+
+      if (transactions.length === 0) {
+        text += center("No hay transacciones") + "\n";
+      } else {
+        transactions.forEach((t) => {
+          const tDate = new Date(t.created_at).toLocaleString("es-ES", { dateStyle: "short", timeStyle: "short" });
+          let op = "";
+          let amountStr = "";
+          if (t.type === "charge") {
+            op = "Cobro";
+            amountStr = `-${currencySymbol}${Number(t.amount).toFixed(2)}`;
+          } else if (t.type === "recharge") {
+            op = "Recarga";
+            amountStr = `+${currencySymbol}${Number(t.amount).toFixed(2)}`;
+          } else if (t.type === "refund") {
+            op = "Reembolso";
+            amountStr = `+${currencySymbol}${Number(t.amount).toFixed(2)}`;
+          } else {
+            op = t.type;
+            amountStr = `${currencySymbol}${Number(t.amount).toFixed(2)}`;
+          }
+          text += `${tDate} | ${op}\n`;
+          text += `  Monto: ${amountStr}  Saldo: ${currencySymbol}${Number(t.new_balance).toFixed(2)}\n`;
+        });
+      }
+
+      text += line + "\n\n\n\n" + CUT_SEQ;
+
+      await (window as any).api.printTicket(ticketPrinter, text);
+      return true;
+    } catch (error) {
+      return false;
+    }
+  };
+
   const printRawText = async (text: string): Promise<boolean> => {
     try {
       if (!ticketPrinter) return false;
@@ -482,6 +555,7 @@ export function usePrinter() {
     printTicket,
     printMembershipTicket,
     printMembershipInvoice,
+    printMembershipHistoryTicket,
     printRawText,
     loadPrinters,
   };
