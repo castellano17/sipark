@@ -194,8 +194,10 @@ export function POSScreen({
 
   const loadProducts = async () => {
     const rows = await getProductsServices();
-    setProducts(rows);
-    setFilteredProducts(rows);
+    // Excluir paquetes del POS - solo se venden desde Operaciones
+    const posProducts = rows.filter((p: any) => p.type !== "package");
+    setProducts(posProducts);
+    setFilteredProducts(posProducts);
   };
 
   const checkCashBoxStatus = async () => {
@@ -207,11 +209,9 @@ export function POSScreen({
   const loadCategories = async () => {
     try {
       const data = await (window as any).api.getCategories();
-      // Filtrar para ocultar las categorías que el usuario no quiere (excepto Paquetes)
-      const systemCategoriesToHide = ["Bebidas", "Comida", "Alquiler", "Eventos", "Membresía", "Snacks", "Tiempo"];
-      const filtered = data.filter((cat: any) => 
-        cat.name === "Paquetes" || !systemCategoriesToHide.includes(cat.name)
-      );
+      // Ocultar categorías de sistema y Paquetes (solo se gestionan en Operaciones)
+      const categoriesToHide = ["Bebidas", "Comida", "Alquiler", "Eventos", "Membresía", "Snacks", "Tiempo", "Paquetes"];
+      const filtered = data.filter((cat: any) => !categoriesToHide.includes(cat.name));
       setDbCategories(filtered);
     } catch (err) {
     }

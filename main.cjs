@@ -476,9 +476,18 @@ function setupIpcHandlers() {
   ipcMain.handle("api:startSession", (event, data) =>
     api.startSession(data.clientId, data.packageId, data.durationMinutes),
   );
+  ipcMain.handle("api:createSession", (event, data) =>
+    api.createSession(data.clientName, data.parentName, data.phone, data.packageId, data.durationMinutes, data.isPaid, data.childrenCount),
+  );
+  ipcMain.handle("api:startTimerSession", (event, data) =>
+    api.startTimerSession(data.sessionId),
+  );
   ipcMain.handle("api:getActiveSessions", () => api.getActiveSessions());
   ipcMain.handle("api:endSession", (event, data) =>
     api.endSession(data.sessionId, data.finalPrice),
+  );
+  ipcMain.handle("api:setPackageIsStandardEntry", (event, data) =>
+    api.setPackageIsStandardEntry(data.packageId, data.isStandardEntry),
   );
 
   // Products/Services

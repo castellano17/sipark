@@ -25,6 +25,7 @@ interface FormData {
   duration: string;
   durationUnit: "minutes" | "hours";
   description: string;
+  isStandardEntry: boolean;
 }
 
 interface PackageFeature {
@@ -50,6 +51,7 @@ export const PackagesManager: React.FC = () => {
     duration: "",
     durationUnit: "hours",
     description: "",
+    isStandardEntry: false,
   });
   const [deleteTarget, setDeleteTarget] = useState<ProductService | null>(null);
   const {
@@ -93,6 +95,7 @@ export const PackagesManager: React.FC = () => {
       duration: "",
       durationUnit: "hours",
       description: "",
+      isStandardEntry: false,
     });
     setFeatureSelections({});
     setModalMode("create");
@@ -113,6 +116,7 @@ export const PackagesManager: React.FC = () => {
         : durationMinutes.toString(),
       durationUnit: isHours ? "hours" : "minutes",
       description: pkg.category || "",
+      isStandardEntry: !!(pkg as any).is_standard_entry,
     });
 
     // Cargar características incluidas
@@ -148,6 +152,7 @@ export const PackagesManager: React.FC = () => {
       duration: "",
       durationUnit: "hours",
       description: "",
+      isStandardEntry: false,
     });
     setFeatureSelections({});
   };
@@ -232,6 +237,12 @@ export const PackagesManager: React.FC = () => {
           packageId,
           selectionsArray,
         );
+
+        // Guardar flag de entrada estándar
+        await (window as any).api.setPackageIsStandardEntry({
+          packageId,
+          isStandardEntry: formData.isStandardEntry,
+        });
       }
 
       await cargarPaquetes();
@@ -485,6 +496,23 @@ export const PackagesManager: React.FC = () => {
                 </div>
               </div>
             </div>
+
+              {/* Entrada Estándar toggle */}
+              <div className="flex items-center justify-between p-4 border border-slate-200 rounded-lg bg-slate-50">
+                <div>
+                  <p className="text-sm font-semibold text-slate-900">Entrada Estándar</p>
+                  <p className="text-xs text-slate-500 mt-0.5">Solo permite 1 niño por entrada. Para agregar otro niño se debe cobrar otra entrada.</p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={formData.isStandardEntry}
+                    onChange={(e) => setFormData({ ...formData, isStandardEntry: e.target.checked })}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-slate-300 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                </label>
+              </div>
 
             {/* Características Incluidas */}
             <div>

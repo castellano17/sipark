@@ -994,7 +994,7 @@ async function startTimerSession(sessionId) {
   try {
     const startTime = getLocalTimestamp();
     await runAsync(
-      "UPDATE active_sessions SET status = 'active', start_time = ? WHERE id = ?",
+      "UPDATE active_sessions SET status = 'active', start_time = $1 WHERE id = $2",
       [startTime, sessionId]
     );
     return true;
@@ -1002,6 +1002,19 @@ async function startTimerSession(sessionId) {
     throw error;
   }
 }
+
+async function setPackageIsStandardEntry(packageId, isStandardEntry) {
+  try {
+    await runAsync(
+      "UPDATE products_services SET is_standard_entry = $1 WHERE id = $2",
+      [isStandardEntry ? 1 : 0, packageId]
+    );
+    return true;
+  } catch (error) {
+    throw error;
+  }
+}
+
 
 async function updateSessionPaidStatus(sessionId, isPaid) {
   try {
@@ -4732,6 +4745,7 @@ module.exports = {
   getPendingWaiterOrders,
   updateWaiterOrderStatus,
   deleteWaiterOrder,
+  setPackageIsStandardEntry,
 };
 
 async function openCashDrawerWithAudit(userId, printerName, reason = "Apertura manual") {

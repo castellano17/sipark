@@ -68,6 +68,9 @@ async function migrateDatabase() {
       db.prepare("ALTER TABLE products_services ADD COLUMN barcode TEXT").run();
     }
 
+    if (!prodColumnNames.includes("is_standard_entry")) {
+      db.prepare("ALTER TABLE products_services ADD COLUMN is_standard_entry INTEGER DEFAULT 0").run();
+    }
 
 
     // Verificar columnas de active_sessions

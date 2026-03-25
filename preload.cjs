@@ -297,7 +297,9 @@ contextBridge.exposeInMainWorld("api", {
       isPaid,
     }),
   startTimerSession: (sessionId) =>
-    ipcRenderer.invoke("api:startTimerSession", sessionId),
+    ipcRenderer.invoke("api:startTimerSession", { sessionId }),
+  setPackageIsStandardEntry: (data) =>
+    ipcRenderer.invoke("api:setPackageIsStandardEntry", data),
 
   // Health Check
   checkDatabaseConnection: () =>
