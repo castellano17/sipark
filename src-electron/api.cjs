@@ -210,7 +210,12 @@ async function getActiveSessions() {
     // Destruir cualquier rastro de objetos nativos (Dates de Postgres, Buffers, etc.)
     // transformándolos forzosamente en strings puros de JSON.
     // Si Electron detecta un objeto desconocido de C++, aborta la transmisión en silencio y devuelve [].
-    const safePayload = JSON.parse(JSON.stringify(activeOnes));
+    // ADEMÁS, PostgreSQL 'pg' driver a menudo devuelve BIGINTs como objetos BigInt natively. 
+    // JSON.stringify tira un FATAL ERROR de TYPE si encuentra un BigInt, causando que la pantalla quede en 0.
+    const safePayloadJson = JSON.stringify(activeOnes, (key, value) =>
+      typeof value === 'bigint' ? Number(value) : value
+    );
+    const safePayload = JSON.parse(safePayloadJson);
 
     return safePayload;
   } catch (error) {
