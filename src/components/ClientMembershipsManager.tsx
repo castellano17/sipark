@@ -139,6 +139,7 @@ export function ClientMembershipsManager() {
           phone: membership.phone,
           id_card: membership.id_card,
           total_hours: membership.total_hours,
+          isReprint: true,
         });
         success("Imprimiendo ticket en impresora térmica...");
       } else {
@@ -151,6 +152,7 @@ export function ClientMembershipsManager() {
           phone: membership.phone,
           id_card: membership.id_card,
           total_hours: membership.total_hours,
+          isReprint: true,
         });
         success("Factura PDF generada");
       }
@@ -351,7 +353,7 @@ export function ClientMembershipsManager() {
               <tr>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Cliente</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Membresía</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Saldo (NFC)</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Saldo (Membresía)</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Cédula / Tel.</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Horas</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Inicio / Vence</th>

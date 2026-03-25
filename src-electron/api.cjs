@@ -967,11 +967,11 @@ async function createSession(
       }
     }
 
-    // Crear sesión
+    // Crear sesión e iniciar de inmediato (estado active)
     const startTime = getLocalTimestamp();
     const sessionResult = await runAsync(
       "INSERT INTO active_sessions (client_id, start_time, package_id, duration_minutes, status, is_paid, children_count) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id",
-      [clientId, startTime, packageId, durationMinutes, "pending", isPaid, childrenCount],
+      [clientId, startTime, packageId, durationMinutes, "active", isPaid, childrenCount],
     );
 
     return {
@@ -980,7 +980,7 @@ async function createSession(
       client_name: clientName,
       start_time: startTime,
       package_id: packageId,
-      status: "pending",
+      status: "active",
       duration_minutes: durationMinutes,
       is_paid: isPaid,
       children_count: childrenCount

@@ -846,7 +846,7 @@ export const Settings: React.FC = () => {
 
                   <div>
                     <label className="block text-sm font-semibold text-slate-900 mb-2">
-                      Precio de Entrada por NFC
+                      Precio de Entrada con Membresía
                     </label>
                     <input
                       type="number"
@@ -879,7 +879,7 @@ export const Settings: React.FC = () => {
                 <div className="mt-4 border-t border-slate-100 pt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-semibold text-slate-900 mb-2">
-                      Mensaje personalizado en Pantalla TV (Ventas/NFC)
+                      Mensaje personalizado en Pantalla TV (Ventas/Membresía)
                     </label>
                     <input
                       type="text"

@@ -541,7 +541,13 @@ async function generateMembershipPDF(pdfData) {
         doc.text("DATOS DE LA MEMBRESÍA", { underline: true });
         doc.font("Helvetica").fontSize(11);
         doc.text(`Tipo: ${membership.membership_name || "N/A"}`);
-        if (membership.total_hours) doc.text(`N° Entradas: ${membership.total_hours}`);
+        if (membership.total_hours) {
+          if (pdfData.isReprint) {
+            doc.text(`Horas Restantes / N° Entradas: ${membership.total_hours}`);
+          } else {
+            doc.text(`N° Entradas: ${membership.total_hours}`);
+          }
+        }
         if (membership.acquisition_date) doc.text(`Adquisición: ${new Date(membership.acquisition_date).toLocaleDateString("es-ES")}`);
         
         let start_date = "N/A";
@@ -566,15 +572,26 @@ async function generateMembershipPDF(pdfData) {
         doc.text(`Método de Pago: ${(membership.payment_method || "N/A").toUpperCase()}`);
         doc.moveDown();
 
-        // Total - destacado
+        // Total o Saldo - destacado
         doc.fontSize(14).font("Helvetica-Bold");
-        doc.text("TOTAL PAGADO:", { continued: false });
-        doc
-          .fontSize(24)
-          .fillColor("#2563eb")
-          .text(`${formatCurrency(membership.payment_amount || 0)}`, {
-            align: "center",
-          });
+        if (pdfData.isReprint) {
+          doc.text("SALDO TOTAL:", { continued: false });
+          const saldo = membership.balance !== undefined ? membership.balance : (membership.payment_amount || 0);
+          doc
+            .fontSize(24)
+            .fillColor("#2563eb")
+            .text(`${formatCurrency(saldo)}`, {
+              align: "center",
+            });
+        } else {
+          doc.text("TOTAL PAGADO:", { continued: false });
+          doc
+            .fontSize(24)
+            .fillColor("#2563eb")
+            .text(`${formatCurrency(membership.payment_amount || 0)}`, {
+              align: "center",
+            });
+        }
         doc.fillColor("black");
         doc.moveDown(2);
 

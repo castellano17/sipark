@@ -204,7 +204,8 @@ export function usePrinter() {
         try {
           const base64Logo = await (window as any).api.getLogo("ticket");
           if (base64Logo) {
-            logoEscPos = await logoToEscPos(base64Logo, 384);
+            const smallLogo = await logoToEscPos(base64Logo, 200);
+            logoEscPos = "\x1B\x61\x01" + smallLogo + "\x1B\x61\x00";
           }
         } catch {}
       }
@@ -268,12 +269,14 @@ export function usePrinter() {
       if (footerMessage) text += center(footerMessage) + "\n";
       text += line + "\n\n\n";
 
-      // ESC/POS Barcode (Code 39)
+      // ESC/POS Barcode (Code 39) - Centrado
       const saleIdStr = String(ticketData.saleId);
+      text += "\x1B\x61\x01"; // Centrar Barcode
       text += "\x1D\x68\x50"; // Height 80
       text += "\x1D\x77\x03"; // Width 3
       text += "\x1D\x48\x02"; // HRI character below
       text += `\x1D\x6B\x04${saleIdStr}\x00`; // Code 39
+      text += "\x1B\x61\x00"; // Restaurar a izquierda
       text += "\n\n\n\n\n\n";
 
       text += CUT_SEQ;
@@ -311,17 +314,29 @@ export function usePrinter() {
         return false;
       }
 
+      let config: any = null;
       let currencySymbol = "C$";
       try {
+        const saved = await window.api.getSetting("ticket_config");
+        if (saved) config = JSON.parse(saved);
+
         const primary = await window.api.getSetting("currency_primary");
         if (primary === "USD") currencySymbol = "$";
         else if (primary === "NIO") currencySymbol = "C$";
       } catch {}
 
+      const businessName    = config?.businessName    || "SIPARK LUDOTECA";
+      const businessAddress = config?.businessAddress || "";
+      const businessPhone   = config?.businessPhone   || "";
+      const headerMessage   = config?.headerMessage   || "";
+      const footerMessage   = config?.footerMessage   || "¡Gracias por su compra!";
+      let width = config?.paperWidth || 48;
+      // Normalizar ancho para 58mm (si es 32) u 80mm (si es 48)
+      if (width < 32) width = 32;
+
       const INIT_SEQ = "\x1B\x40\x1C\x2E\x1B\x74\x10";
       const CUT_SEQ = "\x1D\x56\x00";
 
-      const width = 48;
       const line = "=".repeat(width);
       const dash = "-".repeat(width);
       const center = (text: string) => {
@@ -329,12 +344,33 @@ export function usePrinter() {
         return " ".repeat(padding) + text;
       };
 
+      let logoEscPos = "";
+      if (config?.showLogo ?? true) {
+        try {
+          const base64Logo = await (window as any).api.getLogo("ticket");
+          if (base64Logo) {
+            const smallLogo = await logoToEscPos(base64Logo, 200);
+            logoEscPos = "\x1B\x61\x01" + smallLogo + "\x1B\x61\x00";
+          }
+        } catch {}
+      }
+
+      // Referencias booleanas
+      const showBusinessName = config?.showBusinessName ?? true;
+      const showAddress      = config?.showAddress      ?? true;
+      const showPhone        = config?.showPhone        ?? true;
+
       // Formatear ticket para impresora térmica
       let ticketText = INIT_SEQ + "\n";
+      if (logoEscPos) ticketText += logoEscPos;
       ticketText += line + "\n";
-      ticketText += center("SIPARK LUDOTECA") + "\n";
+      if (showBusinessName) ticketText += center(businessName.toUpperCase()) + "\n";
+      if (showAddress && businessAddress) ticketText += center(businessAddress) + "\n";
+      if (showPhone && businessPhone) ticketText += center(`Tel: ${businessPhone}`) + "\n";
+      if (headerMessage) ticketText += center(headerMessage) + "\n";
       ticketText += line + "\n";
-      ticketText += `TICKET DE MEMBRESÍA\n`;
+      
+      ticketText += membership.isReprint ? `REIMPRESIÓN DE MEMBRESÍA\n` : `TICKET DE MEMBRESÍA\n`;
       ticketText += `Fecha: ${new Date().toLocaleString("es-ES")}\n`;
       ticketText += dash + "\n";
       ticketText += `Cliente: ${membership.client_name}\n`;
@@ -342,7 +378,15 @@ export function usePrinter() {
       if (membership.id_card) ticketText += `Ced: ${membership.id_card}\n`;
       ticketText += dash + "\n";
       ticketText += `Membresía: ${membership.membership_name}\n`;
-      if (membership.total_hours) ticketText += `Horas: ${membership.total_hours}\n`;
+
+      if (membership.total_hours) {
+        if (membership.isReprint) {
+          ticketText += `Horas Restantes: ${membership.total_hours}\n`;
+        } else {
+          ticketText += `Horas: ${membership.total_hours}\n`;
+        }
+      }
+
       ticketText += `Inicio: ${new Date(membership.start_date).toLocaleDateString("es-ES")}\n`;
       ticketText += `Vence: ${new Date(membership.end_date).toLocaleDateString("es-ES")}\n`;
       ticketText += dash + "\n";
@@ -354,9 +398,17 @@ export function usePrinter() {
       const methodLabel = paymentMethodMap[membership.payment_method] || (membership.payment_method || "EFECTIVO").toUpperCase();
 
       ticketText += `Método: ${methodLabel}\n`;
-      ticketText += `TOTAL: ${currencySymbol}${Number(membership.payment_amount).toFixed(2)}\n`;
+      
+      // Mostrar SALDO TOTAL en vez de TOTAL pagado si es reimpresión
+      if (membership.isReprint) {
+        const saldoEnNFC = membership.balance !== undefined ? membership.balance : membership.payment_amount;
+        ticketText += `Saldo Total: ${currencySymbol}${Number(saldoEnNFC).toFixed(2)}\n`;
+      } else {
+        ticketText += `TOTAL: ${currencySymbol}${Number(membership.payment_amount).toFixed(2)}\n`;
+      }
+      
       ticketText += line + "\n";
-      ticketText += center("¡Gracias por su compra!") + "\n";
+      ticketText += center(footerMessage) + "\n";
       ticketText += line + "\n\n\n\n";
       ticketText += CUT_SEQ;
       // Imprimir en impresora térmica

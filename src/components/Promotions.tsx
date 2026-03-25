@@ -238,22 +238,30 @@ export default function Promotions() {
           const benefit = getBenefitLabel(v.type as CampaignType, parseFloat(v.benefit_value));
           const till = v.valid_until ? `Valido hasta: ${formatDateES(v.valid_until)}` : "";
 
-          // Información del QR sin caracteres especiales/tildes para evitar caracteres chinos en la impresora
-          const qrRawText = `${v.campaign_name} - ${benefit}${till ? " - " + till : ""}`;
-          const qrText = qrRawText.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+          // Función para limpiar tildes en todo el texto del ticket
+          const removeAccents = (str: string) => str ? str.normalize("NFD").replace(/[\u0300-\u036f]/g, "") : "";
+          
+          const pBusinessLine = removeAccents(businessLine);
+          const pCampaignName = removeAccents(v.campaign_name);
+          const pBenefit = removeAccents(benefit);
+          const pTill = removeAccents(till);
+
+          // Información del QR sin caracteres especiales
+          const qrRawText = `${pCampaignName} - ${pBenefit}${pTill ? " - " + pTill : ""}`;
+          const qrText = removeAccents(qrRawText);
 
           let t = INIT + CENTER;
-          t += BOLD_ON + DOUBLE + businessLine + "\n" + NORMAL + BOLD_OFF;
-          t += DOUBLE + v.campaign_name + "\n" + NORMAL;
+          t += BOLD_ON + DOUBLE + pBusinessLine + "\n" + NORMAL + BOLD_OFF;
+          t += DOUBLE + pCampaignName + "\n" + NORMAL;
           t += "--------------------------------\n";
-          t += DOUBLE + BOLD_ON + benefit + "\n" + NORMAL + BOLD_OFF;
+          t += DOUBLE + BOLD_ON + pBenefit + "\n" + NORMAL + BOLD_OFF;
           t += "\n";
           t += escQR(qrText, 12);  // QR más grande (tamaño 12)
           t += "\n";
           t += escBarcode(v.code);  // Barcode grande
           t += "\n";
           t += CENTER + DOUBLE + BOLD_ON + v.code + "\n" + NORMAL + BOLD_OFF;
-          if (till) t += CENTER + till + "\n";
+          if (pTill) t += CENTER + pTill + "\n";
           t += "\n";
           t += CENTER + `Usos: ${v.max_uses === 1 ? "1 uso" : `${v.max_uses} usos`}` + "\n";
           t += "\n\n\n";

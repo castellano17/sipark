@@ -464,7 +464,7 @@ export function POSScreen({
     const rechargeItem: SaleItem = {
       id: crypto.randomUUID(),
       product_id: -99,                              // ID especial para recarga NFC
-      product_name: `Recarga NFC – ${nfcCardInfo.client_name}`,
+      product_name: `Recargar Membresía – ${nfcCardInfo.client_name}`,
       product_type: 'membership',
       quantity: 1,
       unit_price: amount,
@@ -823,20 +823,20 @@ export function POSScreen({
             className="flex-1 md:flex-none gap-2 border-purple-400 text-purple-700 hover:bg-purple-50 font-semibold"
             onClick={() => openNfcModal('charge')}
             disabled={!cashBoxOpen}
-            title="Cobrar entrada con tarjeta NFC"
+            title="Cobrar entrada con tarjeta de membresía"
           >
             <Wifi className="w-4 h-4" />
-            <span className="hidden md:inline">Cobrar NFC</span>
+            <span className="hidden md:inline">Cobrar Membresía</span>
           </Button>
           <Button
             variant="outline"
             className="flex-1 md:flex-none gap-2 border-blue-400 text-blue-700 hover:bg-blue-50 font-semibold"
             onClick={() => openNfcModal('recharge')}
             disabled={!cashBoxOpen}
-            title="Recargar membresía con tarjeta NFC"
+            title="Recargar membresía"
           >
             <CreditCard className="w-4 h-4" />
-            <span className="hidden md:inline">Recargar NFC</span>
+            <span className="hidden md:inline">Recargar Membresía</span>
           </Button>
           <Button
             variant="outline"
@@ -1180,7 +1180,7 @@ export function POSScreen({
                   : <CreditCard className="w-7 h-7" />}
                 <div>
                   <h2 className="text-xl font-bold">
-                    {nfcMode === 'charge' ? 'Cobrar Entrada NFC' : 'Recargar Membresía NFC'}
+                    {nfcMode === 'charge' ? 'Cobrar Membresía' : 'Recargar Membresía'}
                   </h2>
                   <p className="text-sm opacity-80">
                     {nfcMode === 'charge'
