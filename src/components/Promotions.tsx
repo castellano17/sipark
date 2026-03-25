@@ -270,12 +270,31 @@ export default function Promotions() {
     }).join("");
 
     const ticketCss = isTicket ? `
-      body{width:72mm;margin:0;padding:0}
-      .voucher{width:72mm;margin:0;border:none;border-radius:0;border-top:1px dashed #000;padding:8px}
-      .qr{width:60mm;height:60mm}
-      .barcode{width:60mm;height:40px}
-      .benefit{font-size:14px}
-      .voucher-code{font-size:14px;letter-spacing:2px}
+      @page{size:80mm auto;margin:0}
+      body{width:72mm;margin:0;padding:0;font-size:14px}
+      .voucher{
+        width:72mm;margin:0;border:none;border-radius:0;
+        border-top:2px dashed #000;padding:6px 4px 10px;
+        page-break-after:always;
+      }
+      .biz-name{font-size:16px}
+      .biz-info{font-size:12px}
+      h2.campaign-name{font-size:16px;margin:4px 0}
+      .benefit{font-size:18px;font-weight:bold;margin:4px 0}
+      .voucher-images{
+        display:flex;flex-direction:column;
+        align-items:center;gap:6px;margin:8px 0
+      }
+      .qr{width:64mm;height:64mm;display:block}
+      .barcode-wrap{width:100%;display:block;text-align:center}
+      .barcode{width:68mm;height:50px;display:block;margin:0 auto}
+      .barcode-svg{width:100%;overflow:visible}
+      .barcode-svg svg{width:100%;height:50px}
+      .voucher-code{font-size:16px;letter-spacing:3px;font-weight:bold;margin:4px 0}
+      .desc{font-size:12px}
+      .valid{font-size:13px;font-weight:bold}
+      .uses{font-size:11px}
+      .footer{font-size:10px}
     ` : "";
 
     return `<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><title>Vouchers — ${business.name || "SIPARK"}</title>

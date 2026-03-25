@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
  * Convierte una imagen en base64 al formato ESC/POS rasterizado (GS v 0).
  * La imagen es escalada a max 384px de ancho (80mm / 203dpi), y convertida a 1-bit.
  */
-async function logoToEscPos(base64: string, maxWidth = 384): Promise<string> {
+async function logoToEscPos(base64: string, maxWidth = 150): Promise<string> {
   return new Promise((resolve) => {
     const img = new Image();
     img.onload = () => {
@@ -403,6 +403,18 @@ export function usePrinter() {
     }
   };
 
+  const printRawText = async (text: string): Promise<boolean> => {
+    try {
+      if (!ticketPrinter) return false;
+      const ESC = "\x1B";
+      const CUT = `${ESC}i`;
+      await (window as any).api.printTicket(ticketPrinter, text + "\n\n\n\n" + CUT);
+      return true;
+    } catch (error) {
+      return false;
+    }
+  };
+
   return {
     printers,
     defaultPrinter,
@@ -418,6 +430,7 @@ export function usePrinter() {
     printTicket,
     printMembershipTicket,
     printMembershipInvoice,
+    printRawText,
     loadPrinters,
   };
 }

@@ -120,14 +120,32 @@ export function POSScreen({
   // Manejar datos de checkout (cuando viene desde TimingDashboard)
   useEffect(() => {
     const processCheckout = async () => {
-      if (checkoutData && products.length > 0 && cashBoxOpen) {
-        const product = products.find((p) => p.id === checkoutData.packageId);
-        
-        setActiveSessionId(checkoutData.sessionId);
-        setIsCheckIn(!!checkoutData.isCheckIn);
+      if (!checkoutData || products.length === 0) return;
+      // Para isCheckIn no requerimos cashBoxOpen (puede no estar abierta formalmente)
+      if (!checkoutData.isCheckIn && !cashBoxOpen) return;
 
-        let updatedItems: SaleItem[] = [];
-        
+      setActiveSessionId(checkoutData.sessionId);
+      setIsCheckIn(!!checkoutData.isCheckIn);
+
+      let updatedItems: SaleItem[] = [];
+
+      // isCheckIn: usar datos directamente del checkoutData (paquete excluido de products list)
+      if (checkoutData.isCheckIn) {
+        if (checkoutData.packageName && checkoutData.packagePrice) {
+          updatedItems.push({
+            id: crypto.randomUUID(),
+            product_id: checkoutData.packageId || -1,
+            product_name: checkoutData.packageName,
+            product_type: "package",
+            quantity: 1,
+            unit_price: Number(checkoutData.packagePrice),
+            subtotal: Number(checkoutData.packagePrice),
+          });
+        }
+      } else {
+        // Checkout normal: buscar el producto
+        const product = products.find((p) => p.id === checkoutData.packageId);
+
         // 1. Añadir el paquete base (si no está pagado)
         if (product && !checkoutData.isPaid) {
           updatedItems.push({
@@ -143,50 +161,47 @@ export function POSScreen({
         }
 
         // 2. Calcular Tiempo Extra
-        let extraMins = 0;
         if (checkoutData.startTime && checkoutData.durationMinutes) {
           const start = new Date(checkoutData.startTime);
           const duration = checkoutData.durationMinutes;
           const end = new Date(start.getTime() + duration * 60000);
           const now = new Date();
-          
+
           if (now > end) {
-            extraMins = Math.floor((now.getTime() - end.getTime()) / 60000);
+            const extraMins = Math.floor((now.getTime() - end.getTime()) / 60000);
             if (extraMins > 0) {
-              // Obtener precio por minuto extra de los ajustes
               const extraPriceStr = await (window as any).api.getSetting('extra_minute_price');
               const extraPricePerMin = parseFloat(extraPriceStr || "1.0");
               const totalExtraPrice = extraMins * extraPricePerMin;
 
               updatedItems.push({
                 id: crypto.randomUUID(),
-                product_id: -1, 
+                product_id: -1,
                 product_name: `Tiempo Extra (${extraMins} min)`,
                 product_type: "time",
                 quantity: 1,
                 unit_price: extraPricePerMin,
                 subtotal: totalExtraPrice,
               });
-              
-              // Disparamos la alerta fuera del render
+
               warning(`¡Tiempo Excedido! ${extraMins} min extra registrados.`);
             }
           }
         }
-
-        const subtotal = updatedItems.reduce((sum, item) => sum + item.subtotal, 0);
-        
-        setCurrentSale((prev) => ({
-          ...prev,
-          client_id: checkoutData.clientId,
-          client_name: checkoutData.clientName,
-          items: updatedItems,
-          subtotal,
-          total: Math.max(0, subtotal - prev.discount),
-        }));
-
-        if (onCheckoutComplete) onCheckoutComplete();
       }
+
+      const subtotal = updatedItems.reduce((sum, item) => sum + item.subtotal, 0);
+
+      setCurrentSale((prev) => ({
+        ...prev,
+        client_id: checkoutData.clientId,
+        client_name: checkoutData.clientName,
+        items: updatedItems,
+        subtotal,
+        total: Math.max(0, subtotal - prev.discount),
+      }));
+
+      if (onCheckoutComplete) onCheckoutComplete();
     };
 
     processCheckout();

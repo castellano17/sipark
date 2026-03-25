@@ -37,7 +37,7 @@ export function CashManagement() {
     getCashBoxSales,
   } = useCashBox();
   const { canOpenDrawer } = usePermissions();
-  const { openDrawer } = usePrinter();
+  const { openDrawer, printRawText } = usePrinter();
 
   const [activeCashBox, setActiveCashBox] = useState<any>(null);
   const [isCheckingStatus, setIsCheckingStatus] = useState(true);
@@ -118,9 +118,12 @@ export function CashManagement() {
     ticketText += "_______________________\n";
     ticketText += "\n\n";
 
-    // Enviar a impresora térmica...
-    success("Ticket de apertura generado");
-    // TODO: Integrar con impresora térmica real
+    const printed = await printRawText(ticketText);
+    if (printed) {
+      success("Ticket de apertura impreso");
+    } else {
+      success("Ticket generado (verifique impresora)");
+    }
   };
 
   const handlePrintOpeningPDF = async () => {
@@ -294,9 +297,13 @@ export function CashManagement() {
       ticketText += "_______________________\n";
       ticketText += "\n\n";
 
-      // Enviar a impresora térmica...
-      success("Ticket de cuadre generado");
-      // TODO: Integrar con impresora térmica real
+      // Imprimir en impresora térmica
+      const printed = await printRawText(ticketText);
+      if (printed) {
+        success("Ticket de cuadre impreso");
+      } else {
+        success("Ticket generado (verifique impresora)");
+      }
     } else {
       // Formato PDF
       // Generando...
