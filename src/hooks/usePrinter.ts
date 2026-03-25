@@ -112,11 +112,15 @@ export function usePrinter() {
         return false;
       }
 
-      // Cargar configuración del ticket guardada por el usuario
       let config: any = null;
+      let currencySymbol = "C$";
       try {
         const saved = await window.api.getSetting("ticket_config");
         if (saved) config = JSON.parse(saved);
+        
+        const primary = await window.api.getSetting("currency_primary");
+        if (primary === "USD") currencySymbol = "$";
+        else if (primary === "NIO") currencySymbol = "C$";
       } catch { /* usa defaults si no hay config */ }
 
       const businessName  = config?.businessName  || "MI LUDOTECA";
@@ -168,30 +172,39 @@ export function usePrinter() {
       // Items
       ticketData.items.forEach((item) => {
         text += `${item.product_name}\n`;
-        text += `  ${item.quantity} x C$${Number(item.unit_price).toFixed(2)} = C$${Number(item.subtotal).toFixed(2)}\n`;
+        text += `  ${item.quantity} x ${currencySymbol}${Number(item.unit_price).toFixed(2)} = ${currencySymbol}${Number(item.subtotal).toFixed(2)}\n`;
       });
 
       text += dash + "\n";
-      text += `Subtotal:        C$${Number(ticketData.subtotal).toFixed(2)}\n`;
+      text += `Subtotal:        ${currencySymbol}${Number(ticketData.subtotal).toFixed(2)}\n`;
       if (ticketData.discount > 0) {
-        text += `Descuento:      -C$${Number(ticketData.discount).toFixed(2)}\n`;
+        text += `Descuento:      -${currencySymbol}${Number(ticketData.discount).toFixed(2)}\n`;
       }
-      text += `TOTAL:           C$${Number(ticketData.total).toFixed(2)}\n`;
+      text += `TOTAL:           ${currencySymbol}${Number(ticketData.total).toFixed(2)}\n`;
       text += dash + "\n";
       text += `Método: ${methodLabel}\n`;
       if (ticketData.paymentMethod.toLowerCase() === 'cash' || ticketData.paymentMethod.toLowerCase() === 'efectivo') {
         const received = ticketData.amountReceived !== undefined && !isNaN(ticketData.amountReceived) ? ticketData.amountReceived : ticketData.total;
         const changeAmount = ticketData.change !== undefined && !isNaN(ticketData.change) ? ticketData.change : 0;
-        text += `Recibido:        C$${Number(received).toFixed(2)}\n`;
-        text += `Cambio:          C$${Number(changeAmount).toFixed(2)}\n`;
+        text += `Recibido:        ${currencySymbol}${Number(received).toFixed(2)}\n`;
+        text += `Cambio:          ${currencySymbol}${Number(changeAmount).toFixed(2)}\n`;
       } else if (ticketData.amountReceived !== undefined && !isNaN(ticketData.amountReceived)) {
-        text += `Recibido:        C$${Number(ticketData.amountReceived).toFixed(2)}\n`;
-        text += `Cambio:          C$${Number(ticketData.change || 0).toFixed(2)}\n`;
+        text += `Recibido:        ${currencySymbol}${Number(ticketData.amountReceived).toFixed(2)}\n`;
+        text += `Cambio:          ${currencySymbol}${Number(ticketData.change || 0).toFixed(2)}\n`;
       }
       text += line + "\n";
       if (showThankYou) text += center(thankYouMsg) + "\n";
       if (footerMessage) text += center(footerMessage) + "\n";
-      text += line + "\n\n\n\n";
+      text += line + "\n\n";
+
+      // ESC/POS Barcode (Code 39)
+      const saleIdStr = String(ticketData.saleId);
+      text += "\x1D\x68\x40"; // Height 64
+      text += "\x1D\x77\x03"; // Width 3
+      text += "\x1D\x48\x02"; // HRI character below
+      text += `\x1D\x6B\x04${saleIdStr}\x00`; // Code 39
+      text += "\n\n\n\n";
+
       text += CUT_SEQ;
 
       // Verificar modo impresión
@@ -226,6 +239,13 @@ export function usePrinter() {
       if (!ticketPrinter) {
         return false;
       }
+
+      let currencySymbol = "C$";
+      try {
+        const primary = await window.api.getSetting("currency_primary");
+        if (primary === "USD") currencySymbol = "$";
+        else if (primary === "NIO") currencySymbol = "C$";
+      } catch {}
 
       const INIT_SEQ = "\x1B\x40\x1C\x2E\x1B\x74\x10";
       const CUT_SEQ = "\x1D\x56\x00";
@@ -263,10 +283,7 @@ export function usePrinter() {
       const methodLabel = paymentMethodMap[membership.payment_method] || (membership.payment_method || "EFECTIVO").toUpperCase();
 
       ticketText += `Método: ${methodLabel}\n`;
-      ticketText += `TOTAL: ${new Intl.NumberFormat("es-NI", {
-        style: "currency",
-        currency: "NIO",
-      }).format(membership.payment_amount)}\n`;
+      ticketText += `TOTAL: ${currencySymbol}${Number(membership.payment_amount).toFixed(2)}\n`;
       ticketText += line + "\n";
       ticketText += center("¡Gracias por su compra!") + "\n";
       ticketText += line + "\n\n\n\n";

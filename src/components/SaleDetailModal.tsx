@@ -1,10 +1,12 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
+import JsBarcode from "jsbarcode";
 import { X, Printer, User, Calendar, CreditCard, Package } from "lucide-react";
 import { Dialog } from "./ui/dialog";
 import { Button } from "./ui/button";
 import { Card } from "./ui/card";
 import { useCurrency } from "../hooks/useCurrency";
 import { useNotification } from "../hooks/useNotification";
+import { usePrinter } from "../hooks/usePrinter";
 
 interface SaleItem {
   id: number;
@@ -36,6 +38,20 @@ export function SaleDetailModal({ saleId, onClose }: SaleDetailModalProps) {
   const [loading, setLoading] = useState(false);
   const { formatCurrency } = useCurrency();
   const { error, info } = useNotification();
+  const { printTicket } = usePrinter();
+  const barcodeRef = useRef<SVGSVGElement>(null);
+
+  useEffect(() => {
+    if (sale && barcodeRef.current) {
+      JsBarcode(barcodeRef.current, sale.id.toString(), {
+        format: "CODE128",
+        displayValue: true,
+        height: 50,
+        margin: 10,
+        background: "transparent",
+      });
+    }
+  }, [sale]);
 
   useEffect(() => {
     if (saleId) {
@@ -57,9 +73,30 @@ export function SaleDetailModal({ saleId, onClose }: SaleDetailModalProps) {
     }
   };
 
-  const handlePrint = () => {
+  const handlePrint = async () => {
+    if (!sale) return;
     info(`Imprimiendo ticket #${saleId}`);
-    // Aquí puedes implementar la lógica de impresión
+    
+    try {
+      const currentUser = JSON.parse(localStorage.getItem("currentUser") || "{}");
+      await printTicket({
+        saleId: sale.id,
+        clientName: sale.client_name,
+        cashierName: currentUser.name || currentUser.username || "Admin",
+        items: sale.items.map((i) => ({
+          product_name: i.product_name,
+          quantity: i.quantity,
+          unit_price: i.unit_price,
+          subtotal: i.subtotal,
+        })),
+        subtotal: sale.subtotal,
+        discount: sale.discount || 0,
+        total: sale.total,
+        paymentMethod: sale.payment_method,
+      });
+    } catch (err) {
+      error("Error al reimprimir el ticket");
+    }
   };
 
   const formatDate = (timestamp: string) => {
@@ -251,6 +288,11 @@ export function SaleDetailModal({ saleId, onClose }: SaleDetailModalProps) {
                     </div>
                   </div>
                 </Card>
+
+                {/* Código de Barras */}
+                <div className="flex justify-center mt-6">
+                  <svg ref={barcodeRef}></svg>
+                </div>
               </div>
             ) : (
               <div className="text-center py-12">

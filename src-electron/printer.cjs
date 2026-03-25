@@ -194,6 +194,14 @@ async function printTestTicket(printerName) {
       config = getDefaultTicketConfig();
     }
 
+    try {
+      const primary = await getSetting("currency_primary");
+      if (primary === "NIO") config.currencySymbol = "C$";
+      else config.currencySymbol = "$";
+    } catch {
+      config.currencySymbol = "$";
+    }
+
     const ticketContent = generateTicketContent(config, {
       ticketNumber: "00123",
       date: new Date().toLocaleDateString("es-ES"),
@@ -462,7 +470,7 @@ function generateTicketContent(config, saleData) {
   // Items
   saleData.items.forEach((item) => {
     const itemLine = `${item.quantity}x ${item.name}`;
-    const priceLine = `$${item.subtotal.toFixed(2)}`;
+    const priceLine = `${config.currencySymbol || "$"}${item.subtotal.toFixed(2)}`;
     const spaces = width - itemLine.length - priceLine.length;
     lines.push(itemLine + " ".repeat(Math.max(1, spaces)) + priceLine);
   });
@@ -472,7 +480,7 @@ function generateTicketContent(config, saleData) {
 
   // Totales
   const addTotal = (label, amount) => {
-    const amountStr = `$${amount.toFixed(2)}`;
+    const amountStr = `${config.currencySymbol || "$"}${amount.toFixed(2)}`;
     const spaces = width - label.length - amountStr.length;
     lines.push(label + " ".repeat(Math.max(1, spaces)) + amountStr);
   };
