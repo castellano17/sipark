@@ -18,6 +18,7 @@
     "node_modules/bcrypt/**/*",
     "node_modules/node-hid/**/*"
   ],
+  "npmRebuild": false,
   "win": {
     "target": [
       {

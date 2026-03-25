@@ -89,6 +89,7 @@
       "node_modules/pg/**/*",
       "node_modules/node-hid/**/*"
     ],
+    "npmRebuild": false,
     "mac": {
       "target": [
         {
