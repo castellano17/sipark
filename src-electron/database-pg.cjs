@@ -7,7 +7,25 @@ let pool = null;
 // Configuración de la base de datos
 // Puede ser configurada mediante variables de entorno o archivo de configuración
 function getConfig() {
-  const configPath = path.join(process.cwd(), "db-config.json");
+  const os = require('os');
+  const fs = require('fs');
+  const path = require('path');
+  
+  // En Electron, usar app.getPath('userData') para consistencia entre dev y prod
+  let configDir;
+  try {
+    const { app } = require('electron');
+    configDir = app.getPath('userData');
+  } catch (e) {
+    // Si no estamos en el proceso principal de Electron, usar el directorio del usuario
+    configDir = path.join(os.homedir(), '.sipark');
+  }
+
+  if (!fs.existsSync(configDir)) {
+    try { fs.mkdirSync(configDir, { recursive: true }); } catch(e) {}
+  }
+
+  const configPath = path.join(configDir, "db-config.json");
 
   // Intentar leer configuración desde archivo
   if (fs.existsSync(configPath)) {

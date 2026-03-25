@@ -287,7 +287,7 @@ contextBridge.exposeInMainWorld("api", {
   selectSystemLogo: () => ipcRenderer.invoke("api:selectSystemLogo"),
 
   // Sessions - Check-in
-  createSession: (clientName, parentName, phone, packageId, durationMinutes, isPaid) =>
+  createSession: (clientName, parentName, phone, packageId, durationMinutes, isPaid, childrenCount) =>
     ipcRenderer.invoke("api:createSession", {
       clientName,
       parentName,
@@ -295,6 +295,7 @@ contextBridge.exposeInMainWorld("api", {
       packageId,
       durationMinutes,
       isPaid,
+      childrenCount,
     }),
   startTimerSession: (sessionId) =>
     ipcRenderer.invoke("api:startTimerSession", { sessionId }),
