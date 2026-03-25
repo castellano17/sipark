@@ -11,56 +11,43 @@ function getConfig() {
   const fs = require('fs');
   const path = require('path');
   
-  // Lista de posibles ubicaciones para el db-config.json (para que funcione en Windows build y dev)
-  let configDir;
-  try {
-    const { app } = require('electron');
-    configDir = app.getPath('userData');
-  } catch (e) {
-    configDir = path.join(os.homedir(), '.sipark');
+  // RUTA FIJA Y SEGURA EN DOCUMENTOS DEL USUARIO (Windows/Mac)
+  const configDir = path.join(os.homedir(), 'Documents', 'SIPARK_CONFIG');
+  if (!fs.existsSync(configDir)) {
+    try { fs.mkdirSync(configDir, { recursive: true }); } catch(e) {}
   }
 
-  const possiblePaths = [
-    path.join(configDir, "db-config.json"),
-    path.join(process.cwd(), "db-config.json"),
-    path.join(path.dirname(process.execPath), "db-config.json") // En caso de ser el .exe
-  ];
+  const configPath = path.join(configDir, "db-config.json");
+  const logFile = path.join(os.homedir(), "sipark_api_debug.txt");
 
   let config = null;
-  let finalPath = "";
 
-  for (const p of possiblePaths) {
-    if (fs.existsSync(p)) {
-      try {
-        config = JSON.parse(fs.readFileSync(p, "utf8"));
-        finalPath = p;
-        break;
-      } catch (e) { }
+  if (fs.existsSync(configPath)) {
+    try {
+      config = JSON.parse(fs.readFileSync(configPath, "utf8"));
+    } catch (e) {
+      try { fs.appendFileSync(logFile, `[${new Date().toISOString()}] ERROR LEYENDO CONFIG EN ${configPath}\n`); } catch(le) {}
     }
   }
 
-  // Configuración por defecto si no se encontró nada
+  // Si no hay config, crear una por defecto para que el usuario pueda editarla allí
   const defaultConfig = {
-    host: process.env.DB_HOST || "127.0.0.1",
-    port: parseInt(process.env.DB_PORT || "5432"),
-    database: process.env.DB_NAME || "ludoteca_pos",
-    user: process.env.DB_USER || "ludoteca_user",
-    password: process.env.DB_PASSWORD || "ludoteca2024",
-    max: 20,
-    idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 10000,
+    host: "127.0.0.1",
+    port: 5432,
+    database: "ludoteca_pos",
+    user: "ludoteca_user",
+    password: "password_cambiame",
+    max: 20
   };
 
-  const selectedConfig = config || defaultConfig;
-  
-  // LOGEAR A QUE BD NOS ESTAMOS CONECTANDO REALMENTE
-  const logFile = path.join(os.homedir(), "sipark_api_debug.txt");
-  try {
-    const logMsg = `[${new Date().toISOString()}] DB CONEXION: host=${selectedConfig.host}, db=${selectedConfig.database}, user=${selectedConfig.user}, path=${finalPath || 'DEFAULT'}\n`;
-    fs.appendFileSync(logFile, logMsg);
-  } catch(e) {}
+  if (!config) {
+    try { fs.writeFileSync(configPath, JSON.stringify(defaultConfig, null, 2)); } catch(e) {}
+    config = defaultConfig;
+  }
 
-  return selectedConfig;
+  try { fs.appendFileSync(logFile, `[${new Date().toISOString()}] USANDO CONFIG DE: ${configPath} (host: ${config.host})\n`); } catch(e) {}
+
+  return config;
 }
 
 async function initializeDatabase() {
