@@ -15,6 +15,12 @@ async function uploadToGoogleDrive(credentials, folderId = null) {
     // Crear respaldo temporal
     const backup = await createLocalBackup();
 
+    if (!backup.success || !backup.path) {
+      throw new Error(
+        backup.error || "No se pudo crear el respaldo local para subir a Google Drive."
+      );
+    }
+
     // Configurar OAuth2
     const oauth2Client = new google.auth.OAuth2(
       credentials.client_id,

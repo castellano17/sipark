@@ -489,7 +489,7 @@ export function POSScreen({
           ? {
               ...item,
               quantity: item.quantity + 1,
-              subtotal: (item.quantity + 1) * item.unit_price,
+              subtotal: (item.quantity + 1) * Number(item.unit_price),
             }
           : item,
       );
@@ -500,8 +500,8 @@ export function POSScreen({
         product_name: product.name,
         product_type: product.type,
         quantity: 1,
-        unit_price: product.price,
-        subtotal: product.price,
+        unit_price: Number(product.price),
+        subtotal: Number(product.price),
         duration_minutes: product.duration_minutes,
       };
       updatedItems = [...currentSale.items, newItem];
@@ -530,7 +530,7 @@ export function POSScreen({
           return {
             ...item,
             quantity: newQuantity,
-            subtotal: newQuantity * item.unit_price,
+            subtotal: newQuantity * Number(item.unit_price),
           };
         }
         return item;
@@ -546,10 +546,9 @@ export function POSScreen({
     updateSaleTotals(updatedItems, currentSale.discount);
   };
 
-  // Actualizar totales
   const updateSaleTotals = (items: SaleItem[], discount: number) => {
-    const subtotal = items.reduce((sum, item) => sum + item.subtotal, 0);
-    const total = subtotal - discount;
+    const subtotal = items.reduce((sum, item) => sum + Number(item.subtotal), 0);
+    const total = subtotal - Number(discount);
 
     setCurrentSale({
       ...currentSale,
