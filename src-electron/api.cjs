@@ -199,7 +199,7 @@ async function getActiveSessions() {
       FROM active_sessions s
       JOIN clients c ON s.client_id = c.id
       LEFT JOIN products_services p ON s.package_id = p.id
-      WHERE s.status = 'active'
+      WHERE s.status IN ('active', 'pending')
       ORDER BY s.start_time DESC
     `;
     const result = await allAsync(sql);

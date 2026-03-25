@@ -57,16 +57,12 @@ function generateUniqueCode() {
 async function generateQRBase64(code, campaignInfo = {}) {
   try {
     const { name = "", benefitLabel = "", validUntil = "" } = campaignInfo;
-    // Formato legible para cámaras + línea máquina al inicio para el scanner interno
-    const lines = [
-      `${VOUCHER_PREFIX}${code}`,
-      `Código: ${code}`,
-    ];
-    if (name) lines.push(`Campaña: ${name}`);
-    if (benefitLabel) lines.push(`Beneficio: ${benefitLabel}`);
-    if (validUntil) lines.push(`Vence: ${validUntil}`);
-    lines.push("Presentar al cajero para canjear");
-    const qrText = lines.join("\n");
+    const parts = [name, benefitLabel];
+    if (validUntil) parts.push(`Válido hasta: ${validUntil}`);
+    
+    const rawText = parts.join(" - ");
+    // Limpiar tildes para no tener problemas con diferentes encoding de lectores/impresoras
+    const qrText = rawText.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
     return await QRCode.toDataURL(qrText, {
       errorCorrectionLevel: "M",
       width: 220,

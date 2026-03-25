@@ -204,7 +204,6 @@ export default function Promotions() {
         const GS  = "\x1D";
         const INIT       = `${ESC}@`;
         const CENTER     = `${ESC}a\x01`;
-        const LEFT       = `${ESC}a\x00`;
         const BOLD_ON    = `${ESC}E\x01`;
         const BOLD_OFF   = `${ESC}E\x00`;
         const DOUBLE     = `${ESC}!\x30`;
@@ -225,11 +224,11 @@ export default function Promotions() {
           );
         };
 
-        // Barcode CODE128 nativo
+        // Barcode CODE128 nativo (más grande y ancho)
         const escBarcode = (data: string) =>
-          `${GS}h\x50` +                              // height = 80 dots
-          `${GS}w\x02` +                              // width multiplier
-          `${GS}H\x02` +                              // HRI abajo
+          `${GS}h\x70` +                              // height = 112 dots
+          `${GS}w\x03` +                              // width multiplier = 3
+          `${GS}H\x02` +                              // HRI en la parte inferior
           `${GS}k\x49${String.fromCharCode(data.length)}${data}`; // CODE128
 
         const businessLine = business.name || "SIPARK";
@@ -239,18 +238,23 @@ export default function Promotions() {
           const benefit = getBenefitLabel(v.type as CampaignType, parseFloat(v.benefit_value));
           const till = v.valid_until ? `Valido hasta: ${formatDateES(v.valid_until)}` : "";
 
+          // Información del QR sin caracteres especiales/tildes para evitar caracteres chinos en la impresora
+          const qrRawText = `${v.campaign_name} - ${benefit}${till ? " - " + till : ""}`;
+          const qrText = qrRawText.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
           let t = INIT + CENTER;
           t += BOLD_ON + DOUBLE + businessLine + "\n" + NORMAL + BOLD_OFF;
-          t += v.campaign_name + "\n";
+          t += DOUBLE + v.campaign_name + "\n" + NORMAL;
           t += "--------------------------------\n";
-          t += BOLD_ON + benefit + "\n" + BOLD_OFF;
+          t += DOUBLE + BOLD_ON + benefit + "\n" + NORMAL + BOLD_OFF;
           t += "\n";
-          t += escQR(v.code, 10);  // QR nativo grande
+          t += escQR(qrText, 12);  // QR más grande (tamaño 12)
           t += "\n";
-          t += escBarcode(v.code);  // Barcode nativo legible
+          t += escBarcode(v.code);  // Barcode grande
           t += "\n";
-          t += LEFT + BOLD_ON + DOUBLE + v.code + "\n" + NORMAL + BOLD_OFF;
+          t += CENTER + DOUBLE + BOLD_ON + v.code + "\n" + NORMAL + BOLD_OFF;
           if (till) t += CENTER + till + "\n";
+          t += "\n";
           t += CENTER + `Usos: ${v.max_uses === 1 ? "1 uso" : `${v.max_uses} usos`}` + "\n";
           t += "\n\n\n";
           t += CUT;
