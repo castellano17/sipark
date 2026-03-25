@@ -468,9 +468,10 @@ function setupIpcHandlers() {
   ipcMain.handle("api:deleteClient", (event, data) =>
     api.deleteClient(data.id),
   );
-  ipcMain.handle("api:getClientById", (event, clientId) =>
-    api.getClientById(clientId),
-  );
+  ipcMain.handle("api:getClientById", (event, data) => {
+    const clientId = typeof data === 'object' ? data.clientId : data;
+    return api.getClientById(clientId);
+  });
 
   // Sessions
   ipcMain.handle("api:startSession", (event, data) =>
@@ -744,20 +745,22 @@ function setupIpcHandlers() {
   ipcMain.handle("api:selectSystemLogo", () => api.selectSystemLogo());
 
   // Sessions - Check-in
-  ipcMain.handle("api:createSession", (event, data) =>
-    api.createSession(
+  ipcMain.handle("api:createSession", (event, data) => {
+    if (!data) return null;
+    return api.createSession(
       data.clientName,
       data.parentName,
       data.phone,
       data.packageId,
       data.durationMinutes,
       data.isPaid,
-      data.childrenCount,
-    ),
-  );
-  ipcMain.handle("api:startTimerSession", (event, data) =>
-    api.startTimerSession(data.sessionId),
-  );
+      data.childrenCount || 1, // Fallback si es undefined (desde preload.cjs antiguo)
+    );
+  });
+  ipcMain.handle("api:startTimerSession", (event, data) => {
+    const sessionId = typeof data === 'object' ? data.sessionId : data;
+    return api.startTimerSession(sessionId);
+  });
   ipcMain.handle("api:updateSessionPaidStatus", (event, data) =>
     api.updateSessionPaidStatus(data.sessionId, data.isPaid),
   );

@@ -181,8 +181,9 @@ async function startSession(clientId, packageId, durationMinutes = 60) {
 }
 
 async function getActiveSessions() {
+  const fs = require('fs');
   try {
-    const sql = `
+    const sessions = await allAsync(`
       SELECT 
         s.id,
         s.client_id,
@@ -201,10 +202,11 @@ async function getActiveSessions() {
       LEFT JOIN products_services p ON s.package_id = p.id
       WHERE s.status IN ('active', 'pending')
       ORDER BY s.start_time DESC
-    `;
-    const result = await allAsync(sql);
-    return result;
+    `);
+    fs.appendFileSync('/tmp/api_logs.txt', `[${new Date().toISOString()}] getActiveSessions returned ${sessions.length} sessions\n`);
+    return sessions;
   } catch (error) {
+    fs.appendFileSync('/tmp/api_logs.txt', `[${new Date().toISOString()}] getActiveSessions error: ${error.message}\n`);
     throw error;
   }
 }
@@ -938,6 +940,8 @@ async function createSession(
   isPaid = false,
   childrenCount = 1
 ) {
+  const fs = require('fs');
+  fs.appendFileSync('/tmp/api_logs.txt', `[${new Date().toISOString()}] createSession called with: ${JSON.stringify({clientName, parentName, phone, packageId, durationMinutes, isPaid, childrenCount})}\n`);
   try {
     let clientId;
 
@@ -991,6 +995,8 @@ async function createSession(
 }
 
 async function startTimerSession(sessionId) {
+  const fs = require('fs');
+  fs.appendFileSync('/tmp/api_logs.txt', `[${new Date().toISOString()}] startTimerSession called with: ${sessionId}\n`);
   try {
     const startTime = getLocalTimestamp();
     await runAsync(

@@ -152,7 +152,7 @@ export const TimingDashboard: React.FC<TimingDashboardProps> = ({
 
   // Filtrar sesiones por búsqueda
   const filteredSessions = sessions.filter((session) =>
-    session.client_name.toLowerCase().includes(searchQuery.toLowerCase()),
+    (session.client_name || "").toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
   return (
