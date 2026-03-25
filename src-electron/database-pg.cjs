@@ -7,36 +7,25 @@ let pool = null;
 // Configuración de la base de datos
 // Puede ser configurada mediante variables de entorno o archivo de configuración
 function getConfig() {
-  const os = require('os');
-  const fs = require('fs');
-  const path = require('path');
-  
-  // Lista de posibles ubicaciones (Prioridad al directorio actual)
-  const paths = [
-    path.join(process.cwd(), "db-config.json"),
-    path.join(os.homedir(), 'Documents', 'SIPARK_CONFIG', 'db-config.json')
-  ];
+  const configPath = path.join(process.cwd(), "db-config.json");
 
-  let config = null;
-  for (const p of paths) {
-    if (fs.existsSync(p)) {
-      try {
-        config = JSON.parse(fs.readFileSync(p, "utf8"));
-        break;
-      } catch (e) {}
+  if (fs.existsSync(configPath)) {
+    try {
+      const config = JSON.parse(fs.readFileSync(configPath, "utf8"));
+      return config;
+    } catch (error) {
+      console.warn("⚠️ Error leyendo db-config.json, usando valores por defecto");
     }
   }
 
-  const defaultConfig = {
-    host: "127.0.0.1",
-    port: 5432,
-    database: "ludoteca_pos",
-    user: "ludoteca_user",
-    password: "password_cambiame",
+  return {
+    host: process.env.DB_HOST || "127.0.0.1",
+    port: parseInt(process.env.DB_PORT || "5432"),
+    database: process.env.DB_NAME || "ludoteca_pos",
+    user: process.env.DB_USER || "ludoteca_user",
+    password: process.env.DB_PASSWORD || "ludoteca2024",
     max: 20
   };
-
-  return config || defaultConfig;
 }
 
 async function initializeDatabase() {
