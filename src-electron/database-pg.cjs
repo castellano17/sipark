@@ -111,6 +111,7 @@ async function createTables() {
       stock INTEGER DEFAULT 0,
       min_stock INTEGER DEFAULT 0,
       duration_minutes INTEGER,
+      is_standard_entry BOOLEAN DEFAULT FALSE,
       last_sale_date TIMESTAMP,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )`,
@@ -734,6 +735,11 @@ async function createTables() {
         -- Migración para permitir teléfono opcional en clientes
         IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='clients' AND column_name='phone' AND is_nullable='NO') THEN
           ALTER TABLE clients ALTER COLUMN phone DROP NOT NULL;
+        END IF;
+
+        -- Migración para is_standard_entry en products_services
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='products_services' AND column_name='is_standard_entry') THEN
+          ALTER TABLE products_services ADD COLUMN is_standard_entry BOOLEAN DEFAULT FALSE;
         END IF;
 
         -- Migración para permitir product_id opcional en sale_items (Venta de membresías, etc.)
