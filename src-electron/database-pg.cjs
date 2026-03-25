@@ -11,26 +11,22 @@ function getConfig() {
   const fs = require('fs');
   const path = require('path');
   
-  // RUTA FIJA Y SEGURA EN DOCUMENTOS DEL USUARIO (Windows/Mac)
-  const configDir = path.join(os.homedir(), 'Documents', 'SIPARK_CONFIG');
-  if (!fs.existsSync(configDir)) {
-    try { fs.mkdirSync(configDir, { recursive: true }); } catch(e) {}
-  }
-
-  const configPath = path.join(configDir, "db-config.json");
-  const logFile = path.join(os.homedir(), "sipark_api_debug.txt");
+  // Lista de posibles ubicaciones (Prioridad al directorio actual)
+  const paths = [
+    path.join(process.cwd(), "db-config.json"),
+    path.join(os.homedir(), 'Documents', 'SIPARK_CONFIG', 'db-config.json')
+  ];
 
   let config = null;
-
-  if (fs.existsSync(configPath)) {
-    try {
-      config = JSON.parse(fs.readFileSync(configPath, "utf8"));
-    } catch (e) {
-      try { fs.appendFileSync(logFile, `[${new Date().toISOString()}] ERROR LEYENDO CONFIG EN ${configPath}\n`); } catch(le) {}
+  for (const p of paths) {
+    if (fs.existsSync(p)) {
+      try {
+        config = JSON.parse(fs.readFileSync(p, "utf8"));
+        break;
+      } catch (e) {}
     }
   }
 
-  // Si no hay config, crear una por defecto para que el usuario pueda editarla allí
   const defaultConfig = {
     host: "127.0.0.1",
     port: 5432,
@@ -40,14 +36,7 @@ function getConfig() {
     max: 20
   };
 
-  if (!config) {
-    try { fs.writeFileSync(configPath, JSON.stringify(defaultConfig, null, 2)); } catch(e) {}
-    config = defaultConfig;
-  }
-
-  try { fs.appendFileSync(logFile, `[${new Date().toISOString()}] USANDO CONFIG DE: ${configPath} (host: ${config.host})\n`); } catch(e) {}
-
-  return config;
+  return config || defaultConfig;
 }
 
 async function initializeDatabase() {
