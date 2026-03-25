@@ -378,7 +378,7 @@ function getDefaultTicketConfig() {
     headerMessage: "",
     footerMessage: "¡Vuelve pronto!",
     thankYouMessage: "Gracias por tu visita",
-    paperWidth: 40,
+    paperWidth: 48,
     fontSize: "normal",
   };
 }
@@ -387,7 +387,9 @@ function getDefaultTicketConfig() {
  * Genera el contenido del ticket basado en la configuración
  */
 function generateTicketContent(config, saleData) {
-  const lines = [];
+  const INIT_SEQ = "\x1B\x40\x1C\x2E\x1B\x74\x10";
+  const CUT_SEQ = "\x1D\x56\x00";
+  const lines = [INIT_SEQ];
   const width = config.paperWidth;
 
   const center = (text) => {
@@ -503,9 +505,9 @@ function generateTicketContent(config, saleData) {
     lines.push(center(config.footerMessage));
   }
 
-  lines.push(line);
   lines.push("");
   lines.push("");
+  lines.push(CUT_SEQ);
 
   return lines.join("\n");
 }
@@ -549,10 +551,13 @@ async function printTestNormal(printerName) {
   try {
     const platform = os.platform();
     
-    const content = `
-========================================
-      PRUEBA DE IMPRESIÓN SIPARK
-========================================
+    const INIT_SEQ = "\x1B\x40\x1C\x2E\x1B\x74\x10";
+    const CUT_SEQ = "\x1D\x56\x00";
+
+    const content = INIT_SEQ + `
+================================================
+           PRUEBA DE IMPRESIÓN SIPARK
+================================================
 Fecha: ${new Date().toLocaleString("es-ES")}
 Impresora: ${printerName}
 Estado: FUNCIONANDO CORRECTAMENTE
@@ -561,10 +566,9 @@ Este es un ticket de prueba para validar la
 comunicación con la impresora matricial o
 estándar configurada en el sistema.
 
-----------------------------------------
-SOPORTE TÉCNICO SIPARK
-========================================
-\f`;
+             SOPORTE TÉCNICO SIPARK
+================================================
+\n\n\n\n` + CUT_SEQ;
 
     const printDir = path.join(app.getPath("userData"), "print_temp");
     if (!fs.existsSync(printDir)) fs.mkdirSync(printDir, { recursive: true });

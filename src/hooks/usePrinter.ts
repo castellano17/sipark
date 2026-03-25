@@ -122,7 +122,7 @@ export function usePrinter() {
       const businessName  = config?.businessName  || "MI LUDOTECA";
       const businessAddress = config?.businessAddress || "";
       const businessPhone  = config?.businessPhone  || "";
-      const width          = config?.paperWidth    || 40;
+      const width          = config?.paperWidth    || 48;
       const headerMessage  = config?.headerMessage  || "";
       const footerMessage  = config?.footerMessage  || "¡Vuelve pronto!";
       const thankYouMsg    = config?.thankYouMessage || "¡Gracias por su compra!";
@@ -149,7 +149,10 @@ export function usePrinter() {
       };
       const methodLabel = paymentMethodMap[ticketData.paymentMethod] || ticketData.paymentMethod.toUpperCase();
 
-      let text = "\n";
+      const INIT_SEQ = "\x1B\x40\x1C\x2E\x1B\x74\x10";
+      const CUT_SEQ = "\x1D\x56\x00";
+
+      let text = INIT_SEQ + "\n";
       text += line + "\n";
       if (showBusinessName) text += center(businessName.toUpperCase()) + "\n";
       if (showAddress && businessAddress) text += center(businessAddress) + "\n";
@@ -188,7 +191,8 @@ export function usePrinter() {
       text += line + "\n";
       if (showThankYou) text += center(thankYouMsg) + "\n";
       if (footerMessage) text += center(footerMessage) + "\n";
-      text += line + "\n\n\n";
+      text += line + "\n\n\n\n";
+      text += CUT_SEQ;
 
       // Verificar modo impresión
       let printerMode = "test";
@@ -223,23 +227,34 @@ export function usePrinter() {
         return false;
       }
 
+      const INIT_SEQ = "\x1B\x40\x1C\x2E\x1B\x74\x10";
+      const CUT_SEQ = "\x1D\x56\x00";
+
+      const width = 48;
+      const line = "=".repeat(width);
+      const dash = "-".repeat(width);
+      const center = (text: string) => {
+        const padding = Math.max(0, Math.floor((width - text.length) / 2));
+        return " ".repeat(padding) + text;
+      };
+
       // Formatear ticket para impresora térmica
-      let ticketText = "\n";
-      ticketText += "================================\n";
-      ticketText += "         SIPARK LUDOTECA        \n";
-      ticketText += "================================\n";
+      let ticketText = INIT_SEQ + "\n";
+      ticketText += line + "\n";
+      ticketText += center("SIPARK LUDOTECA") + "\n";
+      ticketText += line + "\n";
       ticketText += `TICKET DE MEMBRESÍA\n`;
       ticketText += `Fecha: ${new Date().toLocaleString("es-ES")}\n`;
-      ticketText += "--------------------------------\n";
+      ticketText += dash + "\n";
       ticketText += `Cliente: ${membership.client_name}\n`;
       if (membership.phone) ticketText += `Tel: ${membership.phone}\n`;
       if (membership.id_card) ticketText += `Ced: ${membership.id_card}\n`;
-      ticketText += "--------------------------------\n";
+      ticketText += dash + "\n";
       ticketText += `Membresía: ${membership.membership_name}\n`;
       if (membership.total_hours) ticketText += `Horas: ${membership.total_hours}\n`;
       ticketText += `Inicio: ${new Date(membership.start_date).toLocaleDateString("es-ES")}\n`;
       ticketText += `Vence: ${new Date(membership.end_date).toLocaleDateString("es-ES")}\n`;
-      ticketText += "--------------------------------\n";
+      ticketText += dash + "\n";
       const paymentMethodMap: Record<string, string> = {
         cash: "EFECTIVO",
         card: "TARJETA",
@@ -252,10 +267,10 @@ export function usePrinter() {
         style: "currency",
         currency: "NIO",
       }).format(membership.payment_amount)}\n`;
-      ticketText += "================================\n";
-      ticketText += "    ¡Gracias por su compra!    \n";
-      ticketText += "================================\n\n\n";
-
+      ticketText += line + "\n";
+      ticketText += center("¡Gracias por su compra!") + "\n";
+      ticketText += line + "\n\n\n\n";
+      ticketText += CUT_SEQ;
       // Imprimir en impresora térmica
 
       try {
