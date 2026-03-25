@@ -451,7 +451,7 @@ export function useDatabase() {
         return result;
       } catch (err) {
         handleError(err);
-        return null;
+        throw err;
       } finally {
         setLoading(false);
       }

@@ -178,7 +178,7 @@ export const CheckInModal: React.FC<CheckInModalProps> = ({
         }
       }
 
-      success(`Entrada registrada para ${clientName}`);
+      success(`Entrada registrada para ${clientName}. ID Generado en Motor: ${result?.id || 'NINGUNO'}`);
       onOpenChange(false);
       onSuccess({
         sessionId: result?.id,

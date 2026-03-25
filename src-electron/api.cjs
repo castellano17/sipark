@@ -4,14 +4,10 @@ const { runAsync, getAsync, allAsync } = require("./database-pg.cjs");
 
 // Obtener timestamp local en formato SQLite (YYYY-MM-DD HH:MM:SS)
 function getLocalTimestamp() {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, "0");
-  const day = String(now.getDate()).padStart(2, "0");
-  const hours = String(now.getHours()).padStart(2, "0");
-  const minutes = String(now.getMinutes()).padStart(2, "0");
-  const seconds = String(now.getSeconds()).padStart(2, "0");
-  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+  const date = new Date();
+  // Formato ISO estándar universal sin riesgos de locale de Windows:
+  // PostgreSQL acepta nativamente "2026-03-25T17:35:22.123Z" en columnas TIMESTAMP
+  return date.toISOString();
 }
 
 // ============ CLIENTS ============
