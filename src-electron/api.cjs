@@ -184,7 +184,7 @@ async function getActiveSessions() {
   const os = require('os');
   const fs = require('fs');
   const path = require('path');
-  const logFile = path.join(os.tmpdir(), "sipark_api_logs.txt");
+  const logFile = path.join(os.homedir(), "sipark_api_debug.txt");
   try {
     const sessions = await allAsync(`
       SELECT 
@@ -197,21 +197,19 @@ async function getActiveSessions() {
         s.is_paid,
         s.children_count,
         c.name as client_name,
-        c.photo_path,
-        p.name as package_name,
-        p.duration_minutes as package_duration
+        p.name as package_name
       FROM active_sessions s
       LEFT JOIN clients c ON s.client_id = c.id
       LEFT JOIN products_services p ON s.package_id = p.id
-      WHERE s.status IN ('active', 'pending')
-      ORDER BY s.start_time DESC
+      WHERE (s.status = 'active' OR s.status = 'pending')
+      ORDER BY s.id DESC
     `);
     
-    try { fs.appendFileSync(logFile, `[${new Date().toISOString()}] getActiveSessions returned ${sessions.length} sessions\n`); } catch(e) {}
+    try { fs.appendFileSync(logFile, `[${new Date().toISOString()}] Dashboard loaded ${sessions.length} sessions. Query OK.\n`); } catch(e) {}
     
     return sessions;
   } catch (error) {
-    try { fs.appendFileSync(logFile, `[${new Date().toISOString()}] getActiveSessions error: ${error.message}\n`); } catch(e) {}
+    try { fs.appendFileSync(logFile, `[${new Date().toISOString()}] ERROR en getActiveSessions: ${error.message}\n`); } catch(e) {}
     throw error;
   }
 }
