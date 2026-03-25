@@ -88,9 +88,6 @@
       "node_modules/pg/**/*",
       "node_modules/node-hid/**/*"
     ],
-    "npmRebuild": false,
-    "buildDependenciesFromSource": false,
-    "nodeGypRebuild": false,
     "mac": {
       "target": [
         {
