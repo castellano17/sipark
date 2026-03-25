@@ -1,6 +1,6 @@
 {
   "name": "ludoteca-pos",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "main": "main.cjs",
   "type": "module",
   "homepage": "./",
@@ -10,7 +10,7 @@
     "dev:web": "vite",
     "start:electron": "wait-on http://localhost:5173 && electron .",
     "build": "vite build",
-    "build:win": "npm run build && electron-builder --win --x64",
+    "build:win": "npm version patch --no-git-tag-version && npm run build && electron-builder --win --x64",
     "build:mac": "npm run build && electron-builder --mac",
     "build:check": "tsc && vite build",
     "preview": "vite preview",

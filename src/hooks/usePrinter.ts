@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
  * Convierte una imagen en base64 al formato ESC/POS rasterizado (GS v 0).
  * La imagen es escalada a max 384px de ancho (80mm / 203dpi), y convertida a 1-bit.
  */
-async function logoToEscPos(base64: string, maxWidth = 150): Promise<string> {
+async function logoToEscPos(base64: string, maxWidth = 80): Promise<string> {
   return new Promise((resolve) => {
     const img = new Image();
     img.onload = () => {

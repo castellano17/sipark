@@ -191,16 +191,88 @@ export default function Promotions() {
         showNotification("warning", "No hay vouchers para imprimir");
         return;
       }
-      const html = buildPrintHTML(vouchers, business, printMode);
 
+      // ── TICKET TÉRMICO: usa ESC/POS nativo ──────────────────────────
       if (printMode === "ticket") {
-        const success = await (window as any).api.printHtmlSilent(html);
-        if (!success) {
-          showNotification("error", "No se pudo imprimir de forma silenciosa en la impresora de tickets.");
+        const ticketPrinter = await api.getSetting("ticket_printer");
+        if (!ticketPrinter) {
+          showNotification("error", "No hay impresora de tickets configurada (ve a Configuración → Impresoras)");
+          return;
+        }
+
+        const ESC = "\x1B";
+        const GS  = "\x1D";
+        const INIT       = `${ESC}@`;
+        const CENTER     = `${ESC}a\x01`;
+        const LEFT       = `${ESC}a\x00`;
+        const BOLD_ON    = `${ESC}E\x01`;
+        const BOLD_OFF   = `${ESC}E\x00`;
+        const DOUBLE     = `${ESC}!\x30`;
+        const NORMAL     = `${ESC}!\x00`;
+        const CUT        = `${GS}V\x41\x05`;  // corte con avance
+
+        // QR Code ESC/POS nativo (Model 2)
+        const escQR = (data: string, size = 10) => {
+          const lenWithHeader = data.length + 3;
+          const lenL = lenWithHeader & 0xFF;
+          const lenH = (lenWithHeader >> 8) & 0xFF;
+          return (
+            `${GS}(k\x04\x00\x31\x41\x32\x00` +      // Model 2
+            `${GS}(k\x03\x00\x31\x43${String.fromCharCode(size)}` + // Tamaño módulo
+            `${GS}(k\x03\x00\x31\x45\x30` +         // Error correction M
+            `${GS}(k${String.fromCharCode(lenL, lenH)}\x31\x50\x30${data}` + // Datos
+            `${GS}(k\x03\x00\x31\x51\x30`            // Imprimir
+          );
+        };
+
+        // Barcode CODE128 nativo
+        const escBarcode = (data: string) =>
+          `${GS}h\x50` +                              // height = 80 dots
+          `${GS}w\x02` +                              // width multiplier
+          `${GS}H\x02` +                              // HRI abajo
+          `${GS}k\x49${String.fromCharCode(data.length)}${data}`; // CODE128
+
+        const businessLine = business.name || "SIPARK";
+        let printed = 0;
+
+        for (const v of vouchers.slice(0, 10)) {
+          const benefit = getBenefitLabel(v.type as CampaignType, parseFloat(v.benefit_value));
+          const till = v.valid_until ? `Valido hasta: ${formatDateES(v.valid_until)}` : "";
+
+          let t = INIT + CENTER;
+          t += BOLD_ON + DOUBLE + businessLine + "\n" + NORMAL + BOLD_OFF;
+          t += v.campaign_name + "\n";
+          t += "--------------------------------\n";
+          t += BOLD_ON + benefit + "\n" + BOLD_OFF;
+          t += "\n";
+          t += escQR(v.code, 10);  // QR nativo grande
+          t += "\n";
+          t += escBarcode(v.code);  // Barcode nativo legible
+          t += "\n";
+          t += LEFT + BOLD_ON + DOUBLE + v.code + "\n" + NORMAL + BOLD_OFF;
+          if (till) t += CENTER + till + "\n";
+          t += CENTER + `Usos: ${v.max_uses === 1 ? "1 uso" : `${v.max_uses} usos`}` + "\n";
+          t += "\n\n\n";
+          t += CUT;
+
+          try {
+            await api.printTicket(ticketPrinter, t);
+            printed++;
+          } catch (err) {
+            // continúa con el siguiente
+          }
+        }
+
+        if (printed > 0) {
+          showNotification("success", `${printed} voucher(s) enviados a impresora`);
+        } else {
+          showNotification("error", "No se pudieron imprimir los vouchers");
         }
         return;
       }
 
+      // ── IMPRESIÓN NORMAL (ventana de navegador) ──────────────────────
+      const html = buildPrintHTML(vouchers, business, printMode);
       const printWindow = window.open("", "_blank");
       if (!printWindow) { showNotification("error", "No se pudo abrir ventana de impresión"); return; }
       printWindow.document.write(html);
@@ -269,59 +341,32 @@ export default function Promotions() {
       `;
     }).join("");
 
-    const ticketCss = isTicket ? `
-      @page{size:80mm auto;margin:0}
-      body{width:72mm;margin:0;padding:0;font-size:14px}
-      .voucher{
-        width:72mm;margin:0;border:none;border-radius:0;
-        border-top:2px dashed #000;padding:6px 4px 10px;
-        page-break-after:always;
-      }
-      .biz-name{font-size:16px}
-      .biz-info{font-size:12px}
-      h2.campaign-name{font-size:16px;margin:4px 0}
-      .benefit{font-size:18px;font-weight:bold;margin:4px 0}
-      .voucher-images{
-        display:flex;flex-direction:column;
-        align-items:center;gap:6px;margin:8px 0
-      }
-      .qr{width:64mm;height:64mm;display:block}
-      .barcode-wrap{width:100%;display:block;text-align:center}
-      .barcode{width:68mm;height:50px;display:block;margin:0 auto}
-      .barcode-svg{width:100%;overflow:visible}
-      .barcode-svg svg{width:100%;height:50px}
-      .voucher-code{font-size:16px;letter-spacing:3px;font-weight:bold;margin:4px 0}
-      .desc{font-size:12px}
-      .valid{font-size:13px;font-weight:bold}
-      .uses{font-size:11px}
-      .footer{font-size:10px}
-    ` : "";
 
     return `<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><title>Vouchers — ${business.name || "SIPARK"}</title>
       <style>
         *{box-sizing:border-box}
         body{font-family:Arial,sans-serif;margin:0;padding:16px;background:#fff;color:#111}
+        @page{size:A4;margin:12mm}
         .biz-header{text-align:center;margin-bottom:8px}
-        .biz-name{font-size:16px;font-weight:bold;margin:0 0 2px}
-        .biz-info{font-size:11px;color:#444;margin:1px 0}
+        .biz-name{font-size:20px;font-weight:bold;margin:0 0 2px}
+        .biz-info{font-size:13px;color:#444;margin:1px 0}
         .biz-divider{border:none;border-top:1px solid #999;margin:6px 0}
-        .voucher{border:2px dashed #666;border-radius:12px;padding:16px;margin:12px auto;text-align:center;page-break-inside:avoid}
-        h2.campaign-name{margin:0 0 4px;font-size:15px;color:#1a1a2e}
-        .benefit{font-size:20px;font-weight:bold;color:#4f46e5;margin:4px 0}
-        .voucher-images{display:flex;justify-content:center;align-items:center;gap:12px;margin:10px 0;flex-wrap:wrap}
-        .qr{width:110px;height:110px;object-fit:contain}
-        .barcode-wrap{display:flex;align-items:center;justify-content:center}
-        .barcode{max-width:200px;height:60px;object-fit:contain}
-        .barcode-svg{max-width:220px;height:70px;overflow:hidden}
+        .voucher{border:2px dashed #666;border-radius:12px;padding:16px;margin:12px auto;
+          text-align:center;page-break-inside:avoid;max-width:160mm}
+        h2.campaign-name{margin:0 0 4px;font-size:18px;color:#1a1a2e}
+        .benefit{font-size:24px;font-weight:bold;color:#4f46e5;margin:4px 0}
+        .voucher-images{display:flex;flex-direction:column;align-items:center;gap:10px;margin:12px 0}
+        .qr{width:50mm;height:50mm;object-fit:contain}
+        .barcode-wrap{width:100%;display:block;text-align:center}
+        .barcode{width:130mm;height:18mm;object-fit:contain;display:block;margin:0 auto}
+        .barcode-svg{width:130mm;height:18mm;overflow:hidden;margin:0 auto}
         .barcode-svg svg{width:100%;height:100%}
         .no-img{font-size:10px;color:#999}
-        .voucher-code{font-family:monospace;font-size:18px;font-weight:bold;letter-spacing:3px;color:#333;margin:6px 0}
-        .desc{font-size:11px;color:#666;margin:3px 0}
-        .valid{font-size:11px;color:#555;margin:2px 0;font-weight:bold}
-        .uses{font-size:10px;color:#888;margin:2px 0}
-        .footer{font-size:9px;color:#aaa;margin:4px 0 0}
-        @media print{body{padding:4px}@page{margin:8mm}}
-        ${ticketCss}
+        .voucher-code{font-family:monospace;font-size:22px;font-weight:bold;letter-spacing:4px;color:#333;margin:8px 0}
+        .desc{font-size:13px;color:#666;margin:3px 0}
+        .valid{font-size:14px;color:#555;margin:2px 0;font-weight:bold}
+        .uses{font-size:12px;color:#888;margin:2px 0}
+        .footer{font-size:10px;color:#aaa;margin:4px 0 0}
       </style></head><body>${rows}</body></html>`;
   };
 

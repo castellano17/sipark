@@ -36,11 +36,13 @@ interface POSScreenProps {
     durationMinutes?: number;
   } | null;
   onCheckoutComplete?: () => void;
+  onNavigate?: (path: string) => void;
 }
 
 export function POSScreen({
   checkoutData,
   onCheckoutComplete,
+  onNavigate,
 }: POSScreenProps = {}) {
   const { getProductsServices } = useDatabase();
   const { printTicket, openDrawer } = usePrinter();
@@ -721,6 +723,12 @@ export function POSScreen({
       clearSale();
       setShowPaymentModal(false);
       success("Venta procesada exitosamente");
+
+      // Si era un check-in (pago de entrada), regresar a Operaciones
+      // La card de tiempo ya fue creada al registrar la entrada
+      if (isCheckIn && onNavigate) {
+        setTimeout(() => onNavigate("/operaciones"), 500);
+      }
 
       // Avisar a la pantalla secundaria (TV) para mostrar el overlay premium de cobro
       try {

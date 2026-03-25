@@ -271,6 +271,7 @@ export default function MainLayout({ currentUser, onLogout }: MainLayoutProps) {
           <POSScreen
             checkoutData={checkoutData}
             onCheckoutComplete={() => setCheckoutData(null)}
+            onNavigate={handleNavigate}
           />
         );
       case "/mesero":
