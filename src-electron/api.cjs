@@ -217,6 +217,21 @@ async function getActiveSessions() {
     );
     const safePayload = JSON.parse(safePayloadJson);
 
+    // DIAGNÓSTICO DEFINITIVO: Si el motor cree que hay 0, enviará esta tarjeta falsa.
+    // Si esta tarjeta aparece en pantalla, significa que el cable IPC funciona 100% y el problema está en la BD.
+    // Si NO aparece, significa que el cable IPC sigue rompiéndose.
+    if (safePayload.length === 0) {
+      safePayload.push({
+         id: -999,
+         client_id: 1,
+         client_name: `Motor DB=${sessions.length}, Activos=${activeOnes.length}`,
+         package_name: 'DIAGNOSTICO',
+         start_time: new Date().toISOString(),
+         duration_minutes: 60,
+         status: 'pending'
+      });
+    }
+
     return safePayload;
   } catch (error) {
     try { fs.appendFileSync(logFile, `[${new Date().toISOString()}] FALLO CRITICO: ${error.message}\n`); } catch(e) {}

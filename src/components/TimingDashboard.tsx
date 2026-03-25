@@ -197,8 +197,15 @@ export const TimingDashboard: React.FC<TimingDashboardProps> = ({
               <div className="bg-white p-4 rounded-full shadow-sm border border-slate-100 mb-4">
                 <Receipt className="w-8 h-8 opacity-20" />
               </div>
-              <p className="text-lg font-medium">No hay sesiones activas en este momento</p>
+              <p className="text-lg font-medium">No hay llamadas válidas activas en este momento</p>
               <p className="text-sm">Registra una nueva entrada para empezar</p>
+              
+              <div className="mt-8 p-4 bg-slate-100 rounded-lg max-w-2xl w-full text-left overflow-auto border border-red-200">
+                <p className="font-bold text-red-500 mb-2">DEBUG PANNEL (Estado real recibido del Motor):</p>
+                <pre className="text-xs text-slate-700 whitespace-pre-wrap break-words">
+                  {JSON.stringify(sessions, null, 2)}
+                </pre>
+              </div>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 pr-4">
