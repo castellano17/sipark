@@ -1222,6 +1222,39 @@ async function createSaleWithItems(saleData) {
           [item.quantity, productId]
         );
       }
+
+      // CASO ESPECIAL: Si es un Paquete (Entrada) vendido directamente en el POS
+      // y NO viene vinculado de una sesión ya creada (como en el flujo de Check-In)
+      if (item.product_type === 'package' && !item.active_session_id) {
+        try {
+          // Crear sesión automática marcada como pagada
+          const startTime = getLocalTimestamp();
+          // Intentar obtener el duration_minutes por defecto si no viene
+          let duration = item.duration_minutes || 60;
+          if (!item.duration_minutes && productId) {
+             const p = await getAsync("SELECT duration_minutes FROM products_services WHERE id = ?", [productId]);
+             if (p?.duration_minutes) duration = p.duration_minutes;
+          }
+
+          // Obtener o crear clientId fallback (Cliente General)
+          let finalClientId = client_id;
+          if (!finalClientId) {
+            const general = await getAsync("SELECT id FROM clients WHERE name = $1", ["Cliente General"]);
+            if (general) finalClientId = general.id;
+            else {
+              const res = await runAsync("INSERT INTO clients (name, parent_name) VALUES ($1, $2) RETURNING id", ["Cliente General", "Sin Registro"]);
+              finalClientId = res.lastID;
+            }
+          }
+
+          await runAsync(
+            "INSERT INTO active_sessions (client_id, start_time, package_id, duration_minutes, status, is_paid, children_count) VALUES ($1, $2, $3, $4, $5, $6, $7)",
+            [finalClientId, startTime, productId, duration, "active", true, item.quantity || 1]
+          );
+        } catch (sessionErr) {
+          console.error("Error creando sesión automática desde POS:", sessionErr);
+        }
+      }
     }
 
     return saleId;

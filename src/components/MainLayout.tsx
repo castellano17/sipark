@@ -173,6 +173,7 @@ export default function MainLayout({ currentUser, onLogout }: MainLayoutProps) {
     packageId: number;
     packageName: string;
     packagePrice: number;
+    durationMinutes?: number;
   }) => {
     // Ir al POS con el paquete pre-cargado
     // isCheckIn = true: solo cobrar, NO terminar la sesión (aún no ha iniciado el tiempo)
@@ -183,6 +184,7 @@ export default function MainLayout({ currentUser, onLogout }: MainLayoutProps) {
       packageId: data.packageId,
       packageName: data.packageName,
       packagePrice: data.packagePrice,
+      durationMinutes: data.durationMinutes || 60,
       isCheckIn: true,
     });
     setCurrentPath("/pos");

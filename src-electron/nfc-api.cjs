@@ -154,6 +154,28 @@ async function chargeNfcEntry(uid, amount, userId) {
       ]
     );
 
+    // NUEVO: Crear sesión automática para que aparezca la "card" de tiempo en el Dashboard
+    try {
+      // Intentar obtener el duration_minutes por defecto de la membresía o usar 60
+      let duration = 60;
+      // Podríamos buscar si la membresía tiene un paquete asociado con duración
+      const membership = await getAsync(`
+        SELECT m.name FROM client_memberships cm 
+        JOIN memberships m ON cm.membership_id = m.id 
+        WHERE cm.id = $1`, [cardInfo.client_membership_id]);
+      
+      // Si el nombre sugiere tiempo, podríamos ajustarlo, pero por ahora usamos 60min o un ajuste global
+      // Podríamos incluso usar el "nfc_entry_price" para buscar un paquete que cueste eso
+      
+      const startTime = new Date().toISOString(); 
+      await runAsync(
+        "INSERT INTO active_sessions (client_id, start_time, duration_minutes, status, is_paid, children_count) VALUES ($1, $2, $3, $4, $5, $6)",
+        [cardInfo.client_id, startTime, duration, "active", true, 1]
+      );
+    } catch (sessionErr) {
+      console.error("Error creando sesión automática desde NFC:", sessionErr);
+    }
+
     return { 
       success: true, 
       clientName: cardInfo.client_name,

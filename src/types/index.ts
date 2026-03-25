@@ -114,6 +114,7 @@ export interface SaleItem {
   unit_price: number;
   subtotal: number;
   duration_minutes?: number;
+  active_session_id?: number;
 }
 
 export interface CurrentSale {

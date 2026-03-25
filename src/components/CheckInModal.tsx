@@ -23,6 +23,7 @@ interface CheckInModalProps {
     packageId: number;
     packageName: string;
     packagePrice: number;
+    durationMinutes?: number;
   }) => void;
 }
 
@@ -186,6 +187,7 @@ export const CheckInModal: React.FC<CheckInModalProps> = ({
         packageId: formData.packageId,
         packageName: selectedPackage?.name || "",
         packagePrice: selectedPackage?.price || 0,
+        durationMinutes: selectedPackage?.duration_minutes || 60,
       });
     } catch (err) {
       errorNotification("Error al registrar la entrada");

@@ -142,6 +142,8 @@ export function POSScreen({
             quantity: 1,
             unit_price: Number(checkoutData.packagePrice),
             subtotal: Number(checkoutData.packagePrice),
+            duration_minutes: checkoutData.durationMinutes || 60,
+            active_session_id: checkoutData.sessionId, // Link session
           });
         }
       } else {
@@ -159,6 +161,7 @@ export function POSScreen({
             unit_price: Number(product.price),
             subtotal: Number(product.price),
             duration_minutes: product.duration_minutes,
+            active_session_id: checkoutData.sessionId, // Link session
           });
         }
 

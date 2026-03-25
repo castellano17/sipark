@@ -138,6 +138,7 @@ async function createTables() {
       elapsed_minutes INTEGER,
       duration_minutes INTEGER,
       package_id INTEGER,
+      children_count INTEGER DEFAULT 1,
       status VARCHAR(50) DEFAULT 'active',
       is_paid BOOLEAN DEFAULT FALSE,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -745,6 +746,11 @@ async function createTables() {
         -- Migración para permitir product_id opcional en sale_items (Venta de membresías, etc.)
         IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='sale_items' AND column_name='product_id' AND is_nullable='NO') THEN
           ALTER TABLE sale_items ALTER COLUMN product_id DROP NOT NULL;
+        END IF;
+
+        -- Migración para children_count en active_sessions
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='active_sessions' AND column_name='children_count') THEN
+          ALTER TABLE active_sessions ADD COLUMN children_count INTEGER DEFAULT 1;
         END IF;
 
         -- Migración para tipo en categorías
