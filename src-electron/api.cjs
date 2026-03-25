@@ -186,30 +186,29 @@ async function getActiveSessions() {
   const path = require('path');
   const logFile = path.join(os.homedir(), "sipark_api_debug.txt");
   try {
+    // Consulta ULTRA SIMPLE sin filtros complejos para asegurar que devuelva ALGO
     const sessions = await allAsync(`
       SELECT 
-        s.id,
-        s.client_id,
-        s.start_time,
-        s.package_id,
-        s.status,
-        s.duration_minutes,
-        s.is_paid,
-        s.children_count,
+        s.*,
         c.name as client_name,
         p.name as package_name
       FROM active_sessions s
       LEFT JOIN clients c ON s.client_id = c.id
       LEFT JOIN products_services p ON s.package_id = p.id
-      WHERE (LOWER(s.status) = 'active' OR LOWER(s.status) = 'pending')
       ORDER BY s.id DESC
+      LIMIT 50
     `);
     
-    try { fs.appendFileSync(logFile, `[${new Date().toISOString()}] Dashboard loaded ${sessions.length} sessions. Query OK.\n`); } catch(e) {}
+    // Filtrar en memoria por seguridad pero loguear el total
+    const activeOnes = sessions.filter(s => 
+       s.status && (s.status.toLowerCase() === 'active' || s.status.toLowerCase() === 'pending')
+    );
+
+    try { fs.appendFileSync(logFile, `[${new Date().toISOString()}] Dashboard: Total DB=${sessions.length}, Activos=${activeOnes.length}\n`); } catch(e) {}
     
-    return sessions;
+    return activeOnes;
   } catch (error) {
-    try { fs.appendFileSync(logFile, `[${new Date().toISOString()}] ERROR en getActiveSessions: ${error.message}\n`); } catch(e) {}
+    try { fs.appendFileSync(logFile, `[${new Date().toISOString()}] FALLO CRITICO: ${error.message}\n`); } catch(e) {}
     throw error;
   }
 }
