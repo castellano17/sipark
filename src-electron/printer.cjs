@@ -10,7 +10,9 @@ function getWindowsRawPrintScriptPath(app) {
   
   const scriptPath = path.join(printDir, "raw_print.ps1");
   if (!fs.existsSync(scriptPath)) {
-    const scriptContent = `Add-Type -TypeDefinition @"
+    const scriptContent = `param([string]$printerName, [string]$filePath)
+
+Add-Type -TypeDefinition @"
 using System;
 using System.Runtime.InteropServices;
 public class RawPrinterHelper {
@@ -70,11 +72,12 @@ public class RawPrinterHelper {
     }
 }
 "@
-param([string]$printerName, [string]$filePath)
+
 $result = [RawPrinterHelper]::SendFileToPrinter($printerName, $filePath)
 if (-not $result) {
     throw "Error sending raw bytes to printer $printerName"
 }`;
+    // Escribir y sobrescribir siempre para asegurar la última versión del script
     fs.writeFileSync(scriptPath, scriptContent, "utf-8");
   }
   return scriptPath;
