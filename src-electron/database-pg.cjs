@@ -730,9 +730,17 @@ async function createTables() {
           ALTER TABLE sale_items ALTER COLUMN product_id DROP NOT NULL;
         END IF;
 
-        -- Migración para children_count en active_sessions
+        -- Migración para children_count, duration_minutes, y elapsed_minutes en active_sessions
         IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='active_sessions' AND column_name='children_count') THEN
           ALTER TABLE active_sessions ADD COLUMN children_count INTEGER DEFAULT 1;
+        END IF;
+
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='active_sessions' AND column_name='duration_minutes') THEN
+          ALTER TABLE active_sessions ADD COLUMN duration_minutes INTEGER;
+        END IF;
+
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='active_sessions' AND column_name='elapsed_minutes') THEN
+          ALTER TABLE active_sessions ADD COLUMN elapsed_minutes INTEGER;
         END IF;
 
         -- Migración para tipo en categorías
