@@ -213,22 +213,6 @@ async function getActiveSessions() {
     );
     const safePayload = JSON.parse(safePayloadJson);
 
-    // DIAGNÓSTICO DEFINITIVO 2: Comprobar la tabla cruda sin JOINs.
-    if (safePayload.length === 0) {
-      const rawCount = await getAsync("SELECT COUNT(*) as total FROM active_sessions");
-      const raw5 = await allAsync("SELECT id, status, is_paid FROM active_sessions ORDER BY id DESC LIMIT 5");
-
-      safePayload.push({
-         id: -999,
-         client_id: 1,
-         client_name: `DB=${sessions.length}, C=${rawCount?.total}, R=${raw5.map(r=>r.id+':'+r.status).join(',')}`,
-         package_name: 'DIAGNOSTICO PROFUNDO',
-         start_time: new Date().toISOString(),
-         duration_minutes: 60,
-         status: 'pending'
-      });
-    }
-
     return safePayload;
   } catch (error) {
     try { fs.appendFileSync(logFile, `[${new Date().toISOString()}] FALLO CRITICO: ${error.message}\n`); } catch(e) {}
