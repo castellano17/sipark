@@ -42,7 +42,8 @@ export function useCurrency() {
         setCurrency(CURRENCIES[currencyCode]);
         console.log("✅ Currency set to:", CURRENCIES[currencyCode]);
       } else {
-        console.warn("⚠️ No currency configured, using default USD");
+        // Keep default NIO (already set in useState)
+        console.warn("⚠️ No currency configured, using default NIO (C$)");
       }
 
       if (rate) {
