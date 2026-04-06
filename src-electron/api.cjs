@@ -5,9 +5,17 @@ const { runAsync, getAsync, allAsync } = require("./database-pg.cjs");
 // Obtener timestamp local en formato SQLite (YYYY-MM-DD HH:MM:SS)
 function getLocalTimestamp() {
   const date = new Date();
-  // Formato ISO estándar universal sin riesgos de locale de Windows:
-  // PostgreSQL acepta nativamente "2026-03-25T17:35:22.123Z" en columnas TIMESTAMP
-  return date.toISOString();
+  // Devolver timestamp en hora local, no UTC
+  // Esto asegura que el frontend y backend usen la misma zona horaria
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  const seconds = String(date.getSeconds()).padStart(2, '0');
+  const ms = String(date.getMilliseconds()).padStart(3, '0');
+  
+  return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}.${ms}Z`;
 }
 
 // ============ CLIENTS ============
@@ -983,11 +991,11 @@ async function createSession(
       }
     }
 
-    // Crear sesión e iniciar de inmediato (estado active)
+    // Crear sesión en estado PENDING (no inicia hasta que se presione "Empezar")
     const startTime = getLocalTimestamp();
     const sessionResult = await runAsync(
       "INSERT INTO active_sessions (client_id, start_time, package_id, duration_minutes, status, is_paid, children_count) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id",
-      [clientId, startTime, packageId, durationMinutes, "active", isPaid, childrenCount],
+      [clientId, startTime, packageId, durationMinutes, "pending", isPaid, childrenCount],
     );
 
     return {
@@ -996,7 +1004,7 @@ async function createSession(
       client_name: clientName,
       start_time: startTime,
       package_id: packageId,
-      status: "active",
+      status: "pending",
       duration_minutes: durationMinutes,
       is_paid: isPaid,
       children_count: childrenCount
@@ -1092,7 +1100,7 @@ async function closeCashBox(
       throw new Error("Caja no encontrada");
     }
 
-    // Calcular totales
+    // Calcular totales de ventas
     const salesTotal = await getAsync(
       "SELECT COALESCE(SUM(total), 0) as total FROM sales WHERE cash_box_id = ?",
       [cashBoxId],
@@ -1100,6 +1108,83 @@ async function closeCashBox(
 
     const expensesTotal = await getAsync(
       "SELECT COALESCE(SUM(ABS(amount)), 0) as total FROM cash_movements WHERE cash_box_id = ? AND type = 'expense'",
+      [cashBoxId],
+    );
+
+    // ===== INFORMACIÓN ADICIONAL DETALLADA =====
+    
+    // 1. Número total de transacciones
+    const transactionCount = await getAsync(
+      "SELECT COUNT(*) as count FROM sales WHERE cash_box_id = ?",
+      [cashBoxId],
+    );
+
+    // 2. Desglose por método de pago
+    const paymentMethods = await allAsync(
+      `SELECT payment_method, COUNT(*) as count, COALESCE(SUM(total), 0) as total 
+       FROM sales WHERE cash_box_id = ? 
+       GROUP BY payment_method`,
+      [cashBoxId],
+    );
+
+    // 3. Descuentos aplicados
+    const discountsTotal = await getAsync(
+      "SELECT COALESCE(SUM(discount), 0) as total FROM sales WHERE cash_box_id = ?",
+      [cashBoxId],
+    );
+
+    // 4. Vouchers canjeados (buscar en sale_items con product_id = -98)
+    const vouchersRedeemed = await getAsync(
+      `SELECT COUNT(DISTINCT si.sale_id) as count
+       FROM sale_items si
+       JOIN sales s ON s.id = si.sale_id
+       WHERE s.cash_box_id = ? AND si.product_id = -98`,
+      [cashBoxId],
+    );
+
+    // 5. Membresías vendidas/recargadas (product_id = -99 para recargas)
+    const memberships = await getAsync(
+      `SELECT 
+        COUNT(CASE WHEN si.product_type = 'membership' AND si.product_id != -99 THEN 1 END) as sold,
+        COUNT(CASE WHEN si.product_id = -99 THEN 1 END) as recharged,
+        COALESCE(SUM(CASE WHEN si.product_id = -99 THEN si.subtotal ELSE 0 END), 0) as recharge_amount
+       FROM sale_items si
+       JOIN sales s ON s.id = si.sale_id
+       WHERE s.cash_box_id = ?`,
+      [cashBoxId],
+    );
+
+    // 6. Sesiones/Paquetes vendidos
+    const packagesCount = await getAsync(
+      `SELECT COUNT(*) as count, COALESCE(SUM(si.subtotal), 0) as total
+       FROM sale_items si
+       JOIN sales s ON s.id = si.sale_id
+       WHERE s.cash_box_id = ? AND si.product_type = 'package'`,
+      [cashBoxId],
+    );
+
+    // 7. Top 5 productos más vendidos
+    const topProducts = await allAsync(
+      `SELECT si.product_name, si.product_type, 
+              SUM(si.quantity) as quantity, 
+              COALESCE(SUM(si.subtotal), 0) as total
+       FROM sale_items si
+       JOIN sales s ON s.id = si.sale_id
+       WHERE s.cash_box_id = ? AND si.product_id > 0
+       GROUP BY si.product_name, si.product_type
+       ORDER BY quantity DESC
+       LIMIT 5`,
+      [cashBoxId],
+    );
+
+    // 8. Movimientos de caja (entradas/salidas)
+    const cashMovements = await getAsync(
+      `SELECT 
+        COUNT(CASE WHEN type = 'income' THEN 1 END) as income_count,
+        COALESCE(SUM(CASE WHEN type = 'income' THEN amount ELSE 0 END), 0) as income_total,
+        COUNT(CASE WHEN type = 'expense' THEN 1 END) as expense_count,
+        COALESCE(SUM(CASE WHEN type = 'expense' THEN ABS(amount) ELSE 0 END), 0) as expense_total
+       FROM cash_movements WHERE cash_box_id = ?`,
       [cashBoxId],
     );
 
@@ -1124,6 +1209,11 @@ async function closeCashBox(
       cashBoxId,
     ]);
 
+    // Calcular ticket promedio
+    const avgTicket = transactionCount.count > 0 
+      ? parseFloat(salesTotal.total) / transactionCount.count 
+      : 0;
+
     return {
       cashBoxId,
       openingAmount: cashBox.opening_amount,
@@ -1132,6 +1222,28 @@ async function closeCashBox(
       difference,
       salesTotal: salesTotal.total,
       expensesTotal: expensesTotal.total,
+      // Información adicional detallada
+      transactionCount: transactionCount.count,
+      avgTicket,
+      paymentMethods: paymentMethods || [],
+      discountsTotal: discountsTotal.total,
+      vouchersRedeemed: vouchersRedeemed.count || 0,
+      memberships: {
+        sold: memberships.sold || 0,
+        recharged: memberships.recharged || 0,
+        rechargeAmount: memberships.recharge_amount || 0,
+      },
+      packages: {
+        count: packagesCount.count || 0,
+        total: packagesCount.total || 0,
+      },
+      topProducts: topProducts || [],
+      cashMovements: {
+        incomeCount: cashMovements.income_count || 0,
+        incomeTotal: cashMovements.income_total || 0,
+        expenseCount: cashMovements.expense_count || 0,
+        expenseTotal: cashMovements.expense_total || 0,
+      },
     };
   } catch (error) {
     throw error;

@@ -22,7 +22,7 @@ const CURRENCIES: Record<string, CurrencyConfig> = {
 
 export function useCurrency() {
   const { getSetting } = useDatabase();
-  const [currency, setCurrency] = useState<CurrencyConfig>(CURRENCIES.USD);
+  const [currency, setCurrency] = useState<CurrencyConfig>(CURRENCIES.NIO); // Default to NIO to match Settings
   const [exchangeRate, setExchangeRate] = useState(1.0);
   const [loading, setLoading] = useState(true);
 
@@ -36,14 +36,20 @@ export function useCurrency() {
       const currencyCode = await getSetting("currency_primary");
       const rate = await getSetting("exchange_rate");
 
+      console.log("💱 Currency config loaded:", { currencyCode, rate });
+
       if (currencyCode && CURRENCIES[currencyCode]) {
         setCurrency(CURRENCIES[currencyCode]);
+        console.log("✅ Currency set to:", CURRENCIES[currencyCode]);
+      } else {
+        console.warn("⚠️ No currency configured, using default USD");
       }
 
       if (rate) {
         setExchangeRate(parseFloat(rate));
       }
     } catch (error) {
+      console.error("❌ Error loading currency config:", error);
     } finally {
       setLoading(false);
     }

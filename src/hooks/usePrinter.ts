@@ -172,6 +172,7 @@ export function usePrinter() {
 
       let config: any = null;
       let currencySymbol = "C$";
+      let receiptCopies = 1; // Número de copias a imprimir
       try {
         const saved = await window.api.getSetting("ticket_config");
         if (saved) config = JSON.parse(saved);
@@ -179,6 +180,10 @@ export function usePrinter() {
         const primary = await window.api.getSetting("currency_primary");
         if (primary === "USD") currencySymbol = "$";
         else if (primary === "NIO") currencySymbol = "C$";
+        
+        // Obtener número de copias configurado
+        const copiesSetting = await window.api.getSetting("receipt_copies");
+        receiptCopies = parseInt(copiesSetting || "1");
       } catch { /* usa defaults si no hay config */ }
 
       const businessName  = config?.businessName  || "MI LUDOTECA";
@@ -227,59 +232,66 @@ export function usePrinter() {
       const INIT_SEQ = "\x1B\x40\x1C\x2E\x1B\x74\x10";
       const CUT_SEQ = "\x1D\x56\x00";
 
-      let text = INIT_SEQ + "\n";
-      if (logoEscPos) text += logoEscPos;
-      text += line + "\n";
-      if (showBusinessName) text += center(businessName.toUpperCase()) + "\n";
-      if (showAddress && businessAddress) text += center(businessAddress) + "\n";
-      if (showPhone && businessPhone) text += center(`Tel: ${businessPhone}`) + "\n";
-      if (headerMessage) text += center(headerMessage) + "\n";
-      text += line + "\n";
-      if (showTicketNumber) text += `Ticket #${ticketData.saleId}\n`;
-      if (showDateTime) text += `Fecha: ${new Date().toLocaleString("es-ES")}\n`;
-      if (showCashier && ticketData.cashierName) text += `Cajero: ${ticketData.cashierName}\n`;
-      if (ticketData.clientName) text += `Cliente: ${ticketData.clientName}\n`;
-      text += dash + "\n";
+      // Función para generar el contenido del ticket con etiqueta de copia
+      const generateTicketContent = (copyLabel: string) => {
+        let text = INIT_SEQ + "\n";
+        if (logoEscPos) text += logoEscPos;
+        text += line + "\n";
+        if (showBusinessName) text += center(businessName.toUpperCase()) + "\n";
+        if (showAddress && businessAddress) text += center(businessAddress) + "\n";
+        if (showPhone && businessPhone) text += center(`Tel: ${businessPhone}`) + "\n";
+        if (headerMessage) text += center(headerMessage) + "\n";
+        text += line + "\n";
+        if (showTicketNumber) text += `Ticket #${ticketData.saleId}\n`;
+        if (showDateTime) text += `Fecha: ${new Date().toLocaleString("es-ES")}\n`;
+        if (showCashier && ticketData.cashierName) text += `Cajero: ${ticketData.cashierName}\n`;
+        if (ticketData.clientName) text += `Cliente: ${ticketData.clientName}\n`;
+        text += dash + "\n";
 
-      // Items
-      ticketData.items.forEach((item) => {
-        text += `${item.product_name}\n`;
-        text += `  ${item.quantity} x ${currencySymbol}${Number(item.unit_price).toFixed(2)} = ${currencySymbol}${Number(item.subtotal).toFixed(2)}\n`;
-      });
+        // Items
+        ticketData.items.forEach((item) => {
+          text += `${item.product_name}\n`;
+          text += `  ${item.quantity} x ${currencySymbol}${Number(item.unit_price).toFixed(2)} = ${currencySymbol}${Number(item.subtotal).toFixed(2)}\n`;
+        });
 
-      text += dash + "\n";
-      text += `Subtotal:        ${currencySymbol}${Number(ticketData.subtotal).toFixed(2)}\n`;
-      if (ticketData.discount > 0) {
-        text += `Descuento:      -${currencySymbol}${Number(ticketData.discount).toFixed(2)}\n`;
-      }
-      text += `TOTAL:           ${currencySymbol}${Number(ticketData.total).toFixed(2)}\n`;
-      text += dash + "\n";
-      text += `Método: ${methodLabel}\n`;
-      if (ticketData.paymentMethod.toLowerCase() === 'cash' || ticketData.paymentMethod.toLowerCase() === 'efectivo') {
-        const received = ticketData.amountReceived !== undefined && !isNaN(ticketData.amountReceived) ? ticketData.amountReceived : ticketData.total;
-        const changeAmount = ticketData.change !== undefined && !isNaN(ticketData.change) ? ticketData.change : 0;
-        text += `Recibido:        ${currencySymbol}${Number(received).toFixed(2)}\n`;
-        text += `Cambio:          ${currencySymbol}${Number(changeAmount).toFixed(2)}\n`;
-      } else if (ticketData.amountReceived !== undefined && !isNaN(ticketData.amountReceived)) {
-        text += `Recibido:        ${currencySymbol}${Number(ticketData.amountReceived).toFixed(2)}\n`;
-        text += `Cambio:          ${currencySymbol}${Number(ticketData.change || 0).toFixed(2)}\n`;
-      }
-      text += line + "\n";
-      if (showThankYou) text += center(thankYouMsg) + "\n";
-      if (footerMessage) text += center(footerMessage) + "\n";
-      text += line + "\n\n\n";
+        text += dash + "\n";
+        text += `Subtotal:        ${currencySymbol}${Number(ticketData.subtotal).toFixed(2)}\n`;
+        if (ticketData.discount > 0) {
+          text += `Descuento:      -${currencySymbol}${Number(ticketData.discount).toFixed(2)}\n`;
+        }
+        text += `TOTAL:           ${currencySymbol}${Number(ticketData.total).toFixed(2)}\n`;
+        text += dash + "\n";
+        text += `Método: ${methodLabel}\n`;
+        if (ticketData.paymentMethod.toLowerCase() === 'cash' || ticketData.paymentMethod.toLowerCase() === 'efectivo') {
+          const received = ticketData.amountReceived !== undefined && !isNaN(ticketData.amountReceived) ? ticketData.amountReceived : ticketData.total;
+          const changeAmount = ticketData.change !== undefined && !isNaN(ticketData.change) ? ticketData.change : 0;
+          text += `Recibido:        ${currencySymbol}${Number(received).toFixed(2)}\n`;
+          text += `Cambio:          ${currencySymbol}${Number(changeAmount).toFixed(2)}\n`;
+        } else if (ticketData.amountReceived !== undefined && !isNaN(ticketData.amountReceived)) {
+          text += `Recibido:        ${currencySymbol}${Number(ticketData.amountReceived).toFixed(2)}\n`;
+          text += `Cambio:          ${currencySymbol}${Number(ticketData.change || 0).toFixed(2)}\n`;
+        }
+        text += line + "\n";
+        if (showThankYou) text += center(thankYouMsg) + "\n";
+        if (footerMessage) text += center(footerMessage) + "\n";
+        
+        // Etiqueta de copia
+        text += "\n" + center(copyLabel) + "\n";
+        text += line + "\n\n\n";
 
-      // ESC/POS Barcode (Code 39) - Centrado
-      const saleIdStr = String(ticketData.saleId);
-      text += "\x1B\x61\x01"; // Centrar Barcode
-      text += "\x1D\x68\x50"; // Height 80
-      text += "\x1D\x77\x03"; // Width 3
-      text += "\x1D\x48\x02"; // HRI character below
-      text += `\x1D\x6B\x04${saleIdStr}\x00`; // Code 39
-      text += "\x1B\x61\x00"; // Restaurar a izquierda
-      text += "\n\n\n\n\n\n";
+        // ESC/POS Barcode (Code 39) - Centrado
+        const saleIdStr = String(ticketData.saleId);
+        text += "\x1B\x61\x01"; // Centrar Barcode
+        text += "\x1D\x68\x50"; // Height 80
+        text += "\x1D\x77\x03"; // Width 3
+        text += "\x1D\x48\x02"; // HRI character below
+        text += `\x1D\x6B\x04${saleIdStr}\x00`; // Code 39
+        text += "\x1B\x61\x00"; // Restaurar a izquierda
+        text += "\n\n\n\n\n\n";
 
-      text += CUT_SEQ;
+        text += CUT_SEQ;
+        return text;
+      };
 
       // Verificar modo impresión
       let printerMode = "test";
@@ -290,11 +302,25 @@ export function usePrinter() {
       if (printerMode === "real") {
         // Modo real: enviar a impresora física
         try {
-          await (window as any).api.printTicket(ticketPrinter, text);
+          // Imprimir las copias configuradas
+          for (let i = 1; i <= receiptCopies; i++) {
+            const copyLabel = i === 1 
+              ? "ORIGINAL CLIENTE" 
+              : "COPIA: CONTABILIDAD";
+            const ticketContent = generateTicketContent(copyLabel);
+            await (window as any).api.printTicket(ticketPrinter, ticketContent);
+            
+            // Pequeña pausa entre copias para evitar problemas
+            if (i < receiptCopies) {
+              await new Promise(resolve => setTimeout(resolve, 500));
+            }
+          }
         } catch (err) {
+          console.error("Error imprimiendo ticket:", err);
         }
       } else {
         // Modo prueba: solo consola
+        console.log("Modo prueba - Se imprimirían", receiptCopies, "copia(s)");
       }
 
       // Abrir cajón si está en modo real

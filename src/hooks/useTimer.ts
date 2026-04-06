@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 
 export type TimerStatus = "active" | "warning" | "expired";
 
@@ -20,26 +20,51 @@ export function useTimer(
   const [elapsed, setElapsed] = useState(0);
   const [status, setStatus] = useState<TimerStatus>("active");
   const [hasExpired, setHasExpired] = useState(false);
-  const [pausedElapsed, setPausedElapsed] = useState(0);
+  const onExpireRef = useRef(onExpire);
+  const startTimeRef = useRef(startTime);
+
+  // Actualizar la referencia sin causar re-render
+  useEffect(() => {
+    onExpireRef.current = onExpire;
+  }, [onExpire]);
+
+  // Actualizar startTimeRef solo cuando cambia de pending a active
+  useEffect(() => {
+    if (!isPending) {
+      startTimeRef.current = startTime;
+    }
+  }, [isPending, startTime]);
 
   useEffect(() => {
-    // Si está en espera o pausada, no correr el timer
+    // Si está en espera, resetear todo
     if (isPending) {
       setElapsed(0);
       setStatus("active");
+      setHasExpired(false);
       return;
     }
 
+    // Si está pausada, no actualizar
     if (isPaused) {
-      setPausedElapsed(elapsed);
       return;
     }
 
+    // Resetear hasExpired cuando se inicia una nueva sesión
+    setHasExpired(false);
+
+    // Iniciar el intervalo para actualizar cada segundo
     const interval = setInterval(() => {
       const now = new Date();
-      const start = new Date(startTime);
+      const start = new Date(startTimeRef.current);
+      
+      // Validar que startTime sea válido
+      if (isNaN(start.getTime())) {
+        console.error("❌ startTime inválido:", startTimeRef.current);
+        return;
+      }
+      
       const elapsedMs = now.getTime() - start.getTime();
-      const elapsedSeconds = Math.floor(elapsedMs / 1000);
+      const elapsedSeconds = Math.max(0, Math.floor(elapsedMs / 1000));
 
       setElapsed(elapsedSeconds);
 
@@ -47,13 +72,14 @@ export function useTimer(
       const remainingSeconds = durationSeconds - elapsedSeconds;
 
       if (remainingSeconds <= 0) {
-        if (!hasExpired) {
-          setHasExpired(true);
-          onExpire?.();
-        }
+        setHasExpired(prev => {
+          if (!prev) {
+            onExpireRef.current?.();
+          }
+          return true;
+        });
         setStatus("expired");
       } else if (remainingSeconds <= 600) {
-        // 10 minutos = 600 segundos
         setStatus("warning");
       } else {
         setStatus("active");
@@ -61,20 +87,27 @@ export function useTimer(
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [startTime, durationMinutes, hasExpired, onExpire, isPaused, isPending]);
+  }, [durationMinutes, isPaused, isPending]);
 
   const durationSeconds = durationMinutes * 60;
   const remaining = isPending ? durationSeconds : Math.max(0, durationSeconds - elapsed);
 
-  const minutes = Math.floor(elapsed / 60);
-  const seconds = elapsed % 60;
-  const remainingMinutes = Math.floor(remaining / 60);
-  const remainingSeconds = remaining % 60;
+  // Calcular horas, minutos y segundos para el tiempo transcurrido
+  const safeElapsed = Math.max(0, elapsed);
+  const hours = Math.floor(safeElapsed / 3600);
+  const minutes = Math.floor((safeElapsed % 3600) / 60);
+  const seconds = safeElapsed % 60;
+  
+  // Calcular horas, minutos y segundos para el tiempo restante
+  const safeRemaining = Math.max(0, remaining);
+  const remainingHours = Math.floor(safeRemaining / 3600);
+  const remainingMinutes = Math.floor((safeRemaining % 3600) / 60);
+  const remainingSeconds = safeRemaining % 60;
 
-  const formatTime = (value: number) => String(value).padStart(2, "0");
+  const formatTime = (value: number) => String(Math.max(0, Math.floor(value))).padStart(2, "0");
 
-  const formattedTime = `${formatTime(minutes)}:${formatTime(seconds)}`;
-  const formattedRemaining = `${formatTime(remainingMinutes)}:${formatTime(remainingSeconds)}`;
+  const formattedTime = `${formatTime(hours)}:${formatTime(minutes)}:${formatTime(seconds)}`;
+  const formattedRemaining = `${formatTime(remainingHours)}:${formatTime(remainingMinutes)}:${formatTime(remainingSeconds)}`;
 
   return {
     elapsed,

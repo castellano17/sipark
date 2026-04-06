@@ -28,12 +28,17 @@ export const SessionDetailsModal: React.FC<SessionDetailsModalProps> = ({
   const isPending = session.status === "pending";
   const startTime = new Date(session.start_time);
   const now = new Date();
-  const elapsedMs = isPending ? 0 : now.getTime() - startTime.getTime();
-  const elapsedMinutes = Math.floor(elapsedMs / 60000);
-  const elapsedSeconds = Math.floor((elapsedMs % 60000) / 1000);
+  
+  // Si está en pending, el tiempo no ha comenzado
+  const elapsedMs = isPending ? 0 : Math.max(0, now.getTime() - startTime.getTime());
+  const elapsedSeconds = Math.floor(elapsedMs / 1000);
+  const elapsedMinutes = Math.floor(elapsedSeconds / 60);
+  const elapsedSecondsRemainder = elapsedSeconds % 60;
+  
+  const durationMinutes = session.duration_minutes || 60;
   const remainingMinutes = isPending
-    ? session.duration_minutes || 60
-    : Math.max(0, (session.duration_minutes || 60) - elapsedMinutes);
+    ? durationMinutes
+    : Math.max(0, durationMinutes - elapsedMinutes);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -99,7 +104,7 @@ export const SessionDetailsModal: React.FC<SessionDetailsModalProps> = ({
                   {isPending ? (
                     <span className="text-blue-600">En espera</span>
                   ) : (
-                    `${elapsedMinutes}m ${elapsedSeconds}s`
+                    `${elapsedMinutes}m ${elapsedSecondsRemainder}s`
                   )}
                 </p>
               </div>

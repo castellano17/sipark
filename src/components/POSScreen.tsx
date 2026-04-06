@@ -122,9 +122,38 @@ export function POSScreen({
   // Manejar datos de checkout (cuando viene desde TimingDashboard)
   useEffect(() => {
     const processCheckout = async () => {
-      if (!checkoutData || products.length === 0) return;
-      // Para isCheckIn no requerimos cashBoxOpen (puede no estar abierta formalmente)
-      if (!checkoutData.isCheckIn && !cashBoxOpen) return;
+      if (!checkoutData) return;
+      
+      console.log("🎯 ProcessCheckout iniciado:", {
+        isCheckIn: checkoutData.isCheckIn,
+        isPaid: checkoutData.isPaid,
+        hasStartTime: !!checkoutData.startTime,
+        hasDuration: !!checkoutData.durationMinutes,
+        productsLength: products.length,
+        cashBoxOpen
+      });
+      
+      // Para checkout normal con cliente ya pagado, NO necesitamos products
+      // Solo necesitamos products si NO ha pagado y necesitamos buscar el paquete en la BD
+      const needsProducts = !checkoutData.isCheckIn && !checkoutData.isPaid && !checkoutData.packageName;
+      
+      if (needsProducts && products.length === 0) {
+        console.log("⏸️ Esperando products para buscar paquete...");
+        return;
+      }
+      
+      // Si el cliente ya pagó, podemos procesar sin esperar products
+      console.log("✅ Condiciones cumplidas para procesar checkout");
+      
+      // Para isCheckIn (nueva entrada), permitir procesar sin caja abierta
+      // Para checkout normal, requerir caja abierta
+      if (!checkoutData.isCheckIn && !cashBoxOpen) {
+        console.log("⏸️ Esperando apertura de caja...");
+        return;
+      }
+
+      console.log("✅ Procesando checkout...");
+
 
       setActiveSessionId(checkoutData.sessionId);
       setIsCheckIn(!!checkoutData.isCheckIn);
@@ -147,37 +176,76 @@ export function POSScreen({
           });
         }
       } else {
-        // Checkout normal: buscar el producto
-        const product = products.find((p) => p.id === checkoutData.packageId);
-
+        // Checkout normal desde dashboard de tiempos
+        console.log("🔵 Checkout normal - isPaid:", checkoutData.isPaid);
+        
         // 1. Añadir el paquete base (si no está pagado)
-        if (product && !checkoutData.isPaid) {
-          updatedItems.push({
-            id: crypto.randomUUID(),
-            product_id: product.id,
-            product_name: product.name,
-            product_type: product.type,
-            quantity: 1,
-            unit_price: Number(product.price),
-            subtotal: Number(product.price),
-            duration_minutes: product.duration_minutes,
-            active_session_id: checkoutData.sessionId, // Link session
-          });
+        if (!checkoutData.isPaid) {
+          // Buscar el producto, pero si no está (porque es paquete), usar datos de checkoutData
+          const product = products.find((p) => p.id === checkoutData.packageId);
+          
+          if (product) {
+            updatedItems.push({
+              id: crypto.randomUUID(),
+              product_id: product.id,
+              product_name: product.name,
+              product_type: product.type,
+              quantity: 1,
+              unit_price: Number(product.price),
+              subtotal: Number(product.price),
+              duration_minutes: product.duration_minutes,
+              active_session_id: checkoutData.sessionId,
+            });
+          } else if (checkoutData.packageName && checkoutData.packagePrice) {
+            // Si no se encuentra el producto (es paquete), usar datos de checkoutData
+            console.log("📦 Paquete no encontrado en products, usando checkoutData");
+            updatedItems.push({
+              id: crypto.randomUUID(),
+              product_id: checkoutData.packageId || -1,
+              product_name: checkoutData.packageName,
+              product_type: "package",
+              quantity: 1,
+              unit_price: Number(checkoutData.packagePrice),
+              subtotal: Number(checkoutData.packagePrice),
+              duration_minutes: checkoutData.durationMinutes,
+              active_session_id: checkoutData.sessionId,
+            });
+          }
         }
 
         // 2. Calcular Tiempo Extra
         if (checkoutData.startTime && checkoutData.durationMinutes) {
+          console.log("Calculando tiempo extra:", {
+            startTime: checkoutData.startTime,
+            durationMinutes: checkoutData.durationMinutes,
+            now: new Date().toISOString()
+          });
+          
           const start = new Date(checkoutData.startTime);
           const duration = checkoutData.durationMinutes;
           const end = new Date(start.getTime() + duration * 60000);
           const now = new Date();
 
+          console.log("Comparación:", {
+            start: start.toISOString(),
+            end: end.toISOString(),
+            now: now.toISOString(),
+            nowIsAfterEnd: now > end
+          });
+
           if (now > end) {
-            const extraMins = Math.floor((now.getTime() - end.getTime()) / 60000);
+            const extraMins = Math.ceil((now.getTime() - end.getTime()) / 60000);
+            console.log("Tiempo extra detectado:", extraMins, "minutos");
+            
             if (extraMins > 0) {
               const extraPriceStr = await (window as any).api.getSetting('extra_minute_price');
               const extraPricePerMin = parseFloat(extraPriceStr || "1.0");
               const totalExtraPrice = extraMins * extraPricePerMin;
+
+              console.log("Precio tiempo extra:", {
+                extraPricePerMin,
+                totalExtraPrice
+              });
 
               updatedItems.push({
                 id: crypto.randomUUID(),
@@ -191,7 +259,14 @@ export function POSScreen({
 
               warning(`¡Tiempo Excedido! ${extraMins} min extra registrados.`);
             }
+          } else {
+            console.log("No hay tiempo extra - aún dentro del tiempo");
           }
+        } else {
+          console.log("No se puede calcular tiempo extra - faltan datos:", {
+            hasStartTime: !!checkoutData.startTime,
+            hasDuration: !!checkoutData.durationMinutes
+          });
         }
       }
 
@@ -317,6 +392,7 @@ export function POSScreen({
       discount: 0,
       nfc_membership_id: undefined,
       voucher_code: pendingVoucherCode,          // guardado para redeemVoucher al pagar
+      _voucher_info: voucherInfo,                // Guardar info completa del voucher
     } as any;
 
     setCurrentSale(prev => {
@@ -660,6 +736,10 @@ export function POSScreen({
 
       // Post-proceso: recargas NFC vinculadas en el carrito
       const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+      
+      // Variable para almacenar sesiones creadas por vouchers
+      let voucherSessionCreated = false;
+      
       for (const item of currentSale.items) {
         if ((item as any)._nfc_recharge) {
           const { clientMembershipId, amount } = (item as any)._nfc_recharge;
@@ -676,6 +756,7 @@ export function POSScreen({
              error(`No se pudo actualizar el saldo NFC: ${rechargeErr.message}`);
           }
         }
+        
         // Post-proceso: vouchers de promoción canjeados
         if ((item as any).voucher_code) {
           try {
@@ -686,7 +767,34 @@ export function POSScreen({
               redeemedBy: currentUser.id || null,
               benefitApplied: { type: (item as any).product_name },
             });
-          } catch { /* silencioso en producción */ }
+            
+            // Si el voucher es de tipo "hours", crear sesión en el dashboard de tiempos
+            const voucherInfo = (item as any)._voucher_info;
+            if (voucherInfo && voucherInfo.type === "hours") {
+              const durationMinutes = Math.round(parseFloat(voucherInfo.benefit_value) * 60);
+              
+              try {
+                const sessionResult = await (window as any).api.createSession(
+                  currentSale.client_name || "Cliente General",
+                  "", // parentName
+                  "", // phone
+                  voucherInfo.benefit_package_id || -1, // packageId
+                  durationMinutes,
+                  true, // isPaid (ya está pagado con el voucher)
+                  1 // childrenCount
+                );
+                
+                console.log("✅ Sesión creada por voucher:", sessionResult);
+                voucherSessionCreated = true;
+                success(`Sesión de ${voucherInfo.benefit_value}h creada. Ir a Operaciones para iniciar el timer.`);
+              } catch (sessionErr: any) {
+                console.error("Error creando sesión por voucher:", sessionErr);
+                error(`No se pudo crear la sesión: ${sessionErr.message}`);
+              }
+            }
+          } catch (voucherErr) { 
+            console.error("Error canjeando voucher:", voucherErr);
+          }
         }
       }
 
@@ -726,6 +834,14 @@ export function POSScreen({
       clearSale();
       setShowPaymentModal(false);
       success("Venta procesada exitosamente");
+
+      // Si se creó una sesión por voucher, navegar a Operaciones
+      if (voucherSessionCreated && onNavigate) {
+        setTimeout(() => {
+          onNavigate("/operaciones");
+        }, 1000);
+        return; // Salir para no ejecutar el código de check-in
+      }
 
       // Si era un check-in (pago de entrada), regresar a Operaciones
       // La card de tiempo ya fue creada al registrar la entrada

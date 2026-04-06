@@ -197,9 +197,10 @@ async function printTestTicket(printerName) {
     try {
       const primary = await getSetting("currency_primary");
       if (primary === "NIO") config.currencySymbol = "C$";
-      else config.currencySymbol = "$";
+      else if (primary === "USD") config.currencySymbol = "$";
+      else config.currencySymbol = "C$"; // Default to C$ if not set
     } catch {
-      config.currencySymbol = "$";
+      config.currencySymbol = "C$"; // Default to C$ on error
     }
 
     const ticketContent = generateTicketContent(config, {

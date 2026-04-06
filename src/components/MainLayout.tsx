@@ -38,6 +38,7 @@ interface MainLayoutProps {
 }
 
 import { useGlobalScanner } from "../hooks/useGlobalScanner";
+import { useExpiredSessions } from "../hooks/useExpiredSessions";
 
 export default function MainLayout({ currentUser, onLogout }: MainLayoutProps) {
   const [currentPath, setCurrentPath] = useState(currentUser.role === "mesero" ? "/mesero" : "/dashboard");
@@ -46,6 +47,14 @@ export default function MainLayout({ currentUser, onLogout }: MainLayoutProps) {
   
   // Oído Global NFC
   useGlobalScanner(currentPath);
+  
+  // Monitor de sesiones vencidas
+  const { expiredCount, requestNotificationPermission } = useExpiredSessions();
+  
+  // Solicitar permiso de notificaciones al cargar
+  useEffect(() => {
+    requestNotificationPermission();
+  }, []);
 
 
 
@@ -146,6 +155,18 @@ export default function MainLayout({ currentUser, onLogout }: MainLayoutProps) {
       const session = sessions.find((s: any) => s.id === sessionId);
 
       if (session) {
+        // Obtener el precio del paquete desde la base de datos
+        let packagePrice = 0;
+        if (session.package_id) {
+          try {
+            const products = await window.api.getProductsServices();
+            const packageProduct = products.find((p: any) => p.id === session.package_id);
+            packagePrice = packageProduct?.price || 0;
+          } catch (err) {
+            console.error("Error obteniendo precio del paquete:", err);
+          }
+        }
+
         // Preparar datos para el POS
         setCheckoutData({
           sessionId: session.id,
@@ -153,7 +174,7 @@ export default function MainLayout({ currentUser, onLogout }: MainLayoutProps) {
           clientName: session.client_name,
           packageId: session.package_id,
           packageName: session.package_name,
-          packagePrice: session.package_price,
+          packagePrice: packagePrice,
           isPaid: session.is_paid, // Pasar el estado de pago
           startTime: session.start_time,
           durationMinutes: session.duration_minutes,
@@ -163,6 +184,7 @@ export default function MainLayout({ currentUser, onLogout }: MainLayoutProps) {
         setCurrentPath("/pos");
       }
     } catch (error) {
+      console.error("Error en handleCheckout:", error);
     }
   };
 
@@ -175,8 +197,6 @@ export default function MainLayout({ currentUser, onLogout }: MainLayoutProps) {
     packagePrice: number;
     durationMinutes?: number;
   }) => {
-    // Ir al POS con el paquete pre-cargado
-    // isCheckIn = true: solo cobrar, NO terminar la sesión (aún no ha iniciado el tiempo)
     setCheckoutData({
       sessionId: data.sessionId ?? 0,
       clientId: data.clientId ?? null,
@@ -342,6 +362,21 @@ export default function MainLayout({ currentUser, onLogout }: MainLayoutProps) {
           <h1 className="text-xl font-bold tracking-tight text-white">{systemName}</h1>
         </div>
         <div className="flex items-center gap-1">
+          {/* Indicador de sesiones vencidas */}
+          {expiredCount > 0 && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setCurrentPath("/operaciones")}
+              className="relative text-white hover:bg-slate-800"
+              title={`${expiredCount} sesión(es) con tiempo vencido`}
+            >
+              <span className="text-2xl animate-pulse">⏰</span>
+              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                {expiredCount}
+              </span>
+            </Button>
+          )}
           <Button variant="ghost" size="icon" onClick={onLogout} title="Cerrar Sesión" className="text-white hover:bg-slate-800">
             <LogOut className="w-6 h-6" />
           </Button>
@@ -360,6 +395,7 @@ export default function MainLayout({ currentUser, onLogout }: MainLayoutProps) {
             currentPath={currentPath}
             onLogout={onLogout}
             currentUser={currentUser}
+            expiredSessionsCount={expiredCount}
           />
         </div>
 
@@ -372,6 +408,7 @@ export default function MainLayout({ currentUser, onLogout }: MainLayoutProps) {
                 currentPath={currentPath}
                 onLogout={onLogout}
                 currentUser={currentUser}
+                expiredSessionsCount={expiredCount}
               />
             </div>
             <div className="flex-1" onClick={() => setIsMobileMenuOpen(false)} />

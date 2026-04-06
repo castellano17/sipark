@@ -39,7 +39,7 @@ export const TimerCard: React.FC<TimerCardProps> = ({
     warning(`¡Tiempo vencido para ${clientName}!`, 6000);
   };
 
-  const { formattedTime, formattedRemaining, status } = useTimer(
+  const { formattedTime, formattedRemaining, status, elapsed } = useTimer(
     startTime,
     durationMinutes,
     handleExpire,
@@ -157,41 +157,43 @@ export const TimerCard: React.FC<TimerCardProps> = ({
           {isPending ? (
             <Button
               onClick={() => onStartTimer?.(id)}
-              className="w-full h-10 text-sm font-semibold text-white bg-green-600 hover:bg-green-700 flex items-center justify-center gap-2"
+              className="w-full h-12 text-base font-bold text-white bg-green-600 hover:bg-green-700 flex items-center justify-center gap-2 shadow-md"
             >
-              <span>Iniciar Tiempo</span>
+              <span>▶ Empezar</span>
             </Button>
           ) : (
-            <Button
-              onClick={() => onPause?.(id)}
-              variant="outline"
-              className="w-full h-10 text-sm font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 flex items-center justify-center gap-0.5"
-            >
-              <Pause className="w-4 h-4" />
-              <span>{isPaused ? "Reanudar" : "Pausar"}</span>
-            </Button>
+            <>
+              <Button
+                onClick={() => onPause?.(id)}
+                variant="outline"
+                className="w-full h-10 text-sm font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 flex items-center justify-center gap-0.5"
+              >
+                <Pause className="w-4 h-4" />
+                <span>{isPaused ? "Reanudar" : "Pausar"}</span>
+              </Button>
+
+              <Button
+                onClick={() => onViewDetails?.(id)}
+                variant="outline"
+                className="w-full h-10 text-sm font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 flex items-center justify-center gap-0.5"
+              >
+                <Eye className="w-4 h-4" />
+                <span>Detalles</span>
+              </Button>
+
+              <Button
+                onClick={() => onCheckout(id)}
+                className={`w-full h-10 text-sm font-semibold text-white flex items-center justify-center gap-2 ${
+                  status === "expired"
+                    ? "bg-rose-600 hover:bg-rose-700"
+                    : "bg-blue-600 hover:bg-blue-700"
+                }`}
+              >
+                <LogOut className="w-4 h-4" />
+                <span>Check-out</span>
+              </Button>
+            </>
           )}
-
-          <Button
-            onClick={() => onViewDetails?.(id)}
-            variant="outline"
-            className="w-full h-10 text-sm font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 flex items-center justify-center gap-0.5"
-          >
-            <Eye className="w-4 h-4" />
-            <span>Detalles</span>
-          </Button>
-
-          <Button
-            onClick={() => onCheckout(id)}
-            className={`w-full h-10 text-sm font-semibold text-white flex items-center justify-center gap-2 ${
-              status === "expired"
-                ? "bg-rose-600 hover:bg-rose-700"
-                : "bg-blue-600 hover:bg-blue-700"
-            }`}
-          >
-            <LogOut className="w-4 h-4" />
-            <span>Check-out</span>
-          </Button>
         </div>
       </CardContent>
     </Card>

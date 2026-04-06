@@ -169,14 +169,8 @@ export const CheckInModal: React.FC<CheckInModalProps> = ({
         formData.childrenCount
       );
 
-      // Iniciar el timer automáticamente para que aparezca la tarjeta de tiempo
-      if (result?.id) {
-        try {
-          await (window as any).api.startTimerSession(result.id);
-        } catch (timerErr) {
-          // Si falla el auto-start, el supervisor puede iniciarlo manualmente
-        }
-      }
+      // NO iniciar el timer automáticamente - debe hacerse manualmente con el botón "Empezar"
+      // La sesión se crea en estado "pending" y aparecerá con el botón verde "Empezar"
 
       success(`Entrada registrada para ${clientName}. ID Generado en Motor: ${result?.id || 'NINGUNO'}`);
       onOpenChange(false);

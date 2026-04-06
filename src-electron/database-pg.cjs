@@ -378,6 +378,8 @@ async function createTables() {
     )`,
 
     `CREATE INDEX IF NOT EXISTS idx_promotion_vouchers_code ON promotion_vouchers(code)`,
+    
+    `CREATE INDEX IF NOT EXISTS idx_promotion_vouchers_code_upper ON promotion_vouchers(UPPER(code))`,
 
     `CREATE TABLE IF NOT EXISTS voucher_redemptions (
       id SERIAL PRIMARY KEY,

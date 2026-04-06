@@ -138,9 +138,9 @@ async function createCampaign(data) {
     while (generated.length < codeCount && attempts < codeCount * 5) {
       attempts++;
       const code = generateUniqueCode();
-      // Verificar unicidad en BD
+      // Verificar unicidad en BD (case-insensitive)
       const existing = await getAsync(
-        "SELECT id FROM promotion_vouchers WHERE code = $1", [code]
+        "SELECT id FROM promotion_vouchers WHERE UPPER(code) = $1", [code.toUpperCase()]
       );
       if (existing) continue;
 
@@ -241,7 +241,7 @@ async function getVoucherByCode(rawCode) {
     // El QR puede contener múltiples líneas; el código está en la primera línea
     // Formato: "SIPARK-VOUCHER:CODE" o sólo el code
     const firstLine = rawCode.split("\n")[0].trim();
-    const code = firstLine.replace(/^SIPARK-VOUCHER[:-]/i, "").trim();
+    const code = firstLine.replace(/^SIPARK-VOUCHER[:-]/i, "").trim().toUpperCase(); // Convertir a mayúsculas
 
     const voucher = await getAsync(
       `SELECT pv.id, pv.campaign_id, pv.code, pv.times_used, pv.max_uses, pv.is_active,
@@ -251,7 +251,7 @@ async function getVoucherByCode(rawCode) {
               pc.status as campaign_status, pc.description as campaign_description
        FROM promotion_vouchers pv
        JOIN promotion_campaigns pc ON pc.id = pv.campaign_id
-       WHERE pv.code = $1`, [code]
+       WHERE UPPER(pv.code) = $1`, [code] // Comparar en mayúsculas
     );
 
     if (!voucher) return { valid: false, reason: "Voucher no encontrado" };
@@ -288,10 +288,10 @@ async function getVoucherByCode(rawCode) {
 
 async function redeemVoucher({ code, saleId, clientId, redeemedBy, benefitApplied, notes }) {
   try {
-    const cleanCode = code.replace(/^SIPARK-VOUCHER[:-]/i, "").trim();
+    const cleanCode = code.replace(/^SIPARK-VOUCHER[:-]/i, "").trim().toUpperCase(); // Convertir a mayúsculas
 
     const voucher = await getAsync(
-      "SELECT id, times_used, max_uses FROM promotion_vouchers WHERE code = $1",
+      "SELECT id, times_used, max_uses FROM promotion_vouchers WHERE UPPER(code) = $1", // Comparar en mayúsculas
       [cleanCode]
     );
     if (!voucher) throw new Error("Voucher no encontrado");

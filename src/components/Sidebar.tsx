@@ -27,6 +27,7 @@ interface SidebarProps {
   currentPath: string;
   onLogout: () => void;
   currentUser: SystemUser;
+  expiredSessionsCount?: number;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -34,6 +35,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   currentPath,
   onLogout,
   currentUser,
+  expiredSessionsCount = 0,
 }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [expandedMenus, setExpandedMenus] = useState<string[]>(["operaciones"]);
@@ -392,7 +394,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   <Button
                     variant="sidebar"
                     className={cn(
-                      "w-full justify-start gap-3 transition-all duration-200",
+                      "w-full justify-start gap-3 transition-all duration-200 relative",
                       isCollapsed && "justify-center",
                       isActive
                         ? "bg-slate-800 text-blue-400 border-l-2 border-blue-500"
@@ -413,6 +415,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         <span className="text-sm flex-1 text-left">
                           {item.label}
                         </span>
+                        {/* Badge de sesiones vencidas en Operaciones */}
+                        {item.id === "operaciones" && expiredSessionsCount > 0 && (
+                          <span className="bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center animate-pulse">
+                            {expiredSessionsCount}
+                          </span>
+                        )}
                         {hasChildren && (
                           <ChevronRight
                             className={cn(
@@ -422,6 +430,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
                           />
                         )}
                       </>
+                    )}
+                    {/* Badge para modo colapsado */}
+                    {isCollapsed && item.id === "operaciones" && expiredSessionsCount > 0 && (
+                      <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                        {expiredSessionsCount}
+                      </span>
                     )}
                   </Button>
 

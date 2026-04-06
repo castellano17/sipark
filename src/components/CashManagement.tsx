@@ -683,71 +683,172 @@ export function CashManagement() {
 
       {/* Modal: Imprimir Ticket de Cierre */}
       <Dialog open={showClosePrintModal} onOpenChange={setShowClosePrintModal}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Caja Cerrada</DialogTitle>
+            <DialogTitle className="text-2xl">📊 Reporte de Cierre de Caja</DialogTitle>
             <DialogDescription>
-              El cuadre de caja ha sido completado
+              Resumen completo del turno - {closeData?.cashBoxData?.opened_at ? new Date(closeData.cashBoxData.opened_at).toLocaleString('es-ES') : ''}
             </DialogDescription>
           </DialogHeader>
 
-          <div className="py-4 space-y-3">
-            <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg space-y-2">
-              <div className="flex justify-between text-sm">
-                <span className="text-slate-600">Monto Apertura:</span>
-                <span className="font-semibold">
-                  {formatCurrency(closeData?.openingAmount || 0)}
-                </span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-slate-600">Total Ventas:</span>
-                <span className="font-semibold text-green-600">
-                  +{formatCurrency(closeData?.salesTotal || 0)}
-                </span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-slate-600">Total Gastos:</span>
-                <span className="font-semibold text-red-600">
-                  -{formatCurrency(closeData?.expensesTotal || 0)}
-                </span>
-              </div>
-              <div className="border-t border-slate-300 pt-2 mt-2">
+          <div className="py-4 space-y-4">
+            {/* Resumen Financiero Principal */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg space-y-2">
+                <h3 className="font-bold text-sm text-slate-700 mb-3">💰 Resumen Financiero</h3>
                 <div className="flex justify-between text-sm">
-                  <span className="text-slate-600">Esperado:</span>
-                  <span className="font-semibold">
-                    {formatCurrency(closeData?.expectedAmount || 0)}
-                  </span>
+                  <span className="text-slate-600">Monto Apertura:</span>
+                  <span className="font-semibold">{formatCurrency(closeData?.openingAmount || 0)}</span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-slate-600">Contado:</span>
-                  <span className="font-semibold">
-                    {formatCurrency(closeData?.closingAmount || 0)}
-                  </span>
+                  <span className="text-slate-600">Total Ventas:</span>
+                  <span className="font-semibold text-green-600">+{formatCurrency(closeData?.salesTotal || 0)}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-slate-600">Total Gastos:</span>
+                  <span className="font-semibold text-red-600">-{formatCurrency(closeData?.expensesTotal || 0)}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-slate-600">Descuentos:</span>
+                  <span className="font-semibold text-orange-600">-{formatCurrency(closeData?.discountsTotal || 0)}</span>
+                </div>
+                <div className="border-t border-slate-300 pt-2 mt-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-slate-600">Esperado:</span>
+                    <span className="font-semibold">{formatCurrency(closeData?.expectedAmount || 0)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-slate-600">Contado:</span>
+                    <span className="font-semibold">{formatCurrency(closeData?.closingAmount || 0)}</span>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <div
-              className={`p-4 rounded-lg border ${
+              <div className={`p-4 rounded-lg border ${
                 Math.abs(closeData?.difference || 0) < 0.005
                   ? "bg-green-50 border-green-200"
                   : closeData?.difference > 0
                     ? "bg-blue-50 border-blue-200"
                     : "bg-red-50 border-red-200"
-              }`}
-            >
-              <p className="text-sm font-medium mb-1">
-                {Math.abs(closeData?.difference || 0) < 0.005
-                  ? "✓ Caja Cuadrada"
-                  : closeData?.difference > 0
-                    ? "↑ Sobrante"
-                    : "↓ Faltante"}
-              </p>
-              <p className="text-2xl font-bold">
-                {closeData?.difference >= 0 ? "+" : ""}
-                {formatCurrency(closeData?.difference || 0)}
-              </p>
+              }`}>
+                <h3 className="font-bold text-sm mb-2">
+                  {Math.abs(closeData?.difference || 0) < 0.005
+                    ? "✓ Caja Cuadrada"
+                    : closeData?.difference > 0
+                      ? "↑ Sobrante"
+                      : "↓ Faltante"}
+                </h3>
+                <p className="text-4xl font-bold mb-3">
+                  {closeData?.difference >= 0 ? "+" : ""}
+                  {formatCurrency(closeData?.difference || 0)}
+                </p>
+                <div className="text-sm space-y-1">
+                  <div className="flex justify-between">
+                    <span className="text-slate-600">Transacciones:</span>
+                    <span className="font-semibold">{closeData?.transactionCount || 0}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-600">Ticket Promedio:</span>
+                    <span className="font-semibold">{formatCurrency(closeData?.avgTicket || 0)}</span>
+                  </div>
+                </div>
+              </div>
             </div>
+
+            {/* Métodos de Pago */}
+            <div className="p-4 bg-white border border-slate-200 rounded-lg">
+              <h3 className="font-bold text-sm text-slate-700 mb-3">💳 Desglose por Método de Pago</h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                {closeData?.paymentMethods?.map((method: any) => (
+                  <div key={method.payment_method} className="p-3 bg-slate-50 rounded-lg">
+                    <div className="text-xs text-slate-600 uppercase">{method.payment_method}</div>
+                    <div className="text-lg font-bold">{formatCurrency(method.total)}</div>
+                    <div className="text-xs text-slate-500">{method.count} transacciones</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Estadísticas de Operaciones */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="p-4 bg-purple-50 border border-purple-200 rounded-lg">
+                <h3 className="font-bold text-sm text-purple-700 mb-2">🎟️ Vouchers Canjeados</h3>
+                <div className="text-3xl font-bold text-purple-600">{closeData?.vouchersRedeemed || 0}</div>
+                <div className="text-xs text-purple-600 mt-1">Promociones aplicadas</div>
+              </div>
+
+              <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <h3 className="font-bold text-sm text-blue-700 mb-2">🎮 Paquetes Vendidos</h3>
+                <div className="text-3xl font-bold text-blue-600">{closeData?.packages?.count || 0}</div>
+                <div className="text-xs text-blue-600 mt-1">{formatCurrency(closeData?.packages?.total || 0)}</div>
+              </div>
+
+              <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+                <h3 className="font-bold text-sm text-green-700 mb-2">👥 Membresías</h3>
+                <div className="flex gap-4">
+                  <div>
+                    <div className="text-2xl font-bold text-green-600">{closeData?.memberships?.sold || 0}</div>
+                    <div className="text-xs text-green-600">Vendidas</div>
+                  </div>
+                  <div>
+                    <div className="text-2xl font-bold text-green-600">{closeData?.memberships?.recharged || 0}</div>
+                    <div className="text-xs text-green-600">Recargadas</div>
+                  </div>
+                </div>
+                {closeData?.memberships?.rechargeAmount > 0 && (
+                  <div className="text-xs text-green-600 mt-1">
+                    Recargas: {formatCurrency(closeData.memberships.rechargeAmount)}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Movimientos de Caja */}
+            {(closeData?.cashMovements?.incomeCount > 0 || closeData?.cashMovements?.expenseCount > 0) && (
+              <div className="p-4 bg-white border border-slate-200 rounded-lg">
+                <h3 className="font-bold text-sm text-slate-700 mb-3">💸 Movimientos de Caja</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="p-3 bg-green-50 rounded-lg">
+                    <div className="text-xs text-green-700">Entradas</div>
+                    <div className="text-xl font-bold text-green-600">
+                      {formatCurrency(closeData.cashMovements.incomeTotal)}
+                    </div>
+                    <div className="text-xs text-green-600">{closeData.cashMovements.incomeCount} movimientos</div>
+                  </div>
+                  <div className="p-3 bg-red-50 rounded-lg">
+                    <div className="text-xs text-red-700">Salidas</div>
+                    <div className="text-xl font-bold text-red-600">
+                      {formatCurrency(closeData.cashMovements.expenseTotal)}
+                    </div>
+                    <div className="text-xs text-red-600">{closeData.cashMovements.expenseCount} movimientos</div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Top Productos */}
+            {closeData?.topProducts?.length > 0 && (
+              <div className="p-4 bg-white border border-slate-200 rounded-lg">
+                <h3 className="font-bold text-sm text-slate-700 mb-3">🏆 Top 5 Productos Más Vendidos</h3>
+                <div className="space-y-2">
+                  {closeData.topProducts.map((product: any, index: number) => (
+                    <div key={index} className="flex items-center justify-between p-2 bg-slate-50 rounded">
+                      <div className="flex items-center gap-2">
+                        <span className="text-lg font-bold text-slate-400">#{index + 1}</span>
+                        <div>
+                          <div className="text-sm font-semibold">{product.product_name}</div>
+                          <div className="text-xs text-slate-500">{product.product_type}</div>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-sm font-bold">{product.quantity} unidades</div>
+                        <div className="text-xs text-slate-600">{formatCurrency(product.total)}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           <DialogFooter className="flex-col sm:flex-row gap-2">
@@ -760,7 +861,7 @@ export function CashManagement() {
               }}
               className="w-full sm:w-auto"
             >
-              No Imprimir
+              Cerrar
             </Button>
             <Button
               onClick={handlePrintClosePDF}

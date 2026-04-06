@@ -63,6 +63,7 @@ export const Settings: React.FC = () => {
   const [nfcCustomMessage, setNfcCustomMessage] = useState("¡Bienvenido a SIPARK!");
   const [nfcSystemMode, setNfcSystemMode] = useState("production");
   const [nfcAlertDuration, setNfcAlertDuration] = useState("5");
+  const [receiptCopies, setReceiptCopies] = useState("1"); // Número de copias de recibo
 
   // Contabilidad
   const [enableTax, setEnableTax] = useState(false);
@@ -207,6 +208,9 @@ export const Settings: React.FC = () => {
               break;
             case "nfc_alert_duration":
               setNfcAlertDuration(setting.value);
+              break;
+            case "receipt_copies":
+              setReceiptCopies(setting.value || "1");
               break;
             case "enable_tax":
               setEnableTax(setting.value === "true");
@@ -408,6 +412,7 @@ export const Settings: React.FC = () => {
       await setSetting("nfc_custom_message", nfcCustomMessage);
       await setSetting("nfc_system_mode", nfcSystemMode);
       await setSetting("nfc_alert_duration", nfcAlertDuration.toString());
+      await setSetting("receipt_copies", receiptCopies);
       success("Configuración de operaciones guardada correctamente");
     } catch (err) {
       errorNotification("Error al guardar la configuración");
@@ -931,6 +936,51 @@ export const Settings: React.FC = () => {
                       </div>
                     </label>
                   </div>
+                </div>
+
+                {/* Selector de Copias de Recibo */}
+                <div className="mt-4 border-t border-slate-100 pt-4">
+                  <label className="block text-sm font-semibold text-slate-900 mb-3">
+                    Copias de Recibo a Imprimir
+                  </label>
+                  <div className="flex gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setReceiptCopies("1")}
+                      className={`flex-1 px-6 py-4 rounded-xl border-2 transition-all duration-200 ${
+                        receiptCopies === "1"
+                          ? "border-blue-500 bg-blue-50 text-blue-700 shadow-md"
+                          : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"
+                      }`}
+                    >
+                      <div className="text-center">
+                        <div className="text-3xl font-bold mb-1">1</div>
+                        <div className="text-xs font-medium">Copia Única</div>
+                        <div className="text-[10px] text-slate-500 mt-1">Original Cliente</div>
+                      </div>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setReceiptCopies("2")}
+                      className={`flex-1 px-6 py-4 rounded-xl border-2 transition-all duration-200 ${
+                        receiptCopies === "2"
+                          ? "border-blue-500 bg-blue-50 text-blue-700 shadow-md"
+                          : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"
+                      }`}
+                    >
+                      <div className="text-center">
+                        <div className="text-3xl font-bold mb-1">2</div>
+                        <div className="text-xs font-medium">Dos Copias</div>
+                        <div className="text-[10px] text-slate-500 mt-1">Cliente + Contabilidad</div>
+                      </div>
+                    </button>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-2 text-center">
+                    {receiptCopies === "1" 
+                      ? "Se imprimirá una sola copia marcada como 'Original Cliente'"
+                      : "Se imprimirán dos copias: 'Original Cliente' y 'Copia: Contabilidad'"
+                    }
+                  </p>
                 </div>
 
                 <Button
