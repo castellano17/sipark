@@ -267,13 +267,6 @@ export const CheckInModal: React.FC<CheckInModalProps> = ({
             >
               Cancelar
             </button>
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="px-4 py-2 bg-white text-blue-600 hover:bg-gray-100 rounded-md font-medium transition-colors disabled:opacity-50"
-            >
-              {isSubmitting ? "Procesando..." : "Registrar Entrada"}
-            </button>
           </div>
         </div>
 
