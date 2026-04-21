@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Search, Scan, User, Trash2, Plus, Minus, CreditCard, Wifi, Utensils } from "lucide-react";
+import { Search, Scan, User, Trash2, Plus, Minus, CreditCard, Wifi, Utensils, Package } from "lucide-react";
 import { Button } from "./ui/button";
 import { Card } from "./ui/card";
 import { Input } from "./ui/input";
@@ -54,6 +54,7 @@ export function POSScreen({
   const [filteredProducts, setFilteredProducts] = useState<ProductService[]>(
     [],
   );
+  const [productImages, setProductImages] = useState<Record<number, string>>({});
   const [dbCategories, setDbCategories] = useState<any[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -68,6 +69,7 @@ export function POSScreen({
   const [voucherInfo, setVoucherInfo] = useState<any>(null);
   const [showVoucherModal, setShowVoucherModal] = useState(false);
   const [pendingVoucherCode, setPendingVoucherCode] = useState("");
+  const [showPackageSelectionModal, setShowPackageSelectionModal] = useState(false);
   const [currentSale, setCurrentSale] = useState<CurrentSale>({
     items: [],
     subtotal: 0,
@@ -114,10 +116,77 @@ export function POSScreen({
       }
     }, 300);
 
+    // Listener para recargar categorías cuando se crea una nueva
+    const handleCategoriesUpdate = () => {
+      console.log('🔄 Recargando categorías en POS...');
+      loadCategories();
+      loadProducts(); // También recargar productos por si hay nuevos con la categoría
+    };
+    window.addEventListener('categories-updated', handleCategoriesUpdate);
+
     // Verificar estado de caja cada 5 segundos
     const interval = setInterval(checkCashBoxStatus, 10000);
-    return () => clearInterval(interval);
+    
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('categories-updated', handleCategoriesUpdate);
+    };
   }, []);
+
+  // Atajos de teclado globales para el POS
+  useEffect(() => {
+    const handleGlobalKeyboard = (e: KeyboardEvent) => {
+      // Ignorar si estamos en un input/textarea (excepto el de código de barras)
+      const target = e.target as HTMLElement;
+      const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA';
+      const isBarcodeInput = target === barcodeInputRef.current;
+      
+      // F9: Abrir modal de pago (Cobrar)
+      if (e.key === 'F9' && !showPaymentModal) {
+        e.preventDefault();
+        if (currentSale.items.length > 0 && cashBoxOpen) {
+          setShowPaymentModal(true);
+        }
+      }
+      
+      // F8: Limpiar venta
+      if (e.key === 'F8' && !showPaymentModal) {
+        e.preventDefault();
+        if (currentSale.items.length > 0) {
+          if (confirm('¿Desea limpiar la venta actual?')) {
+            clearSale();
+          }
+        }
+      }
+      
+      // F7: Seleccionar cliente
+      if (e.key === 'F7' && !showPaymentModal && !showClientSelector) {
+        e.preventDefault();
+        setShowClientSelector(true);
+      }
+      
+      // F6: Enfocar búsqueda de productos
+      if (e.key === 'F6' && !showPaymentModal && !isInput) {
+        e.preventDefault();
+        const searchInput = document.querySelector('input[placeholder*="Buscar"]') as HTMLInputElement;
+        if (searchInput) searchInput.focus();
+      }
+      
+      // ESC: Cerrar modales o limpiar búsqueda
+      if (e.key === 'Escape') {
+        if (showPaymentModal) {
+          setShowPaymentModal(false);
+        } else if (showClientSelector) {
+          setShowClientSelector(false);
+        } else if (!isBarcodeInput && barcodeInputRef.current) {
+          barcodeInputRef.current.focus();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleGlobalKeyboard);
+    return () => window.removeEventListener('keydown', handleGlobalKeyboard);
+  }, [currentSale.items.length, cashBoxOpen, showPaymentModal, showClientSelector]);
 
   // Manejar datos de checkout (cuando viene desde TimingDashboard)
   useEffect(() => {
@@ -293,6 +362,20 @@ export function POSScreen({
     const posProducts = rows.filter((p: any) => p.type !== "package");
     setProducts(posProducts);
     setFilteredProducts(posProducts);
+    
+    // Cargar imágenes de productos
+    const images: Record<number, string> = {};
+    for (const product of posProducts) {
+      try {
+        const imageData = await (window.api as any).getProductImage(product.id);
+        if (imageData) {
+          images[product.id] = imageData;
+        }
+      } catch (err) {
+        // Si no hay imagen, simplemente no la agregamos
+      }
+    }
+    setProductImages(images);
   };
 
   const checkCashBoxStatus = async () => {
@@ -304,8 +387,9 @@ export function POSScreen({
   const loadCategories = async () => {
     try {
       const data = await (window as any).api.getCategories();
-      // Ocultar categorías de sistema y Paquetes (solo se gestionan en Operaciones)
-      const categoriesToHide = ["Bebidas", "Comida", "Alquiler", "Eventos", "Membresía", "Snacks", "Tiempo", "Paquetes"];
+      // Solo ocultar categorías de sistema que no son productos del POS
+      // Permitir todas las categorías creadas por el usuario
+      const categoriesToHide = ["Paquetes", "Membresía", "Tiempo"];
       const filtered = data.filter((cat: any) => !categoriesToHide.includes(cat.name));
       setDbCategories(filtered);
     } catch (err) {
@@ -379,7 +463,28 @@ export function POSScreen({
       ? `${voucherInfo.benefit_value}% descuento`
       : voucherInfo.type === "discount_fixed"
       ? `C$${parseFloat(voucherInfo.benefit_value).toFixed(2)} descuento`
-      : "Paquete gratis";
+      : "Beneficio";
+
+    // Validar que haya un paquete en el carrito para descuentos
+    if (voucherInfo.type === "discount_pct" || voucherInfo.type === "discount_fixed") {
+      const hasPackage = currentSale.items.some(item => item.product_type === "package");
+      if (!hasPackage) {
+        error("Debes agregar un paquete al carrito antes de aplicar este voucher de descuento");
+        setShowVoucherModal(false);
+        setVoucherInfo(null);
+        return;
+      }
+    }
+
+    // Calcular el descuento a aplicar
+    let discountAmount = 0;
+    if (voucherInfo.type === "discount_pct") {
+      // Descuento porcentual sobre el subtotal actual
+      discountAmount = (currentSale.subtotal * parseFloat(voucherInfo.benefit_value)) / 100;
+    } else if (voucherInfo.type === "discount_fixed") {
+      // Descuento fijo
+      discountAmount = parseFloat(voucherInfo.benefit_value);
+    }
 
     const voucherItem: SaleItem = {
       id: crypto.randomUUID(),
@@ -398,11 +503,12 @@ export function POSScreen({
     setCurrentSale(prev => {
       const items = [...prev.items, voucherItem];
       const subtotal = items.reduce((sum, i) => sum + i.subtotal, 0);
-      return { ...prev, items, subtotal, total: Math.max(0, subtotal - prev.discount) };
+      const totalDiscount = prev.discount + discountAmount;
+      return { ...prev, items, subtotal, discount: totalDiscount, total: Math.max(0, subtotal - totalDiscount) };
     });
     setShowVoucherModal(false);
     setVoucherInfo(null);
-    success(`Voucher ${pendingVoucherCode} agregado al carrito`);
+    success(`Voucher ${pendingVoucherCode} agregado. Descuento aplicado: C$${discountAmount.toFixed(2)}`);
   };
 
   const handlersRef = useRef({ handleBarcodeSearch, products });
@@ -1029,7 +1135,8 @@ export function POSScreen({
                    cat.type === 'package' ? '🎮' :
                    cat.type === 'event' ? '🎂' :
                    cat.type === 'rental' ? '🏠' :
-                   cat.type === 'membership' ? '🎟️' : '🏷️'}</span>
+                   cat.type === 'membership' ? '🎟️' :
+                   cat.type === 'other' ? '🏷️' : '🏷️'}</span>
             {cat.name}
           </Button>
         ))}
@@ -1059,25 +1166,63 @@ export function POSScreen({
               {filteredProducts.map((product) => (
                 <Card
                   key={product.id}
-                  className="p-3 sm:p-4 cursor-pointer hover:bg-gray-50 transition-colors flex flex-col justify-between"
+                  className="p-0 cursor-pointer hover:shadow-lg transition-all overflow-hidden flex flex-col"
                   onClick={() => addItemToSale(product)}
                 >
-                  <div className="font-semibold text-sm mb-1 line-clamp-2">
-                    {product.name}
-                  </div>
-                  <div className="text-lg font-bold text-blue-600 mt-auto">
-                    {formatCurrency(product.price)}
-                  </div>
-                  {product.duration_minutes && (
-                    <div className="text-xs text-gray-500">
-                      {product.duration_minutes} min
+                  {/* Imagen del producto */}
+                  {productImages[product.id] ? (
+                    <div className="w-full h-32 bg-white flex items-center justify-center overflow-hidden relative">
+                      <img 
+                        src={productImages[product.id]} 
+                        alt={product.name}
+                        className="w-full h-full object-contain p-2"
+                      />
+                      {/* Badge de stock */}
+                      {["snack", "drink", "food"].includes(product.type) && product.stock !== undefined && product.stock !== null && (
+                        <div className={`absolute top-2 right-2 px-2 py-1 rounded-full text-xs font-bold ${
+                          product.stock === 0 ? 'bg-red-500 text-white' :
+                          product.stock <= ((product as any).min_stock || 5) ? 'bg-yellow-500 text-white' :
+                          'bg-green-500 text-white'
+                        }`}>
+                          {product.stock}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="w-full h-32 bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center relative">
+                      <Package className="w-12 h-12 text-gray-400" />
+                      {/* Badge de stock */}
+                      {["snack", "drink", "food"].includes(product.type) && product.stock !== undefined && product.stock !== null && (
+                        <div className={`absolute top-2 right-2 px-2 py-1 rounded-full text-xs font-bold ${
+                          product.stock === 0 ? 'bg-red-500 text-white' :
+                          product.stock <= ((product as any).min_stock || 5) ? 'bg-yellow-500 text-white' :
+                          'bg-green-500 text-white'
+                        }`}>
+                          {product.stock}
+                        </div>
+                      )}
                     </div>
                   )}
-                  {product.barcode && (
-                    <div className="text-xs text-gray-400 mt-1">
-                      {product.barcode}
+                  
+                  {/* Información del producto */}
+                  <div className="p-3 sm:p-4 flex flex-col flex-1">
+                    <div className="font-semibold text-sm mb-1 line-clamp-2">
+                      {product.name}
                     </div>
-                  )}
+                    <div className="text-lg font-bold text-blue-600 mt-auto">
+                      {formatCurrency(product.price)}
+                    </div>
+                    {product.duration_minutes && (
+                      <div className="text-xs text-gray-500">
+                        {product.duration_minutes} min
+                      </div>
+                    )}
+                    {product.barcode && (
+                      <div className="text-xs text-gray-400 mt-1 truncate">
+                        {product.barcode}
+                      </div>
+                    )}
+                  </div>
                 </Card>
               ))}
             </div>
@@ -1173,17 +1318,21 @@ export function POSScreen({
             <Button
               variant="outline"
               onClick={clearSale}
-              className="flex-1"
+              className="flex-1 relative"
               disabled={!cashBoxOpen}
+              title="Limpiar venta (F8)"
             >
               Limpiar
+              <span className="absolute top-1 right-1 text-[10px] opacity-50">F8</span>
             </Button>
             <Button
-              className="flex-1 bg-blue-600 hover:bg-blue-700 font-bold"
+              className="flex-1 bg-blue-600 hover:bg-blue-700 font-bold relative"
               disabled={currentSale.items.length === 0 || !cashBoxOpen}
               onClick={() => setShowPaymentModal(true)}
+              title="Cobrar (F9)"
             >
               💳 COBRAR
+              <span className="absolute top-1 right-1 text-[10px] opacity-70">F9</span>
             </Button>
           </div>
         </Card>
@@ -1436,7 +1585,7 @@ export function POSScreen({
                     ? `${voucherInfo.benefit_value}% descuento`
                     : voucherInfo.type === "discount_fixed"
                     ? `C$${parseFloat(voucherInfo.benefit_value).toFixed(2)} descuento`
-                    : "Paquete gratis"}
+                    : "Beneficio"}
                 </span>
               </div>
               <div className="flex justify-between">

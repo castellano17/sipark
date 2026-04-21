@@ -7,7 +7,7 @@ import {
 import { Button } from "./ui/button";
 import { useNotification } from "@/hooks/useNotification";
 
-type CampaignType = "hours" | "discount_pct" | "discount_fixed" | "free_package";
+type CampaignType = "hours" | "discount_pct" | "discount_fixed";
 
 interface Campaign {
   id: number;
@@ -31,14 +31,12 @@ const TYPE_LABELS: Record<CampaignType, string> = {
   hours: "Horas de Juego Gratis",
   discount_pct: "Descuento Porcentual (%)",
   discount_fixed: "Descuento Fijo (C$)",
-  free_package: "Paquete Gratis",
 };
 
 const TYPE_COLORS: Record<CampaignType, string> = {
   hours: "bg-blue-100 text-blue-700",
   discount_pct: "bg-purple-100 text-purple-700",
   discount_fixed: "bg-green-100 text-green-700",
-  free_package: "bg-orange-100 text-orange-700",
 };
 
 // Convierte cualquier valor de fecha a string (PostgreSQL puede devolver Date objects)
@@ -54,7 +52,6 @@ const getBenefitLabel = (type: CampaignType, value: any) => {
     case "hours": return `${numValue} hora${numValue !== 1 ? "s" : ""} gratis`;
     case "discount_pct": return `${numValue}% de descuento`;
     case "discount_fixed": return `C$${numValue.toFixed(2)} de descuento`;
-    case "free_package": return `Paquete gratis`;
     default: return `${numValue}`;
   }
 };
@@ -70,6 +67,7 @@ export default function Promotions() {
   const [redeemCode, setRedeemCode] = useState("");
   const [redeemResult, setRedeemResult] = useState<any>(null);
   const redeemRef = useRef<HTMLInputElement>(null);
+  const [packages, setPackages] = useState<any[]>([]);
 
   const { notify } = useNotification();
   const showNotification = (type: "success" | "error" | "warning" | "info", message: string) => notify({ type, message });
@@ -82,6 +80,7 @@ export default function Promotions() {
     description: "",
     type: "hours" as CampaignType,
     benefitValue: "",
+    benefitPackageId: "",
     codeCount: "10",
     maxUsesPerCode: "1",
     validFrom: "",
@@ -92,11 +91,22 @@ export default function Promotions() {
 
   useEffect(() => {
     loadCampaigns();
+    loadPackages();
   }, [filterStatus]);
 
   useEffect(() => {
     if (activeTab === "redeem") setTimeout(() => redeemRef.current?.focus(), 100);
   }, [activeTab]);
+
+  const loadPackages = async () => {
+    try {
+      const data = await api.getProductsServices();
+      const pkgs = data.filter((p: any) => p.type === "package");
+      setPackages(pkgs);
+    } catch (e: any) {
+      console.error("Error cargando paquetes:", e);
+    }
+  };
 
   const loadCampaigns = async () => {
     setLoading(true);
@@ -123,6 +133,7 @@ export default function Promotions() {
         description: form.description.trim() || null,
         type: form.type,
         benefitValue: parseFloat(form.benefitValue),
+        benefitPackageId: form.benefitPackageId ? parseInt(form.benefitPackageId) : null,
         codeCount: parseInt(form.codeCount),
         maxUsesPerCode: parseInt(form.maxUsesPerCode),
         validFrom: form.validFrom || null,
@@ -132,7 +143,7 @@ export default function Promotions() {
         createdBy: null,
       });
       showNotification("success", `¡Campaña creada! ${result.codesGenerated} vouchers generados.`);
-      setForm({ name: "", description: "", type: "hours", benefitValue: "", codeCount: "10", maxUsesPerCode: "1", validFrom: "", validUntil: "", targetAudience: "all", minPurchase: "0" });
+      setForm({ name: "", description: "", type: "hours", benefitValue: "", benefitPackageId: "", codeCount: "10", maxUsesPerCode: "1", validFrom: "", validUntil: "", targetAudience: "all", minPurchase: "0" });
       setActiveTab("campaigns");
       loadCampaigns();
     } catch (e: any) {
@@ -200,6 +211,23 @@ export default function Promotions() {
           return;
         }
 
+        // Cargar configuración del ticket
+        let config: any = null;
+        try {
+          const saved = await api.getSetting("ticket_config");
+          if (saved) config = JSON.parse(saved);
+        } catch { /* usa defaults */ }
+
+        const businessName = config?.businessName || business.name || "SIPARK";
+        const businessAddress = config?.businessAddress || business.address || "";
+        const businessPhone = config?.businessPhone || business.phone || "";
+        const headerMessage = config?.headerMessage || "";
+        const footerMessage = config?.footerMessage || "¡Vuelve pronto!";
+        const showBusinessName = config?.showBusinessName ?? true;
+        const showAddress = config?.showAddress ?? true;
+        const showPhone = config?.showPhone ?? true;
+        const showLogo = config?.showLogo ?? true;
+
         const ESC = "\x1B";
         const GS  = "\x1D";
         const INIT       = `${ESC}@`;
@@ -209,6 +237,18 @@ export default function Promotions() {
         const DOUBLE     = `${ESC}!\x30`;
         const NORMAL     = `${ESC}!\x00`;
         const CUT        = `${GS}V\x41\x05`;  // corte con avance
+
+        // Cargar logo si está habilitado
+        let logoEscPos = "";
+        if (showLogo) {
+          try {
+            const base64Logo = await api.getLogo("ticket");
+            if (base64Logo) {
+              // Convertir logo a ESC/POS (necesitarías la función logoToEscPos del usePrinter)
+              // Por ahora lo omitimos, pero puedes agregarlo si lo necesitas
+            }
+          } catch {}
+        }
 
         // QR Code ESC/POS nativo (Model 2)
         const escQR = (data: string, size = 10) => {
@@ -231,8 +271,8 @@ export default function Promotions() {
           `${GS}H\x02` +                              // HRI en la parte inferior
           `${GS}k\x49${String.fromCharCode(data.length)}${data}`; // CODE128
 
-        const businessLine = business.name || "SIPARK";
         let printed = 0;
+        const line = "================================";
 
         for (const v of vouchers.slice(0, 10)) {
           const benefit = getBenefitLabel(v.type as CampaignType, parseFloat(v.benefit_value));
@@ -241,7 +281,11 @@ export default function Promotions() {
           // Función para limpiar tildes en todo el texto del ticket
           const removeAccents = (str: string) => str ? str.normalize("NFD").replace(/[\u0300-\u036f]/g, "") : "";
           
-          const pBusinessLine = removeAccents(businessLine);
+          const pBusinessName = removeAccents(businessName);
+          const pBusinessAddress = removeAccents(businessAddress);
+          const pBusinessPhone = removeAccents(businessPhone);
+          const pHeaderMessage = removeAccents(headerMessage);
+          const pFooterMessage = removeAccents(footerMessage);
           const pCampaignName = removeAccents(v.campaign_name);
           const pBenefit = removeAccents(benefit);
           const pTill = removeAccents(till);
@@ -253,10 +297,16 @@ export default function Promotions() {
           const pDescription = removeAccents(v.campaign_description || "");
 
           let t = INIT + CENTER;
-          t += BOLD_ON + DOUBLE + pBusinessLine + "\n" + NORMAL + BOLD_OFF;
+          if (logoEscPos) t += logoEscPos;
+          t += line + "\n";
+          if (showBusinessName) t += BOLD_ON + DOUBLE + pBusinessName + "\n" + NORMAL + BOLD_OFF;
+          if (showAddress && pBusinessAddress) t += pBusinessAddress + "\n";
+          if (showPhone && pBusinessPhone) t += `Tel: ${pBusinessPhone}\n`;
+          if (pHeaderMessage) t += pHeaderMessage + "\n";
+          t += line + "\n";
           t += DOUBLE + pCampaignName + "\n" + NORMAL;
           if (pDescription) t += CENTER + pDescription + "\n";
-          t += "--------------------------------\n";
+          t += line + "\n";
           t += DOUBLE + BOLD_ON + pBenefit + "\n" + NORMAL + BOLD_OFF;
           t += "\n";
           t += escQR(qrText, 12);  // QR más grande (tamaño 12)
@@ -267,6 +317,8 @@ export default function Promotions() {
           if (pTill) t += CENTER + pTill + "\n";
           t += "\n";
           t += CENTER + `Usos: ${v.max_uses === 1 ? "1 uso" : `${v.max_uses} usos`}` + "\n";
+          t += line + "\n";
+          if (pFooterMessage) t += CENTER + pFooterMessage + "\n";
           t += "\n\n\n";
           t += CUT;
 
@@ -615,7 +667,7 @@ export default function Promotions() {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">
-                      {form.type === "hours" ? "Horas" : form.type === "discount_pct" ? "% Descuento" : form.type === "discount_fixed" ? "Monto C$" : "ID Paquete"} *
+                      {form.type === "hours" ? "Horas" : form.type === "discount_pct" ? "% Descuento" : "Monto C$"} *
                     </label>
                     <input type="number" min="0.01" step="0.01" value={form.benefitValue}
                       onChange={e => setForm(f => ({ ...f, benefitValue: e.target.value }))}

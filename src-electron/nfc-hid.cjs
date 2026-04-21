@@ -93,7 +93,7 @@ async function tryConnect() {
       }
     } else {
       // Auto-detección genérica (basado en nombres comunes de lectores RFID)
-      const nfcKeywords = ["sycreader", "rfid", "nfc", "reader", "smart", "acr122"];
+      const nfcKeywords = ["sycreader", "rfid", "nfc", "reader", "smart", "acr122", "yarongtech", "x002eik11z"];
       targetDevice = devices.find(d => {
          const prod = (d.product || "").toLowerCase();
          const man = (d.manufacturer || "").toLowerCase();

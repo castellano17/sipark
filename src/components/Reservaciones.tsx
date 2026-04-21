@@ -522,8 +522,8 @@ export const Reservaciones: React.FC = () => {
 
       {/* Modal Nueva Reservación */}
       {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <Card className="w-full max-w-4xl max-h-[95vh] overflow-y-auto">
             <CardHeader>
               <CardTitle>Nueva Reservación</CardTitle>
             </CardHeader>
@@ -771,7 +771,7 @@ export const Reservaciones: React.FC = () => {
       {/* Modal Detalle */}
       {selectedReservation && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+          <Card className="w-full max-w-4xl max-h-[95vh] overflow-y-auto">
             <CardHeader className="bg-gradient-to-r from-blue-600 to-blue-700 text-white">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-2xl">

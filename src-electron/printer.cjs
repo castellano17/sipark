@@ -139,9 +139,9 @@ function getDefaultPrinter() {
     const platform = os.platform();
 
     if (platform === "win32") {
-      // Windows
+      // Windows - usar Get-Printer en lugar de WMI
       const command =
-        '(Get-WmiObject -Query "Select * from Win32_Printer Where Default=$true").Name';
+        'Get-Printer | Where-Object {$_.Default -eq $true} | Select-Object -ExpandProperty Name';
       const result = execSync(`powershell -Command "${command}"`, {
         encoding: "utf-8",
       }).trim();

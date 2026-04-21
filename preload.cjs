@@ -80,6 +80,7 @@ contextBridge.exposeInMainWorld("api", {
     barcode,
     stock,
     durationMinutes,
+    imagePath,
   ) =>
     ipcRenderer.invoke("api:createProductService", {
       name,
@@ -89,6 +90,7 @@ contextBridge.exposeInMainWorld("api", {
       barcode,
       stock,
       durationMinutes,
+      imagePath,
     }),
   updateProductService: (
     id,
@@ -99,6 +101,7 @@ contextBridge.exposeInMainWorld("api", {
     barcode,
     stock,
     durationMinutes,
+    imagePath,
   ) =>
     ipcRenderer.invoke("api:updateProductService", {
       id,
@@ -109,9 +112,18 @@ contextBridge.exposeInMainWorld("api", {
       barcode,
       stock,
       durationMinutes,
+      imagePath,
     }),
   deleteProductService: (id) =>
     ipcRenderer.invoke("api:deleteProductService", { id }),
+  
+  // Product Images
+  saveProductImage: (productId, base64Data, extension) =>
+    ipcRenderer.invoke("api:saveProductImage", { productId, base64Data, extension }),
+  getProductImage: (productId) =>
+    ipcRenderer.invoke("api:getProductImage", productId),
+  deleteProductImage: (productId) =>
+    ipcRenderer.invoke("api:deleteProductImage", productId),
 
   // Sales
   getSales: (limit) => ipcRenderer.invoke("api:getSales", limit),
@@ -411,10 +423,10 @@ contextBridge.exposeInMainWorld("api", {
 
   // Categories
   getCategories: () => ipcRenderer.invoke("api:getCategories"),
-  createCategory: (name, description) =>
-    ipcRenderer.invoke("api:createCategory", { name, description }),
-  updateCategory: (id, name, description) =>
-    ipcRenderer.invoke("api:updateCategory", { id, name, description }),
+  createCategory: (name, description, type) =>
+    ipcRenderer.invoke("api:createCategory", { name, description, type }),
+  updateCategory: (id, name, description, type) =>
+    ipcRenderer.invoke("api:updateCategory", { id, name, description, type }),
   deleteCategory: (id) => ipcRenderer.invoke("api:deleteCategory", { id }),
 
   // Purchase Orders

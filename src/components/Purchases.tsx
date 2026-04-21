@@ -424,9 +424,9 @@ export function Purchases() {
       {showModal && (
         <Dialog open={showModal} onOpenChange={handleCloseModal}>
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <Card className="w-full max-w-4xl max-h-[90vh] overflow-y-auto flex flex-col bg-white border-0">
-              <form onSubmit={handleSubmit} className="flex flex-col h-full">
-                {/* Header */}
+            <Card className="w-full max-w-5xl max-h-[95vh] overflow-y-auto bg-white border-0">
+              <form onSubmit={handleSubmit}>
+                {/* Header con botones */}
                 <div className="flex items-center justify-between p-6 border-b bg-gradient-to-r from-blue-600 to-blue-700">
                   <div className="flex items-center gap-3">
                     <div className="p-2 bg-white/20 rounded-lg">
@@ -436,9 +436,27 @@ export function Purchases() {
                       Nueva Compra
                     </h2>
                   </div>
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={handleCloseModal}
+                      className="bg-white/10 text-white hover:bg-white/20 border-white/20"
+                    >
+                      Cancelar
+                    </Button>
+                    <Button
+                      type="submit"
+                      disabled={items.length === 0}
+                      className="bg-white text-blue-600 hover:bg-gray-100"
+                    >
+                      Registrar Compra
+                    </Button>
+                  </div>
                 </div>
 
-                <div className="flex-1 overflow-auto p-6 space-y-6">
+                {/* Contenido */}
+                <div className="p-6 space-y-6">
                   {/* Datos de la factura */}
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="relative supplier-search-container">
@@ -678,7 +696,7 @@ export function Purchases() {
                   </div>
                 </div>
 
-                {/* Footer */}
+                {/* Footer con botones */}
                 <div className="p-6 border-t bg-gray-50 flex justify-end gap-3">
                   <Button
                     type="button"

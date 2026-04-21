@@ -277,4 +277,7 @@ contextBridge.exposeInMainWorld("api", {
   getDefaultPrinter: () => ipcRenderer.invoke("printer:getDefaultPrinter"),
   generateMembershipPDF: (pdfData) =>
     ipcRenderer.invoke("pdf:generateMembershipPDF", pdfData),
+
+  // Debug - USB Devices
+  getUsbDevicesDebug: () => ipcRenderer.invoke("api:getUsbDevicesDebug"),
 });

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   Package,
   Plus,
@@ -7,7 +7,11 @@ import {
   FileDown,
   FileText,
   Printer,
+  Upload,
+  X,
+  Image as ImageIcon,
 } from "lucide-react";
+import { useDropzone } from "react-dropzone";
 import { Card } from "./ui/card";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -26,6 +30,7 @@ interface Product {
   barcode: string;
   stock: number;
   duration_minutes?: number;
+  image_path?: string;
 }
 
 interface Category {
@@ -42,7 +47,10 @@ export function Products() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [productToDelete, setProductToDelete] = useState<Product | null>(null);
   const [newCategoryName, setNewCategoryName] = useState("");
+  const [newCategoryType, setNewCategoryType] = useState("food");
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [productImage, setProductImage] = useState<string | null>(null);
+  const [imageFile, setImageFile] = useState<File | null>(null);
   const { success, error } = useNotification();
   const { formatCurrency } = useCurrency();
   const { canCreate, canEdit, canDelete } = usePermissions();
@@ -57,12 +65,43 @@ export function Products() {
     barcode: "",
     stock: "0",
     duration_minutes: "",
+    requires_stock: false,
   });
 
   useEffect(() => {
     loadProducts();
     loadCategories();
   }, []);
+
+  const onDrop = useCallback((acceptedFiles: File[]) => {
+    const file = acceptedFiles[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        error("La imagen no debe superar 5MB");
+        return;
+      }
+      setImageFile(file);
+      const reader = new FileReader();
+      reader.onload = () => {
+        setProductImage(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  }, [error]);
+
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    onDrop,
+    accept: {
+      'image/*': ['.png', '.jpg', '.jpeg', '.gif', '.webp']
+    },
+    maxFiles: 1,
+    multiple: false,
+  });
+
+  const removeImage = () => {
+    setProductImage(null);
+    setImageFile(null);
+  };
 
   const loadProducts = async () => {
     try {
@@ -88,12 +127,17 @@ export function Products() {
     }
 
     try {
-      await (window as any).api.createCategory(newCategoryName.trim(), "", formData.type);
+      await (window as any).api.createCategory(newCategoryName.trim(), "", newCategoryType);
       success("Categoría creada");
       setNewCategoryName("");
+      setNewCategoryType("food");
       setShowCategoryModal(false);
       await loadCategories();
-      setFormData({ ...formData, category: newCategoryName.trim() });
+      setFormData({ ...formData, category: newCategoryName.trim(), type: newCategoryType });
+      
+      // Notificar al POS que se creó una nueva categoría
+      console.log('📢 Disparando evento categories-updated');
+      window.dispatchEvent(new CustomEvent('categories-updated'));
     } catch (err) {
       error("Error creando categoría");
     }
@@ -123,7 +167,26 @@ export function Products() {
     }
 
     try {
+      let imagePath = null;
+
       if (editingProduct) {
+        // Si hay una nueva imagen, guardarla
+        if (imageFile && productImage) {
+          const extension = imageFile.name.split('.').pop() || 'jpg';
+          imagePath = await window.api.saveProductImage(
+            editingProduct.id,
+            productImage,
+            extension
+          );
+        } else if (productImage) {
+          // Mantener la imagen existente
+          imagePath = editingProduct.image_path;
+        } else if (editingProduct.image_path && !productImage) {
+          // Si se eliminó la imagen, borrarla
+          await window.api.deleteProductImage(editingProduct.id);
+          imagePath = null;
+        }
+
         await window.api.updateProductService(
           editingProduct.id,
           formData.name,
@@ -131,20 +194,47 @@ export function Products() {
           formData.type,
           formData.category || null,
           formData.barcode || null,
-          formData.stock ? parseInt(formData.stock) : null,
-          formData.duration_minutes ? parseInt(formData.duration_minutes) : null
+          formData.requires_stock ? parseInt(formData.stock) : null,
+          formData.duration_minutes ? parseInt(formData.duration_minutes) : null,
+          imagePath
         );
         success("Producto actualizado");
       } else {
-        await window.api.createProductService(
+        // Crear producto primero para obtener el ID
+        const productId = await window.api.createProductService(
           formData.name,
           price,
           formData.type,
           formData.category || null,
           formData.barcode || null,
-          formData.stock ? parseInt(formData.stock) : null,
-          formData.duration_minutes ? parseInt(formData.duration_minutes) : null
+          formData.requires_stock ? parseInt(formData.stock) : null,
+          formData.duration_minutes ? parseInt(formData.duration_minutes) : null,
+          null
         );
+
+        // Si hay imagen, guardarla con el ID del producto
+        if (imageFile && productImage && productId) {
+          const extension = imageFile.name.split('.').pop() || 'jpg';
+          imagePath = await window.api.saveProductImage(
+            productId,
+            productImage,
+            extension
+          );
+          
+          // Actualizar el producto con la ruta de la imagen
+          await window.api.updateProductService(
+            productId,
+            formData.name,
+            price,
+            formData.type,
+            formData.category || null,
+            formData.barcode || null,
+            formData.requires_stock ? parseInt(formData.stock) : null,
+            formData.duration_minutes ? parseInt(formData.duration_minutes) : null,
+            imagePath
+          );
+        }
+
         success("Producto creado");
       }
       handleCloseModal();
@@ -154,7 +244,7 @@ export function Products() {
     }
   };
 
-  const handleEdit = (product: Product) => {
+  const handleEdit = async (product: Product) => {
     setEditingProduct(product);
     setFormData({
       name: product.name,
@@ -164,7 +254,24 @@ export function Products() {
       barcode: product.barcode || "",
       stock: product.stock?.toString() || "0",
       duration_minutes: product.duration_minutes?.toString() || "",
+      requires_stock: product.stock !== null && product.stock !== undefined,
     });
+    
+    // Cargar imagen si existe
+    if (product.id) {
+      try {
+        const imageData = await window.api.getProductImage(product.id);
+        if (imageData) {
+          setProductImage(imageData);
+        } else {
+          setProductImage(null);
+        }
+      } catch (err) {
+        setProductImage(null);
+      }
+    }
+    
+    setImageFile(null);
     setShowModal(true);
   };
 
@@ -193,6 +300,8 @@ export function Products() {
   const handleCloseModal = () => {
     setShowModal(false);
     setEditingProduct(null);
+    setProductImage(null);
+    setImageFile(null);
     setFormData({
       name: "",
       price: "",
@@ -201,6 +310,7 @@ export function Products() {
       barcode: "",
       stock: "0",
       duration_minutes: "",
+      requires_stock: false,
     });
   };
 
@@ -310,14 +420,26 @@ export function Products() {
       {showModal && (
         <Dialog open={showModal} onOpenChange={handleCloseModal}>
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <Card className="w-full max-w-2xl bg-white max-h-[90vh] overflow-y-auto flex flex-col border-0">
-              <form onSubmit={handleSubmit} className="flex flex-col h-full">
-                <div className="p-6 border-b bg-gradient-to-r from-slate-700 to-slate-800 text-white flex items-center gap-3">
-                   <Package className="w-6 h-6" />
-                   <h2 className="text-xl font-bold">{editingProduct ? "Editar Producto" : "Nuevo Producto"}</h2>
+            <Card className="w-full max-w-4xl bg-white max-h-[95vh] overflow-y-auto border-0">
+              <form onSubmit={handleSubmit}>
+                {/* Header con botones */}
+                <div className="p-6 border-b bg-gradient-to-r from-slate-700 to-slate-800 text-white flex items-center justify-between">
+                   <div className="flex items-center gap-3">
+                     <Package className="w-6 h-6" />
+                     <h2 className="text-xl font-bold">{editingProduct ? "Editar Producto" : "Nuevo Producto"}</h2>
+                   </div>
+                   <div className="flex gap-2">
+                     <Button type="button" variant="outline" onClick={handleCloseModal} className="bg-white/10 text-white hover:bg-white/20 border-white/20">
+                       Cancelar
+                     </Button>
+                     <Button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white">
+                        {editingProduct ? "Actualizar" : "Crear"}
+                     </Button>
+                   </div>
                 </div>
 
-                <div className="p-6 space-y-4 flex-1">
+                {/* Contenido */}
+                <div className="p-6 space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="md:col-span-2">
                        <label className="block text-sm font-medium mb-1">Nombre *</label>
@@ -343,7 +465,24 @@ export function Products() {
                        <label className="block text-sm font-medium mb-1">Código de Barras</label>
                        <Input value={formData.barcode} onChange={(e) => setFormData({...formData, barcode: e.target.value})} placeholder="7501055302000" />
                     </div>
-                    {isPhysicalProduct(formData.type) && editingProduct && (
+                    
+                    {/* Switch para control de stock */}
+                    <div className="md:col-span-2 flex items-center gap-3 p-3 bg-gray-50 rounded-lg border">
+                      <label className="flex items-center gap-2 cursor-pointer flex-1">
+                        <input
+                          type="checkbox"
+                          checked={formData.requires_stock}
+                          onChange={(e) => setFormData({...formData, requires_stock: e.target.checked})}
+                          className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        />
+                        <div>
+                          <span className="text-sm font-medium text-gray-900">Este producto requiere control de stock</span>
+                          <p className="text-xs text-gray-500">Activar si el producto es físico y necesita inventario</p>
+                        </div>
+                      </label>
+                    </div>
+                    
+                    {formData.requires_stock && editingProduct && (
                       <div>
                         <label className="block text-sm font-medium mb-1">Stock Actual</label>
                         <Input type="number" value={formData.stock} onChange={(e) => setFormData({...formData, stock: e.target.value})} />
@@ -355,9 +494,57 @@ export function Products() {
                         <Input type="number" min="1" value={formData.duration_minutes} onChange={(e) => setFormData({...formData, duration_minutes: e.target.value})} />
                       </div>
                     )}
+                    
+                    {/* Sección de imagen */}
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-medium mb-2">Imagen del Producto (Opcional)</label>
+                      {productImage ? (
+                        <div className="relative">
+                          <img 
+                            src={productImage} 
+                            alt="Preview" 
+                            className="w-full h-64 object-contain rounded-lg border-2 border-gray-200 bg-white p-2"
+                          />
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={removeImage}
+                            className="absolute top-2 right-2 bg-white hover:bg-red-50 text-red-600"
+                          >
+                            <X className="w-4 h-4 mr-1" /> Eliminar
+                          </Button>
+                        </div>
+                      ) : (
+                        <div
+                          {...getRootProps()}
+                          className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
+                            isDragActive 
+                              ? 'border-blue-500 bg-blue-50' 
+                              : 'border-gray-300 hover:border-blue-400 hover:bg-gray-50'
+                          }`}
+                        >
+                          <input {...getInputProps()} />
+                          <Upload className="w-12 h-12 mx-auto mb-3 text-gray-400" />
+                          {isDragActive ? (
+                            <p className="text-blue-600 font-medium">Suelta la imagen aquí...</p>
+                          ) : (
+                            <>
+                              <p className="text-gray-600 font-medium mb-1">
+                                Arrastra una imagen o haz clic para seleccionar
+                              </p>
+                              <p className="text-sm text-gray-500">
+                                PNG, JPG, GIF o WEBP (máx. 5MB)
+                              </p>
+                            </>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
 
+                {/* Footer con botones */}
                 <div className="p-6 border-t bg-gray-50 flex justify-end gap-3">
                    <Button type="button" variant="outline" onClick={handleCloseModal}>Cancelar</Button>
                    <Button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white">
@@ -375,12 +562,37 @@ export function Products() {
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4">
              <Card className="w-full max-w-md bg-white border-0">
                 <div className="p-6 border-b text-xl font-bold">Nueva Categoría</div>
-                <div className="p-6">
-                   <label className="block text-sm font-medium mb-2">Nombre de la Categoría *</label>
-                   <Input value={newCategoryName} onChange={(e) => setNewCategoryName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleCreateCategory()} autoFocus />
+                <div className="p-6 space-y-4">
+                   <div>
+                     <label className="block text-sm font-medium mb-2">Nombre de la Categoría *</label>
+                     <Input 
+                       value={newCategoryName} 
+                       onChange={(e) => setNewCategoryName(e.target.value)} 
+                       onKeyDown={(e) => e.key === "Enter" && handleCreateCategory()} 
+                       autoFocus 
+                     />
+                   </div>
+                   <div>
+                     <label className="block text-sm font-medium mb-2">Tipo de Categoría *</label>
+                     <select 
+                       className="w-full px-3 py-2 border rounded-md text-sm"
+                       value={newCategoryType}
+                       onChange={(e) => setNewCategoryType(e.target.value)}
+                     >
+                       <option value="food">🍔 Comida</option>
+                       <option value="drink">🥤 Bebida</option>
+                       <option value="snack">🍿 Snack</option>
+                       <option value="time">⏱️ Tiempo</option>
+                       <option value="package">🎮 Paquete</option>
+                       <option value="event">🎂 Evento</option>
+                       <option value="rental">🏠 Alquiler</option>
+                       <option value="membership">🎟️ Membresía</option>
+                       <option value="other">🏷️ Otro</option>
+                     </select>
+                   </div>
                 </div>
                 <div className="p-6 border-t flex justify-end gap-3">
-                   <Button type="button" variant="outline" onClick={() => {setShowCategoryModal(false); setNewCategoryName("");}}>Cancelar</Button>
+                   <Button type="button" variant="outline" onClick={() => {setShowCategoryModal(false); setNewCategoryName(""); setNewCategoryType("food");}}>Cancelar</Button>
                    <Button type="button" onClick={handleCreateCategory}>Crear</Button>
                 </div>
              </Card>

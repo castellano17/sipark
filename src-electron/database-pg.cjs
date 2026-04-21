@@ -95,6 +95,7 @@ async function createTables() {
       duration_minutes INTEGER,
       is_standard_entry BOOLEAN DEFAULT FALSE,
       last_sale_date TIMESTAMP,
+      image_path TEXT,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )`,
 
@@ -725,6 +726,11 @@ async function createTables() {
         -- Migración para is_standard_entry en products_services
         IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='products_services' AND column_name='is_standard_entry') THEN
           ALTER TABLE products_services ADD COLUMN is_standard_entry BOOLEAN DEFAULT FALSE;
+        END IF;
+
+        -- Migración para image_path en products_services
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='products_services' AND column_name='image_path') THEN
+          ALTER TABLE products_services ADD COLUMN image_path TEXT;
         END IF;
 
         -- Migración para permitir product_id opcional en sale_items (Venta de membresías, etc.)

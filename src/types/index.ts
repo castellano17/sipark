@@ -76,6 +76,7 @@ export interface ProductService {
   category: string;
   barcode?: string;
   stock?: number;
+  min_stock?: number;
   duration_minutes?: number;
   created_at: string;
 }

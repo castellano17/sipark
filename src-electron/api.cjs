@@ -283,10 +283,11 @@ async function createProductService(
   barcode = null,
   stock = null,
   durationMinutes = null,
+  imagePath = null,
 ) {
   try {
     const sql =
-      "INSERT INTO products_services (name, price, type, category, barcode, stock, duration_minutes) VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id";
+      "INSERT INTO products_services (name, price, type, category, barcode, stock, duration_minutes, image_path) VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id";
     const result = await runAsync(sql, [
       name,
       price,
@@ -295,6 +296,7 @@ async function createProductService(
       barcode,
       stock,
       durationMinutes,
+      imagePath,
     ]);
     return result.lastID;
   } catch (error) {
@@ -311,10 +313,11 @@ async function updateProductService(
   barcode = null,
   stock = null,
   durationMinutes = null,
+  imagePath = null,
 ) {
   try {
     const sql =
-      "UPDATE products_services SET name = ?, price = ?, type = ?, category = ?, barcode = ?, stock = ?, duration_minutes = ? WHERE id = ?";
+      "UPDATE products_services SET name = ?, price = ?, type = ?, category = ?, barcode = ?, stock = ?, duration_minutes = ?, image_path = ? WHERE id = ?";
     await runAsync(sql, [
       name,
       price,
@@ -323,6 +326,7 @@ async function updateProductService(
       barcode,
       stock,
       durationMinutes,
+      imagePath,
       id,
     ]);
   } catch (error) {

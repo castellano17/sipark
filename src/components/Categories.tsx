@@ -220,14 +220,15 @@ export function Categories() {
                       }
                       required
                     >
-                      <option value="food">Comida / Preparado</option>
-                      <option value="drink">Bebida (Físico/Stock)</option>
-                      <option value="snack">Snack (Físico/Stock)</option>
-                      <option value="time">Tiempo / Servicio</option>
-                      <option value="package">Paquete</option>
-                      <option value="event">Evento</option>
-                      <option value="rental">Alquiler (Físico/Stock)</option>
-                      <option value="membership">Membresía</option>
+                      <option value="food">🍔 Comida</option>
+                      <option value="drink">🥤 Bebida</option>
+                      <option value="snack">🍿 Snack</option>
+                      <option value="time">⏱️ Tiempo</option>
+                      <option value="package">🎮 Paquete</option>
+                      <option value="event">🎂 Evento</option>
+                      <option value="rental">🏠 Alquiler</option>
+                      <option value="membership">🎟️ Membresía</option>
+                      <option value="other">🏷️ Otro</option>
                     </select>
                     <p className="text-xs text-gray-500 mt-1">
                       Determina si el producto descuenta stock o requiere cronómetro.

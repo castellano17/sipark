@@ -27,6 +27,8 @@ import {
   Mail,
   Cloud,
   CheckCircle,
+  RefreshCw,
+  Copy,
 } from "lucide-react";
 import { useDatabase } from "@/hooks/useDatabase";
 import { useNotification } from "@/hooks/useNotification";
@@ -102,6 +104,13 @@ export const Settings: React.FC = () => {
   const [autoBackupGDriveEnabled, setAutoBackupGDriveEnabled] = useState(false);
   const [schedulerStatus, setSchedulerStatus] = useState<any>(null);
 
+  // Device Debugging
+  const [usbDevices, setUsbDevices] = useState<any[]>([]);
+  const [deviceStatus, setDeviceStatus] = useState<any>(null);
+  const [loadingDevices, setLoadingDevices] = useState(false);
+  const [nfcVidPid, setNfcVidPid] = useState("");
+  const [nfcVidPidEditing, setNfcVidPidEditing] = useState(false);
+
   const { setSetting, getAllSettings, checkDatabaseConnection } = useDatabase();
   const { success, error: errorNotification } = useNotification();
   const {
@@ -121,7 +130,24 @@ export const Settings: React.FC = () => {
     cargarConfiguracion();
     verificarConexionBD();
     cargarEstadoScheduler();
+    loadDeviceStatus();
   }, []);
+
+  const loadDeviceStatus = async () => {
+    try {
+      setLoadingDevices(true);
+      const [devices, status] = await Promise.all([
+        (window as any).api.getUsbDevicesDebug(),
+        (window as any).api.getConnectedDevices()
+      ]);
+      setUsbDevices(devices || []);
+      setDeviceStatus(status);
+    } catch (err) {
+      console.error("Error loading device status:", err);
+    } finally {
+      setLoadingDevices(false);
+    }
+  };
 
   const verificarConexionBD = async () => {
     try {
@@ -208,6 +234,9 @@ export const Settings: React.FC = () => {
               break;
             case "nfc_alert_duration":
               setNfcAlertDuration(setting.value);
+              break;
+            case "nfc_reader_vid_pid":
+              setNfcVidPid(setting.value || "");
               break;
             case "receipt_copies":
               setReceiptCopies(setting.value || "1");
@@ -1129,6 +1158,233 @@ export const Settings: React.FC = () => {
                       {dbConnected ? "OK" : "Error"}
                     </span>
                   </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Dispositivos Conectados - DEBUG */}
+            <Card className="shadow-md border-none">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <div>
+                  <CardTitle className="text-lg">Dispositivos Conectados</CardTitle>
+                  <CardDescription>
+                    Información de dispositivos USB detectados
+                  </CardDescription>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={loadDeviceStatus}
+                  disabled={loadingDevices}
+                  className="gap-2 border-blue-300 text-blue-600 hover:bg-blue-50 hover:text-blue-700"
+                >
+                  <RefreshCw className={`w-4 h-4 ${loadingDevices ? "animate-spin" : ""}`} />
+                  {loadingDevices ? "Actualizando..." : "Actualizar"}
+                </Button>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* Estado actual */}
+                {deviceStatus && (
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-sm font-semibold text-slate-700">Impresora</span>
+                          <span className={`w-2 h-2 rounded-full ${deviceStatus.printerConnected ? "bg-emerald-500" : "bg-rose-500"}`} />
+                        </div>
+                        <p className="text-xs text-slate-600">
+                          {deviceStatus.printerConnected ? "Conectada" : "No detectada"}
+                        </p>
+                      </div>
+                      
+                      <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-sm font-semibold text-slate-700">Lector NFC</span>
+                          <span className={`w-2 h-2 rounded-full ${deviceStatus.nfcReaders > 0 ? "bg-emerald-500" : "bg-amber-500"}`} />
+                        </div>
+                        <p className="text-xs text-slate-600">
+                          {deviceStatus.nfcReaders > 0 ? `${deviceStatus.nfcReaders} detectado(s)` : "No detectado"}
+                        </p>
+                      </div>
+                      
+                      <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-sm font-semibold text-slate-700">Cajón</span>
+                          <span className={`w-2 h-2 rounded-full ${deviceStatus.drawerAvailable ? "bg-emerald-500" : "bg-slate-400"}`} />
+                        </div>
+                        <p className="text-xs text-slate-600">
+                          {deviceStatus.drawerAvailable ? "Disponible" : "No disponible"}
+                        </p>
+                      </div>
+                    </div>
+                    
+                    <div className="p-3 bg-blue-50 rounded-lg border border-blue-200 text-xs">
+                      <p className="font-semibold text-blue-900 mb-1">Última actualización:</p>
+                      <p className="text-blue-800">{new Date(deviceStatus.timestamp).toLocaleString()}</p>
+                    </div>
+                  </div>
+                )}
+                
+                {!deviceStatus && (
+                  <div className="p-4 bg-amber-50 rounded-lg border border-amber-200">
+                    <p className="text-sm text-amber-800">
+                      Haz clic en "Actualizar" para detectar dispositivos
+                    </p>
+                  </div>
+                )}
+
+                {/* Lista de dispositivos USB HID */}
+                <div className="border-t border-slate-200 pt-4">
+                  <h4 className="text-sm font-semibold text-slate-900 mb-3">
+                    Dispositivos USB HID Detectados ({usbDevices.length})
+                  </h4>
+                  
+                  {usbDevices.length === 0 ? (
+                    <div className="p-4 bg-amber-50 rounded-lg border border-amber-200">
+                      <p className="text-sm text-amber-800 font-semibold mb-2">
+                        ⚠️ No se detectaron dispositivos USB HID
+                      </p>
+                      <p className="text-xs text-amber-700 mb-2">
+                        Esto puede significar:
+                      </p>
+                      <ul className="text-xs text-amber-700 list-disc ml-4 space-y-1">
+                        <li>La librería node-hid no tiene permisos en Windows</li>
+                        <li>Los dispositivos no están conectados</li>
+                        <li>La aplicación necesita ejecutarse como administrador</li>
+                      </ul>
+                      <p className="text-xs text-amber-700 mt-2">
+                        💡 Intenta: Cierra la app, ejecuta como administrador (clic derecho → "Ejecutar como administrador") y vuelve a intentar.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2 max-h-64 overflow-y-auto">
+                      {usbDevices.map((device, idx) => (
+                        <div key={idx} className="p-3 bg-slate-50 rounded-lg border border-slate-200 text-xs font-mono">
+                          <div className="grid grid-cols-2 gap-2">
+                            <div className="col-span-2 flex items-center justify-between mb-1">
+                              <span className="text-slate-900 font-semibold">{device.product}</span>
+                              <span className={`text-xs px-2 py-0.5 rounded ${device.source === 'node-hid' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>
+                                {device.source === 'node-hid' ? 'HID' : 'PowerShell'}
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-slate-500">Fabricante:</span>
+                              <span className="ml-2 text-slate-900">{device.manufacturer}</span>
+                            </div>
+                            {device.vendorId !== 'N/A' && (
+                              <div>
+                                <span className="text-slate-500">VID:PID:</span>
+                                <span className="ml-2 text-slate-900">{device.vendorId}:{device.productId}</span>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="ml-2 h-5 px-2"
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(`${device.vendorId}:${device.productId}`);
+                                    success("VID:PID copiado al portapapeles");
+                                  }}
+                                >
+                                  <Copy className="w-3 h-3" />
+                                </Button>
+                              </div>
+                            )}
+                            {device.usage !== 'N/A' && (
+                              <div>
+                                <span className="text-slate-500">Usage:</span>
+                                <span className="ml-2 text-slate-900">{device.usage} (Page: {device.usagePage})</span>
+                              </div>
+                            )}
+                            {device.serialNumber && device.serialNumber !== 'N/A' && (
+                              <div className="col-span-2">
+                                <span className="text-slate-500">Serial/ID:</span>
+                                <span className="ml-2 text-slate-900 break-all">{device.serialNumber}</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Configuración manual de NFC VID:PID */}
+                <div className="border-t border-slate-200 pt-4">
+                  <h4 className="text-sm font-semibold text-slate-900 mb-3">
+                    Configuración Manual de Lector NFC
+                  </h4>
+                  
+                  <div className="space-y-3">
+                    <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
+                      <p className="text-xs text-blue-800 mb-2">
+                        💡 <strong>Tip:</strong> Si tu lector NFC YARONGTECH no se detecta automáticamente, puedes configurarlo manualmente:
+                      </p>
+                      <ol className="text-xs text-blue-800 ml-4 list-decimal space-y-1">
+                        <li>Busca tu dispositivo en la lista de arriba</li>
+                        <li>Copia el VID:PID haciendo clic en el botón de copiar</li>
+                        <li>Habilita el campo de abajo y pega el código</li>
+                        <li>Guarda la configuración</li>
+                      </ol>
+                    </div>
+
+                    <div className="flex items-end gap-2">
+                      <div className="flex-1">
+                        <label className="block text-sm font-semibold text-slate-900 mb-2">
+                          VID:PID del Lector NFC
+                        </label>
+                        <input
+                          type="text"
+                          value={nfcVidPid}
+                          onChange={(e) => setNfcVidPid(e.target.value)}
+                          disabled={!nfcVidPidEditing}
+                          placeholder="Ej: 0xFFFF:0x0035"
+                          className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-slate-100 disabled:cursor-not-allowed"
+                        />
+                        {nfcVidPid && (
+                          <p className="text-xs text-slate-500 mt-1">
+                            Configurado: {nfcVidPid}
+                          </p>
+                        )}
+                      </div>
+                      
+                      <Button
+                        variant="outline"
+                        onClick={() => setNfcVidPidEditing(!nfcVidPidEditing)}
+                        className="gap-2"
+                      >
+                        {nfcVidPidEditing ? "Cancelar" : "Editar"}
+                      </Button>
+                      
+                      {nfcVidPidEditing && (
+                        <Button
+                          onClick={async () => {
+                            try {
+                              setLoading(true);
+                              await setSetting("nfc_reader_vid_pid", nfcVidPid);
+                              success("VID:PID del lector NFC guardado. Reinicia la aplicación para aplicar cambios.");
+                              setNfcVidPidEditing(false);
+                              // Recargar dispositivos
+                              await loadDeviceStatus();
+                            } catch (err) {
+                              errorNotification("Error al guardar VID:PID");
+                            } finally {
+                              setLoading(false);
+                            }
+                          }}
+                          disabled={loading || !nfcVidPid}
+                          className="bg-blue-600 hover:bg-blue-700 text-white gap-2"
+                        >
+                          <Save className="w-4 h-4" />
+                          Guardar
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-3 bg-amber-50 rounded-lg border border-amber-200">
+                  <p className="text-xs text-amber-800">
+                    ⚠️ <strong>Nota:</strong> Después de configurar el VID:PID, debes reiniciar la aplicación para que los cambios surtan efecto.
+                  </p>
                 </div>
               </CardContent>
             </Card>

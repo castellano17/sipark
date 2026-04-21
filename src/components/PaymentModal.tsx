@@ -27,7 +27,9 @@ export function PaymentModal({ sale, onClose, onConfirm }: PaymentModalProps) {
 
   const canConfirm = () => {
     if (paymentMethod === "cash") {
-      return parseFloat(amountReceived || "0") >= sale.total;
+      // Permitir confirmar sin monto recibido (se usará el total)
+      const received = parseFloat(amountReceived || "0");
+      return received === 0 || received >= sale.total;
     }
     if (paymentMethod === "card" || paymentMethod === "transfer") {
       return reference.trim().length > 0;
@@ -36,11 +38,15 @@ export function PaymentModal({ sale, onClose, onConfirm }: PaymentModalProps) {
   };
 
   const handleConfirm = () => {
+    // Si no se ingresó monto recibido, usar el total exacto
+    const receivedAmount = amountReceived.trim() === "" || parseFloat(amountReceived) === 0
+      ? sale.total
+      : parseFloat(amountReceived);
+
     const payment: PaymentDetails = {
       method: paymentMethod,
-      amount_received:
-        paymentMethod === "cash" ? parseFloat(amountReceived) : sale.total,
-      change: change,
+      amount_received: paymentMethod === "cash" ? receivedAmount : sale.total,
+      change: paymentMethod === "cash" ? Math.max(0, receivedAmount - sale.total) : 0,
       reference: reference || undefined,
     };
     onConfirm(payment);
@@ -118,24 +124,30 @@ export function PaymentModal({ sale, onClose, onConfirm }: PaymentModalProps) {
 
         {/* Campos según método */}
         {paymentMethod === "cash" && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-            <div>
-              <label className="text-sm font-medium mb-2 block">
-                Monto Recibido
-              </label>
-              <Input
-                type="number"
-                step="0.01"
-                value={amountReceived}
-                onChange={(e) => setAmountReceived(e.target.value)}
-                className="text-xl"
-                autoFocus
-              />
-            </div>
-            <div className="bg-green-50 p-4 rounded-lg flex flex-col justify-center">
-              <div className="text-sm text-gray-600 mb-1">Cambio</div>
-              <div className="text-3xl font-bold text-green-600">
-                {formatCurrency(change)}
+          <div className="space-y-4 mb-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm font-medium mb-2 block">
+                  Monto Recibido
+                </label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={amountReceived}
+                  onChange={(e) => setAmountReceived(e.target.value)}
+                  className="text-xl"
+                  placeholder={sale.total.toFixed(2)}
+                  autoFocus
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Dejar vacío si el cliente paga el monto exacto
+                </p>
+              </div>
+              <div className="bg-green-50 p-4 rounded-lg flex flex-col justify-center">
+                <div className="text-sm text-gray-600 mb-1">Cambio</div>
+                <div className="text-3xl font-bold text-green-600">
+                  {formatCurrency(change)}
+                </div>
               </div>
             </div>
           </div>
@@ -162,15 +174,18 @@ export function PaymentModal({ sale, onClose, onConfirm }: PaymentModalProps) {
 
         {/* Acciones */}
         <div className="flex gap-3">
-          <Button variant="outline" onClick={onClose} className="flex-1">
+          <Button variant="outline" onClick={onClose} className="flex-1" title="Cancelar (ESC)">
             Cancelar
+            <span className="ml-2 text-xs opacity-50">ESC</span>
           </Button>
           <Button
             onClick={handleConfirm}
             disabled={!canConfirm()}
-            className="flex-1"
+            className="flex-1 relative"
+            title="Confirmar pago (Enter)"
           >
             Confirmar Pago
+            <span className="ml-2 text-xs opacity-70">↵</span>
           </Button>
         </div>
       </Card>

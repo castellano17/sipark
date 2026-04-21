@@ -32,6 +32,20 @@ function getLogosPath() {
 }
 
 /**
+ * Obtiene el directorio de imágenes de productos
+ */
+function getProductImagesPath() {
+  const imagesDir = path.join(getAppDataPath(), "product-images");
+
+  // Crear directorio si no existe
+  if (!fs.existsSync(imagesDir)) {
+    fs.mkdirSync(imagesDir, { recursive: true });
+  }
+
+  return imagesDir;
+}
+
+/**
  * Guarda un logo (ticket o factura)
  * @param {string} type - 'ticket' o 'invoice'
  * @param {string} base64Data - Datos de la imagen en base64
@@ -107,10 +121,90 @@ async function deleteLogo(type) {
   }
 }
 
+/**
+ * Guarda una imagen de producto
+ * @param {number} productId - ID del producto
+ * @param {string} base64Data - Datos de la imagen en base64
+ * @param {string} extension - Extensión del archivo (jpg, png, etc)
+ */
+async function saveProductImage(productId, base64Data, extension) {
+  try {
+    const imagesDir = getProductImagesPath();
+    const fileName = `product-${productId}.${extension}`;
+    const filePath = path.join(imagesDir, fileName);
+
+    // Remover el prefijo data:image/...;base64, si existe
+    const base64Image = base64Data.replace(/^data:image\/\w+;base64,/, "");
+    const buffer = Buffer.from(base64Image, "base64");
+
+    fs.writeFileSync(filePath, buffer);
+
+    return filePath;
+  } catch (error) {
+    throw error;
+  }
+}
+
+/**
+ * Obtiene una imagen de producto
+ * @param {number} productId - ID del producto
+ */
+async function getProductImage(productId) {
+  try {
+    const imagesDir = getProductImagesPath();
+    const extensions = ["png", "jpg", "jpeg", "gif", "webp"];
+
+    for (const ext of extensions) {
+      const fileName = `product-${productId}.${ext}`;
+      const filePath = path.join(imagesDir, fileName);
+
+      if (fs.existsSync(filePath)) {
+        const buffer = fs.readFileSync(filePath);
+        const base64 = buffer.toString("base64");
+        const mimeType = `image/${ext === "jpg" ? "jpeg" : ext}`;
+        return `data:${mimeType};base64,${base64}`;
+      }
+    }
+
+    return null;
+  } catch (error) {
+    return null;
+  }
+}
+
+/**
+ * Elimina una imagen de producto
+ * @param {number} productId - ID del producto
+ */
+async function deleteProductImage(productId) {
+  try {
+    const imagesDir = getProductImagesPath();
+    const extensions = ["png", "jpg", "jpeg", "gif", "webp"];
+
+    for (const ext of extensions) {
+      const fileName = `product-${productId}.${ext}`;
+      const filePath = path.join(imagesDir, fileName);
+
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+        return true;
+      }
+    }
+
+    return false;
+  } catch (error) {
+    throw error;
+  }
+}
+
 module.exports = {
   saveLogo,
   getLogo,
   deleteLogo,
   getAppDataPath,
   getLogosPath,
+  saveProductImage,
+  getProductImage,
+  deleteProductImage,
+  getProductImagesPath,
 };

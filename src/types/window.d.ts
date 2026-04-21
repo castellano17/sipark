@@ -72,9 +72,14 @@ type AppApi = {
 
   // Products & Services
   getProductsServices: () => Promise<any[]>;
-  createProductService: (name: string, price: number, type: string, category: string | null, barcode: string | null, stock: number | null, durationMinutes: number | null) => Promise<any>;
-  updateProductService: (id: number, name: string, price: number, type: string, category: string | null, barcode: string | null, stock: number | null, durationMinutes: number | null) => Promise<any>;
+  createProductService: (name: string, price: number, type: string, category: string | null, barcode: string | null, stock: number | null, durationMinutes: number | null, imagePath?: string | null) => Promise<any>;
+  updateProductService: (id: number, name: string, price: number, type: string, category: string | null, barcode: string | null, stock: number | null, durationMinutes: number | null, imagePath?: string | null) => Promise<any>;
   deleteProductService: (id: number) => Promise<any>;
+  
+  // Product Images
+  saveProductImage: (productId: number, base64Data: string, extension: string) => Promise<string>;
+  getProductImage: (productId: number) => Promise<string | null>;
+  deleteProductImage: (productId: number) => Promise<boolean>;
 
   // Categories
   getCategories: () => Promise<any[]>;

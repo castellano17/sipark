@@ -392,15 +392,28 @@ function setupIpcHandlers() {
     const execFileAsync = promisify(execFile);
 
     let usbOutput = "";
+    let nfcReaders = 0;
+    let drawerAvailable = false;
+    let printerConnected = false;
+
     try {
       if (process.platform === "darwin") {
         // macOS
         const { stdout } = await execFileAsync("system_profiler", ["SPUSBDataType"], { timeout: 5000 });
         usbOutput = stdout;
       } else if (process.platform === "win32") {
-        // Windows
-        const { stdout } = await execFileAsync("wmic", ["path", "Win32_PnPEntity", "get", "Caption,Description,Name"], { timeout: 5000 });
-        usbOutput = stdout;
+        // Windows - usar PowerShell para mejor detección
+        try {
+          const { stdout } = await execFileAsync("powershell", [
+            "-Command",
+            "Get-PnpDevice -Class USB | Select-Object Name, Description, Status | ConvertTo-Json"
+          ], { timeout: 5000 });
+          usbOutput = stdout;
+        } catch (e) {
+          // Fallback a wmic si PowerShell falla
+          const { stdout } = await execFileAsync("wmic", ["path", "Win32_PnPEntity", "get", "Caption,Description,Name"], { timeout: 5000 });
+          usbOutput = stdout;
+        }
       } else {
         // Linux
         const { stdout } = await execFileAsync("lsusb", [], { timeout: 5000 });
@@ -410,30 +423,225 @@ function setupIpcHandlers() {
       console.warn("Error listando dispositivos USB:", e.message);
     }
 
-    // Detectar lectores NFC por nombres comunes en la salida
-    const nfcKeywords = ["ACR", "ACS", "NFC", "RFID", "HID Global", "Feitian", "Identiv", "RF IDeas", "uTrust", "OmniKey"];
-    const nfcCount = nfcKeywords.reduce((count, kw) => {
-      const regex = new RegExp(kw, "gi");
-      const matches = (usbOutput.match(regex) || []).length;
-      return count + (matches > 0 ? 1 : 0); // contar dispositivo único por keyword
-    }, 0);
-
-    // Cajón de dinero: si hay una impresora configurada se asume disponible
-    let drawerAvailable = false;
+    // Detectar NFC usando node-hid (más confiable que búsqueda de texto)
     try {
-      const printers = mainWindow?.webContents.getPrintersAsync
-        ? await mainWindow.webContents.getPrintersAsync()
-        : mainWindow?.webContents.getPrinters?.() || [];
-      drawerAvailable = Array.isArray(printers) && printers.length > 0;
+      const availableDevices = nfcHid.getAvailableDevices();
+      
+      // Buscar dispositivos NFC específicos - mejorado para YARONGTECH
+      const nfcKeywords = ["sycreader", "rfid", "nfc", "reader", "smart", "acr122", "yarongtech", "x002eik11z", "yar", "yrtech"];
+      const nfcDevices = availableDevices.filter(d => {
+        const prod = (d.product || "").toLowerCase();
+        const man = (d.manufacturer || "").toLowerCase();
+        const combined = `${prod} ${man}`;
+        
+        // Buscar por keywords o por VID/PID conocidos de YARONGTECH
+        const hasKeyword = nfcKeywords.some(kw => combined.includes(kw));
+        
+        // VID/PID comunes de lectores RFID HID (YARONGTECH suele usar estos)
+        const knownVidPids = [
+          { vid: 0xFFFF, pid: 0x0035 }, // YARONGTECH común
+          { vid: 0x6688, pid: 0x6850 }, // Otro modelo YARONGTECH
+          { vid: 0x0C27, pid: 0x3BFA }, // Genérico RFID
+        ];
+        const hasKnownVidPid = knownVidPids.some(vp => 
+          d.vendorId === vp.vid && d.productId === vp.pid
+        );
+        
+        // Debe ser un dispositivo HID de teclado (usage 6) o genérico (usage 1)
+        const isHidKeyboard = d.usage === 6 || d.usage === 1 || d.usagePage === 1;
+        
+        return (hasKeyword || hasKnownVidPid) && isHidKeyboard;
+      });
+      
+      nfcReaders = nfcDevices.length;
+      
+      // Log para debugging
+      if (nfcDevices.length > 0) {
+        console.log("[Device Detection] NFC readers found:", nfcDevices.map(d => 
+          `${d.manufacturer || 'Unknown'} ${d.product || 'Unknown'} (VID:${d.vendorId.toString(16)}, PID:${d.productId.toString(16)})`
+        ));
+      }
+      
+      // Si no encontramos por HID, buscar en la salida USB como fallback
+      if (nfcReaders === 0) {
+        const nfcKeywordsGeneral = ["ACR", "ACS", "NFC", "RFID", "HID Global", "Feitian", "Identiv", "RF IDeas", "uTrust", "OmniKey", "YARONGTECH", "YAR"];
+        const foundKeywords = new Set();
+        nfcKeywordsGeneral.forEach(kw => {
+          const regex = new RegExp(kw, "gi");
+          if (regex.test(usbOutput)) {
+            foundKeywords.add(kw);
+          }
+        });
+        nfcReaders = foundKeywords.size;
+      }
+      
+      nfcReaders = Math.min(nfcReaders, 5); // máx 5 para evitar falsos positivos
     } catch (e) {
+      console.warn("Error detectando NFC:", e.message);
+    }
+
+    // Detectar impresora (verificar que esté físicamente conectada, no solo instalada)
+    try {
+      if (process.platform === "win32") {
+        // En Windows, usar PowerShell para obtener impresoras y filtrar las virtuales
+        try {
+          const { stdout } = await execFileAsync("powershell", [
+            "-Command",
+            "Get-Printer | Where-Object {$_.PrinterStatus -eq 'Normal' -or $_.PrinterStatus -eq 'Idle'} | Select-Object Name, PrinterStatus, PortName | ConvertTo-Json"
+          ], { timeout: 5000 });
+          
+          const result = JSON.parse(stdout || "[]");
+          const allPrinters = Array.isArray(result) ? result : (result ? [result] : []);
+          
+          // Filtrar impresoras virtuales de Windows
+          const virtualPrinterNames = [
+            "Microsoft Print to PDF",
+            "Microsoft XPS Document Writer",
+            "Fax",
+            "OneNote",
+            "Send To OneNote"
+          ];
+          
+          const physicalPrinters = allPrinters.filter(p => {
+            // Filtrar por nombre
+            const isVirtual = virtualPrinterNames.some(vp => 
+              p.Name && p.Name.includes(vp)
+            );
+            // Filtrar por puerto (impresoras virtuales usan FILE:, PORTPROMPT:, etc.)
+            const isFilePort = p.PortName && (
+              p.PortName.includes("FILE:") || 
+              p.PortName.includes("PORTPROMPT:") ||
+              p.PortName.includes("XPS") ||
+              p.PortName.includes("SHRFAX")
+            );
+            return !isVirtual && !isFilePort;
+          });
+          
+          printerConnected = physicalPrinters.length > 0;
+          
+          if (physicalPrinters.length > 0) {
+            console.log(`[Device Detection] Printer: found ${physicalPrinters.length} physical printer(s):`, 
+              physicalPrinters.map(p => `${p.Name} (${p.PortName})`).join(', '));
+          } else {
+            console.log(`[Device Detection] Printer: No physical printers detected (${allPrinters.length} virtual printers filtered out)`);
+          }
+        } catch (psError) {
+          console.warn("[Device Detection] PowerShell printer check failed:", psError.message);
+          // Fallback: buscar impresoras en dispositivos USB
+          const usbPrinterKeywords = ["printer", "impresora", "pos", "thermal", "termica", "receipt", "ticket"];
+          printerConnected = usbPrinterKeywords.some(kw => {
+            const regex = new RegExp(kw, "gi");
+            return regex.test(usbOutput);
+          });
+          console.log(`[Device Detection] Printer (USB fallback): ${printerConnected}`);
+        }
+      } else {
+        // macOS/Linux: usar el método tradicional
+        const printers = mainWindow?.webContents.getPrintersAsync
+          ? await mainWindow.webContents.getPrintersAsync()
+          : mainWindow?.webContents.getPrinters?.() || [];
+        printerConnected = Array.isArray(printers) && printers.length > 0;
+        console.log(`[Device Detection] Printer (macOS/Linux): ${printerConnected}, count: ${printers.length}`);
+      }
+    } catch (e) {
+      console.warn("Error detectando impresora:", e.message);
+      printerConnected = false;
+    }
+
+    // Detectar cajón de dinero (búsqueda específica en USB)
+    try {
+      // El cajón se conecta típicamente a través de la impresora o como dispositivo USB independiente
+      const drawerKeywords = ["drawer", "cash box", "cajon", "caja", "ESC/POS"];
+      const hasDrawerInUSB = drawerKeywords.some(kw => {
+        const regex = new RegExp(kw, "gi");
+        return regex.test(usbOutput);
+      });
+      
+      // Verificar configuración del cajón
+      const drawerConfigured = await api.getSetting("cash_drawer_enabled").catch(() => false);
+      
+      // El cajón está disponible si:
+      // 1. Está configurado Y la impresora está conectada (cajón conectado a impresora)
+      // 2. O se detecta explícitamente en USB como dispositivo independiente
+      if (drawerConfigured && printerConnected) {
+        drawerAvailable = true;
+      } else if (hasDrawerInUSB) {
+        drawerAvailable = true;
+      } else {
+        drawerAvailable = false;
+      }
+      
+      console.log(`[Device Detection] Drawer: configured=${drawerConfigured}, printer=${printerConnected}, usb=${hasDrawerInUSB}, available=${drawerAvailable}`);
+    } catch (e) {
+      console.warn("Error detectando cajón:", e.message);
       drawerAvailable = false;
     }
 
     return {
-      nfcReaders: Math.min(nfcCount, 5), // máx 5 para evitar falsos positivos
+      nfcReaders,
       drawerAvailable,
-      rawOutput: usbOutput.substring(0, 200), // debug limitado
+      printerConnected,
+      timestamp: new Date().toISOString(),
     };
+  });
+
+  // Obtener información detallada de dispositivos USB (para debugging)
+  ipcMain.handle("api:getUsbDevicesDebug", async () => {
+    try {
+      const HID = require('node-hid');
+      const devices = HID.devices();
+      
+      console.log(`[USB Debug] node-hid found ${devices.length} devices`);
+      
+      const hidDevices = devices.map(d => ({
+        vendorId: `0x${d.vendorId.toString(16).toUpperCase().padStart(4, '0')}`,
+        productId: `0x${d.productId.toString(16).toUpperCase().padStart(4, '0')}`,
+        product: d.product || 'Unknown',
+        manufacturer: d.manufacturer || 'Unknown',
+        usage: d.usage,
+        usagePage: d.usagePage,
+        serialNumber: d.serialNumber || 'N/A',
+        source: 'node-hid'
+      }));
+      
+      // Si node-hid no encuentra nada, intentar con PowerShell como alternativa
+      if (hidDevices.length === 0 && process.platform === 'win32') {
+        console.log('[USB Debug] node-hid returned empty, trying PowerShell...');
+        const { execFile } = require("child_process");
+        const { promisify } = require("util");
+        const execFileAsync = promisify(execFile);
+        
+        try {
+          const { stdout } = await execFileAsync("powershell", [
+            "-Command",
+            "Get-PnpDevice -Class USB | Select-Object FriendlyName, InstanceId, Status | ConvertTo-Json"
+          ], { timeout: 5000 });
+          
+          const usbDevices = JSON.parse(stdout || "[]");
+          const devices = Array.isArray(usbDevices) ? usbDevices : [usbDevices];
+          
+          console.log(`[USB Debug] PowerShell found ${devices.length} USB devices`);
+          
+          return devices.filter(d => d.Status === 'OK').map(d => ({
+            vendorId: 'N/A',
+            productId: 'N/A',
+            product: d.FriendlyName || 'Unknown',
+            manufacturer: 'Unknown',
+            usage: 'N/A',
+            usagePage: 'N/A',
+            serialNumber: d.InstanceId || 'N/A',
+            source: 'powershell'
+          }));
+        } catch (psError) {
+          console.error('[USB Debug] PowerShell also failed:', psError.message);
+        }
+      }
+      
+      return hidDevices;
+    } catch (e) {
+      console.error("Error obteniendo dispositivos USB:", e.message);
+      return [];
+    }
   });
 
   // Clients
@@ -493,6 +701,7 @@ function setupIpcHandlers() {
       data.barcode,
       data.stock,
       data.durationMinutes,
+      data.imagePath,
     ),
   );
   ipcMain.handle("api:updateProductService", (event, data) =>
@@ -505,10 +714,22 @@ function setupIpcHandlers() {
       data.barcode,
       data.stock,
       data.durationMinutes,
+      data.imagePath,
     ),
   );
   ipcMain.handle("api:deleteProductService", (event, data) =>
     api.deleteProductService(data.id),
+  );
+  
+  // Product Images
+  ipcMain.handle("api:saveProductImage", (event, data) =>
+    fileHandler.saveProductImage(data.productId, data.base64Data, data.extension),
+  );
+  ipcMain.handle("api:getProductImage", (event, productId) =>
+    fileHandler.getProductImage(productId),
+  );
+  ipcMain.handle("api:deleteProductImage", (event, productId) =>
+    fileHandler.deleteProductImage(productId),
   );
 
   // Sales
@@ -944,14 +1165,14 @@ function setupIpcHandlers() {
   ipcMain.handle("api:getCategories", () => api.getCategories());
   ipcMain.handle("api:createCategory", async (event, data) => {
     try {
-      const result = await api.createCategory(data.name, data.description);
+      const result = await api.createCategory(data.name, data.description, data.type);
       return result;
     } catch (error) {
       throw error;
     }
   });
   ipcMain.handle("api:updateCategory", (event, data) =>
-    api.updateCategory(data.id, data.name, data.description),
+    api.updateCategory(data.id, data.name, data.description, data.type),
   );
   ipcMain.handle("api:deleteCategory", (event, data) =>
     api.deleteCategory(data.id),

@@ -227,10 +227,10 @@ export const CheckInModal: React.FC<CheckInModalProps> = ({
       onClick={() => onOpenChange(false)}
     >
       <div
-        className="w-full max-w-2xl bg-white rounded-lg shadow-lg max-h-[90vh] overflow-y-auto flex flex-col border-0"
+        className="w-full max-w-4xl bg-white rounded-lg shadow-lg max-h-[95vh] overflow-y-auto border-0"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
+        {/* Header con botones */}
         <div className="flex items-center justify-between p-6 border-b bg-gradient-to-r from-blue-600 to-blue-700">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-white/20 rounded-lg">
@@ -259,14 +259,29 @@ export const CheckInModal: React.FC<CheckInModalProps> = ({
               </p>
             </div>
           </div>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => onOpenChange(false)}
+              className="px-4 py-2 bg-white/10 text-white hover:bg-white/20 border border-white/20 rounded-md transition-colors"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="px-4 py-2 bg-white text-blue-600 hover:bg-gray-100 rounded-md font-medium transition-colors disabled:opacity-50"
+            >
+              {isSubmitting ? "Procesando..." : "Registrar Entrada"}
+            </button>
+          </div>
         </div>
 
         {/* Content */}
         <form
           onSubmit={handleSubmit}
-          className="flex flex-col flex-1 overflow-hidden"
         >
-          <div className="flex-1 overflow-auto p-6 space-y-6">
+          <div className="p-6 space-y-6">
             {/* Tipo de Cliente - Radio Buttons */}
             <div className="space-y-3">
               <label className="block text-sm font-semibold text-slate-900">
@@ -733,7 +748,7 @@ export const CheckInModal: React.FC<CheckInModalProps> = ({
             )}
           </div>
 
-          {/* Footer */}
+          {/* Footer con botones */}
           <div className="p-6 border-t bg-gray-50 flex gap-3">
             <Button
               type="button"

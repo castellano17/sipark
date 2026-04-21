@@ -96,14 +96,14 @@ export default function MainLayout({ currentUser, onLogout }: MainLayoutProps) {
   // Verificar estado de la base de datos y caja cada 5 segundos
   useEffect(() => {
     checkSystemStatus();
-    const interval = setInterval(checkSystemStatus, 10000);
+    const interval = setInterval(checkSystemStatus, 5000);
     return () => clearInterval(interval);
   }, []);
 
-  // Verificar dispositivos USB cada 15 segundos (más lento para no saturar el sistema)
+  // Verificar dispositivos USB cada 3 segundos (más frecuente para detección en tiempo real)
   useEffect(() => {
     checkDeviceStatus();
-    const interval = setInterval(checkDeviceStatus, 15000);
+    const interval = setInterval(checkDeviceStatus, 3000);
     return () => clearInterval(interval);
   }, []);
 
@@ -124,13 +124,16 @@ export default function MainLayout({ currentUser, onLogout }: MainLayoutProps) {
     try {
       const dbStatus = await window.api.checkDatabaseConnection();
       const activeCashBox = await (window as any).api.getActiveCashBox();
+      
+      // Usar la nueva API de detección de dispositivos que verifica conexión física
       let printerStatus: "connected" | "disconnected" | "error" = "disconnected";
       try {
-        const printers = await window.api.getPrinters();
-        printerStatus = printers && printers.length > 0 ? "connected" : "disconnected";
+        const devices = await (window as any).api.getConnectedDevices();
+        printerStatus = devices.printerConnected ? "connected" : "disconnected";
       } catch {
         printerStatus = "disconnected";
       }
+      
       setSystemStatus((prev) => ({
         ...prev,
         database: dbStatus.connected ? "connected" : "error",

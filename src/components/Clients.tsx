@@ -390,14 +390,24 @@ export function Clients() {
       {showModal && (
         <Dialog open={showModal} onOpenChange={setShowModal}>
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <Card className="w-full max-w-2xl bg-white max-h-[90vh] overflow-y-auto">
+            <Card className="w-full max-w-4xl bg-white max-h-[95vh] overflow-y-auto">
               <form onSubmit={handleSubmit} noValidate>
-                <div className="p-6 border-b bg-gradient-to-r from-blue-600 to-blue-700">
+                {/* Header con botones */}
+                <div className="p-6 border-b bg-gradient-to-r from-blue-600 to-blue-700 flex items-center justify-between">
                   <h2 className="text-xl font-bold text-white">
                     {editingClient ? "Editar Cliente" : "Nuevo Cliente"}
                   </h2>
+                  <div className="flex gap-2">
+                    <Button type="button" variant="outline" onClick={() => setShowModal(false)} className="bg-white/10 text-white hover:bg-white/20 border-white/20">
+                      Cancelar
+                    </Button>
+                    <Button type="submit" className="bg-white text-blue-600 hover:bg-gray-100">
+                      {editingClient ? "Actualizar" : "Crear"}
+                    </Button>
+                  </div>
                 </div>
 
+                {/* Contenido */}
                 <div className="p-6 space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="md:col-span-1">
@@ -494,6 +504,7 @@ export function Clients() {
                   </div>
                 </div>
 
+                {/* Footer con botones */}
                 <div className="p-6 border-t bg-gray-50 flex justify-end gap-3">
                   <Button
                     type="button"
