@@ -9,7 +9,6 @@ import {
   Printer,
   Upload,
   X,
-  Image as ImageIcon,
 } from "lucide-react";
 import { useDropzone } from "react-dropzone";
 import { Card } from "./ui/card";

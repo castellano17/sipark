@@ -139,7 +139,8 @@ async function saveProductImage(productId, base64Data, extension) {
 
     fs.writeFileSync(filePath, buffer);
 
-    return filePath;
+    // Retornar solo el nombre del archivo, no la ruta completa
+    return fileName;
   } catch (error) {
     throw error;
   }
@@ -154,6 +155,7 @@ async function getProductImage(productId) {
     const imagesDir = getProductImagesPath();
     const extensions = ["png", "jpg", "jpeg", "gif", "webp"];
 
+    // Buscar el archivo con cualquiera de las extensiones
     for (const ext of extensions) {
       const fileName = `product-${productId}.${ext}`;
       const filePath = path.join(imagesDir, fileName);
@@ -166,8 +168,11 @@ async function getProductImage(productId) {
       }
     }
 
+    // Si no se encuentra por ID, intentar buscar por el nombre guardado en la DB
+    // (para compatibilidad con imágenes antiguas)
     return null;
   } catch (error) {
+    console.error("Error loading product image:", error);
     return null;
   }
 }

@@ -1,6 +1,8 @@
 ignoredBuiltDependencies:
   - better-sqlite3
+  - canvas
   - core-js
   - electron
   - esbuild
+  - node-hid
   - sqlite3
