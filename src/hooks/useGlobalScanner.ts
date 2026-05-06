@@ -87,9 +87,13 @@ export function useGlobalScanner(currentPath: string) {
 
     window.addEventListener('simulate-nfc-scan', handleSimulate as EventListener);
 
-    return () => {
-      cleanup(); // Limpiar el listener IPC
-      window.removeEventListener('simulate-nfc-scan', handleSimulate as EventListener);
-    };
+    return typeof cleanup === 'function'
+      ? () => {
+          cleanup();
+          window.removeEventListener('simulate-nfc-scan', handleSimulate as EventListener);
+        }
+      : () => {
+          window.removeEventListener('simulate-nfc-scan', handleSimulate as EventListener);
+        };
   }, [currentPath]);
 }

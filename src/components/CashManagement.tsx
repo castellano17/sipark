@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { TrendingUp, TrendingDown, Lock, Unlock, Printer } from "lucide-react";
+import { TrendingUp, TrendingDown, Lock, Unlock, Printer, Clock, ShoppingBag, Receipt, AlertTriangle, CheckCircle, Ban } from "lucide-react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Card } from "./ui/card";
@@ -57,6 +57,15 @@ export function CashManagement() {
 
   useEffect(() => {
     loadCashBoxData();
+
+    const handleRefresh = () => loadCashBoxData();
+    window.addEventListener('sale-cancelled', handleRefresh);
+    window.addEventListener('cash-movement-added', handleRefresh);
+
+    return () => {
+      window.removeEventListener('sale-cancelled', handleRefresh);
+      window.removeEventListener('cash-movement-added', handleRefresh);
+    };
   }, []);
 
   const loadCashBoxData = async () => {
@@ -209,6 +218,7 @@ export function CashManagement() {
           opened_at: activeCashBox.opened_at,
           opened_by: activeCashBox.opened_by,
         },
+        salesList: [...sales], // Persistir la lista de ventas para el reporte detallado
       });
       setSavedClosingNotes(closingNotes); // Guardar las notas para usarlas en el PDF
       setShowCloseModal(false);
@@ -242,6 +252,86 @@ export function CashManagement() {
     }
   };
 
+  const handlePrintSalesReportTicket = async () => {
+    if (!closeData?.salesList || closeData.salesList.length === 0) {
+      showError("No hay ventas para imprimir");
+      return;
+    }
+
+    const today = new Date().toLocaleDateString("es-ES");
+    const now = new Date().toLocaleTimeString("es-ES", { hour: '2-digit', minute: '2-digit' });
+    
+    let ticketText = "\n";
+    ticketText += "================================\n";
+    ticketText += "   RESUMEN DE VENTAS DEL DIA    \n";
+    ticketText += `   Fecha: ${today}  ${now}   \n`;
+    ticketText += "================================\n\n";
+    
+    // Usar totales oficiales del servidor para consistencia con el PDF
+    const openingAmount = Number(closeData.openingAmount || 0);
+    const validSalesList = closeData.salesList.filter((s: any) => s.status !== 'cancelled');
+    const salesTotal = validSalesList.reduce((sum: number, s: any) => sum + Number(s.total), 0);
+    const expensesTotal = Number(closeData.expensesTotal || 0);
+    const totalDescuentos = validSalesList.reduce((sum: number, s: any) => sum + Number(s.discount || 0), 0);
+    
+    const finalExpected = openingAmount + salesTotal - expensesTotal;
+    
+    const timeSales = validSalesList.filter((s: any) => s.time_items_count > 0 && s.product_items_count === 0);
+    const productSales = validSalesList.filter((s: any) => s.product_items_count > 0 && s.time_items_count === 0);
+    const mixedSales = validSalesList.filter((s: any) => s.time_items_count > 0 && s.product_items_count > 0);
+    
+    const timeTotal = timeSales.reduce((sum: number, s: any) => sum + Number(s.total), 0);
+    const productTotal = productSales.reduce((sum: number, s: any) => sum + Number(s.total), 0);
+    const mixedTotal = mixedSales.reduce((sum: number, s: any) => sum + Number(s.total), 0);
+
+    ticketText += `DINERO APERTURA:   ${formatCurrency(openingAmount)}\n`;
+    ticketText += `(+) VENTAS:        ${formatCurrency(salesTotal)}\n`;
+    ticketText += `    - Entradas:    ${formatCurrency(timeTotal)}\n`;
+    ticketText += `    - Productos:   ${formatCurrency(productTotal)}\n`;
+    if (mixedTotal > 0) {
+      ticketText += `    - Mixtas:      ${formatCurrency(mixedTotal)}\n`;
+    }
+    ticketText += `(-) GASTOS:       -${formatCurrency(expensesTotal)}\n`;
+    ticketText += `(-) DESCUENTOS:   -${formatCurrency(totalDescuentos)}\n`;
+    ticketText += "--------------------------------\n";
+    ticketText += `TOTAL EN CAJA:     ${formatCurrency(finalExpected)}\n`;
+    ticketText += `Transacciones:     ${closeData.salesList.length}\n`;
+    ticketText += "--------------------------------\n";
+    
+    // Encabezado de lista
+    ticketText += "ID   Hora   Detalle      Monto\n";
+    ticketText += "--------------------------------\n";
+    
+    // Ordenar por fecha (más antigua a más reciente)
+    const sortedSales = [...closeData.salesList].sort((a, b) => 
+      new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+    );
+
+    sortedSales.forEach((sale: any) => {
+      const time = new Date(sale.timestamp).toLocaleTimeString("es-ES", { hour: '2-digit', minute: '2-digit' });
+      const amount = formatCurrency(sale.total);
+      
+      // Formatear línea principal: #123 21:30          C$100.00
+      ticketText += `#${String(sale.id).padEnd(3)} ${time} ${amount.padStart(20)}\n`;
+      
+      // Mostrar lista de productos en la siguiente línea
+      const products = sale.products || (sale.client_name ? `Cliente: ${sale.client_name}` : "—");
+      ticketText += `${products}\n`;
+      ticketText += "--------------------------------\n";
+    });
+    ticketText += `TOTAL VENTAS:      ${formatCurrency(salesTotal)}\n`;
+    ticketText += "================================\n\n\n";
+
+    console.log("📄 Generando Ticket Detalle Ventas:\n", ticketText);
+
+    const printed = await printRawText(ticketText);
+    if (printed) {
+      success("Reporte detallado impreso");
+    } else {
+      success("Ticket generado (verifique impresora)");
+    }
+  };
+
   const printCashBoxClose = async (
     closeData: any,
     format: "ticket" | "pdf",
@@ -260,9 +350,24 @@ export function CashManagement() {
       ticketText += `Cajero: ${closeData.cashBoxData.opened_by}\n`;
       ticketText += `ID Caja: #${closeData.cashBoxId}\n`;
       ticketText += "--------------------------------\n";
-      ticketText += `Monto Apertura:  ${formatCurrency(closeData.openingAmount)}\n`;
-      ticketText += `Total Ventas:    ${formatCurrency(closeData.salesTotal)}\n`;
-      ticketText += `Total Gastos:   -${formatCurrency(closeData.expensesTotal)}\n`;
+      const validSales = closeData.salesList.filter((s: any) => s.status !== 'cancelled');
+      
+      const timeSales = validSales.filter((s: any) => s.time_items_count > 0 && s.product_items_count === 0);
+      const productSales = validSales.filter((s: any) => s.product_items_count > 0 && s.time_items_count === 0);
+      const mixedSales = validSales.filter((s: any) => s.time_items_count > 0 && s.product_items_count > 0);
+      
+      const timeTotal = timeSales.reduce((sum: number, s: any) => sum + Number(s.total), 0);
+      const productTotal = productSales.reduce((sum: number, s: any) => sum + Number(s.total), 0);
+      const mixedTotal = mixedSales.reduce((sum: number, s: any) => sum + Number(s.total), 0);
+
+      ticketText += `(+) APERTURA:    ${formatCurrency(closeData.openingAmount)}\n`;
+      ticketText += `(+) VENTAS:      ${formatCurrency(closeData.salesTotal)}\n`;
+      ticketText += `    - Entradas:  ${formatCurrency(timeTotal)}\n`;
+      ticketText += `    - Productos: ${formatCurrency(productTotal)}\n`;
+      if (mixedTotal > 0) {
+        ticketText += `    - Mixtas:    ${formatCurrency(mixedTotal)}\n`;
+      }
+      ticketText += `(-) GASTOS:     -${formatCurrency(closeData.expensesTotal)}\n`;
       ticketText += "--------------------------------\n";
       ticketText += `Esperado:        ${formatCurrency(closeData.expectedAmount)}\n`;
       ticketText += `Contado:         ${formatCurrency(closeData.closingAmount)}\n`;
@@ -320,12 +425,17 @@ export function CashManagement() {
     });
   };
 
-  const totalSales = sales.reduce((sum, sale) => sum + parseFloat(sale.total), 0);
+  const totalSales = sales
+    .filter(s => s.status !== 'cancelled' && s.payment_method === 'cash')
+    .reduce((sum, sale) => sum + parseFloat(String(sale.total)), 0);
   const totalExpenses = movements
     .filter((m) => m.type === "expense")
     .reduce((sum, m) => sum + Math.abs(parseFloat(String(m.amount))), 0);
+  const totalIncome = movements
+    .filter((m) => m.type === "income")
+    .reduce((sum, m) => sum + Math.abs(parseFloat(String(m.amount))), 0);
   const currentBalance = activeCashBox
-    ? parseFloat(String(activeCashBox.opening_amount)) + totalSales - totalExpenses
+    ? parseFloat(String(activeCashBox.opening_amount)) + totalSales + totalIncome - totalExpenses
     : 0;
 
   const handleManualOpenDrawer = async () => {
@@ -385,15 +495,33 @@ export function CashManagement() {
             </div>
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div>
-                <div className="text-gray-600">Ventas</div>
+                <div className="text-gray-600">Apertura</div>
+                <div className="font-semibold text-blue-500">
+                  {formatCurrency(activeCashBox?.opening_amount || 0)}
+                </div>
+              </div>
+              <div>
+                <div className="text-gray-600">Ventas Efectivo</div>
                 <div className="font-semibold text-green-600">
                   {formatCurrency(totalSales)}
                 </div>
               </div>
-              <div>
+              {totalIncome > 0 && (
+                <div>
+                  <div className="text-gray-600">Ingresos</div>
+                  <div className="font-semibold text-teal-600">+{formatCurrency(totalIncome)}</div>
+                </div>
+              )}
+              <div className="mt-2">
                 <div className="text-gray-600">Gastos</div>
                 <div className="font-semibold text-red-600">
                   {formatCurrency(totalExpenses)}
+                </div>
+              </div>
+              <div className="mt-2">
+                <div className="text-gray-600">En Caja</div>
+                <div className="font-bold text-blue-700">
+                  {formatCurrency(currentBalance)}
                 </div>
               </div>
             </div>
@@ -484,30 +612,67 @@ export function CashManagement() {
             ) : (
               <>
                 {/* Ventas */}
-                {sales.map((sale) => (
-                  <div
-                    key={`sale-${sale.id}`}
-                    className="flex items-center justify-between p-3 bg-green-50 rounded"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full flex items-center justify-center bg-green-100 text-green-600">
-                        <TrendingUp className="w-5 h-5" />
-                      </div>
-                      <div>
-                        <div className="font-medium">
-                          Venta #{sale.id}{" "}
-                          {sale.client_name && `- ${sale.client_name}`}
-                        </div>
-                        <div className="text-sm text-gray-500">
-                          {formatDate(sale.timestamp)}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="text-lg font-semibold text-green-600">
-                      +{formatCurrency(sale.total)}
-                    </div>
-                  </div>
-                ))}
+                 {sales.map((sale) => {
+                   const isTimeSale = sale.time_items_count > 0;
+                   const isProductSale = sale.product_items_count > 0;
+                   const isMixed = isTimeSale && isProductSale;
+
+                   return (
+                     <div
+                       key={`sale-${sale.id}`}
+                       className={`flex items-center justify-between p-3 rounded border ${
+                         sale.status === 'cancelled' 
+                           ? 'bg-gray-50 border-gray-200 opacity-60 grayscale' 
+                           : 'bg-green-50 border-green-100'
+                       }`}
+                     >
+                       <div className="flex items-center gap-3">
+                         <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                           sale.status === 'cancelled' ? 'bg-gray-200 text-gray-500' :
+                           isTimeSale ? 'bg-blue-100 text-blue-600' : 'bg-green-100 text-green-600'
+                         }`}>
+                           {sale.status === 'cancelled' ? (
+                             <Ban className="w-5 h-5" />
+                           ) : isMixed ? (
+                             <div className="relative">
+                               <Clock className="w-4 h-4 absolute -top-1 -left-1" />
+                               <ShoppingBag className="w-4 h-4 absolute -bottom-1 -right-1" />
+                             </div>
+                           ) : isTimeSale ? (
+                             <Clock className="w-5 h-5" />
+                           ) : (
+                             <ShoppingBag className="w-5 h-5" />
+                           )}
+                         </div>
+                         <div>
+                           <div className="font-medium flex items-center gap-2">
+                             <span className={sale.status === 'cancelled' ? 'line-through text-gray-400' : ''}>
+                               Venta #{sale.id}
+                             </span>
+                             <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold uppercase ${
+                               sale.status === 'cancelled' ? 'bg-gray-200 text-gray-600' :
+                               isMixed ? 'bg-purple-100 text-purple-700' : 
+                               isTimeSale ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'
+                             }`}>
+                               {sale.status === 'cancelled' ? 'Anulada' : isMixed ? 'Mixta' : isTimeSale ? 'Tiempo' : 'Producto'}
+                             </span>
+                             {sale.client_name && (
+                               <span className={`font-normal ${sale.status === 'cancelled' ? 'line-through text-gray-400' : 'text-gray-500'}`}>
+                                 - {sale.client_name}
+                               </span>
+                             )}
+                           </div>
+                           <div className="text-sm text-gray-500">
+                             {formatDate(sale.timestamp)}
+                           </div>
+                         </div>
+                       </div>
+                       <div className={`text-lg font-semibold ${sale.status === 'cancelled' ? 'text-gray-400 line-through' : 'text-green-600'}`}>
+                         +{formatCurrency(sale.total)}
+                       </div>
+                     </div>
+                   );
+                 })}
 
                 {/* Gastos */}
                 {movements
@@ -585,7 +750,7 @@ export function CashManagement() {
                         : "text-red-600"
                     }`}
                   >
-                    {parseFloat(closingAmount) - currentBalance >= 0 ? "+" : ""}
+                    {parseFloat(closingAmount) - currentBalance > 0 ? "+" : ""}
                     {formatCurrency(parseFloat(closingAmount) - currentBalance)}
                   </div>
                 </div>
@@ -692,163 +857,39 @@ export function CashManagement() {
           </DialogHeader>
 
           <div className="py-4 space-y-4">
-            {/* Resumen Financiero Principal */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg space-y-2">
-                <h3 className="font-bold text-sm text-slate-700 mb-3">💰 Resumen Financiero</h3>
-                <div className="flex justify-between text-sm">
-                  <span className="text-slate-600">Monto Apertura:</span>
+            <div className={`p-6 rounded-xl border-2 ${
+              Math.abs(closeData?.difference || 0) < 0.005
+                ? "bg-green-50 border-green-200"
+                : "bg-amber-50 border-amber-200"
+            }`}>
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <p className="text-sm font-medium text-slate-600 uppercase tracking-wider">Estado del Cuadre</p>
+                  <h3 className={`text-2xl font-bold ${
+                    Math.abs(closeData?.difference || 0) < 0.005 ? "text-green-700" : "text-amber-700"
+                  }`}>
+                    {Math.abs(closeData?.difference || 0) < 0.005 ? "✓ Caja Cuadrada" : "⚠ Diferencia Detectada"}
+                  </h3>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm font-medium text-slate-600">Diferencia</p>
+                  <p className={`text-2xl font-bold ${
+                    closeData?.difference >= 0 ? "text-green-600" : "text-red-600"
+                  }`}>
+                    {closeData?.difference > 0 ? "+" : ""}
+                    {formatCurrency(closeData?.difference || 0)}
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-y-3 gap-x-8 pt-4 border-t border-slate-200">
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-600 text-sm">Monto Apertura:</span>
                   <span className="font-semibold">{formatCurrency(closeData?.openingAmount || 0)}</span>
                 </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-slate-600">Total Ventas:</span>
-                  <span className="font-semibold text-green-600">+{formatCurrency(closeData?.salesTotal || 0)}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-slate-600">Total Gastos:</span>
-                  <span className="font-semibold text-red-600">-{formatCurrency(closeData?.expensesTotal || 0)}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-slate-600">Descuentos:</span>
-                  <span className="font-semibold text-orange-600">-{formatCurrency(closeData?.discountsTotal || 0)}</span>
-                </div>
-                <div className="border-t border-slate-300 pt-2 mt-2">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-slate-600">Esperado:</span>
-                    <span className="font-semibold">{formatCurrency(closeData?.expectedAmount || 0)}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-slate-600">Contado:</span>
-                    <span className="font-semibold">{formatCurrency(closeData?.closingAmount || 0)}</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className={`p-4 rounded-lg border ${
-                Math.abs(closeData?.difference || 0) < 0.005
-                  ? "bg-green-50 border-green-200"
-                  : closeData?.difference > 0
-                    ? "bg-blue-50 border-blue-200"
-                    : "bg-red-50 border-red-200"
-              }`}>
-                <h3 className="font-bold text-sm mb-2">
-                  {Math.abs(closeData?.difference || 0) < 0.005
-                    ? "✓ Caja Cuadrada"
-                    : closeData?.difference > 0
-                      ? "↑ Sobrante"
-                      : "↓ Faltante"}
-                </h3>
-                <p className="text-4xl font-bold mb-3">
-                  {closeData?.difference >= 0 ? "+" : ""}
-                  {formatCurrency(closeData?.difference || 0)}
-                </p>
-                <div className="text-sm space-y-1">
-                  <div className="flex justify-between">
-                    <span className="text-slate-600">Transacciones:</span>
-                    <span className="font-semibold">{closeData?.transactionCount || 0}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-600">Ticket Promedio:</span>
-                    <span className="font-semibold">{formatCurrency(closeData?.avgTicket || 0)}</span>
-                  </div>
-                </div>
               </div>
             </div>
 
-            {/* Métodos de Pago */}
-            <div className="p-4 bg-white border border-slate-200 rounded-lg">
-              <h3 className="font-bold text-sm text-slate-700 mb-3">💳 Desglose por Método de Pago</h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                {closeData?.paymentMethods?.map((method: any) => (
-                  <div key={method.payment_method} className="p-3 bg-slate-50 rounded-lg">
-                    <div className="text-xs text-slate-600 uppercase">{method.payment_method}</div>
-                    <div className="text-lg font-bold">{formatCurrency(method.total)}</div>
-                    <div className="text-xs text-slate-500">{method.count} transacciones</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Estadísticas de Operaciones */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="p-4 bg-purple-50 border border-purple-200 rounded-lg">
-                <h3 className="font-bold text-sm text-purple-700 mb-2">🎟️ Vouchers Canjeados</h3>
-                <div className="text-3xl font-bold text-purple-600">{closeData?.vouchersRedeemed || 0}</div>
-                <div className="text-xs text-purple-600 mt-1">Promociones aplicadas</div>
-              </div>
-
-              <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                <h3 className="font-bold text-sm text-blue-700 mb-2">🎮 Paquetes Vendidos</h3>
-                <div className="text-3xl font-bold text-blue-600">{closeData?.packages?.count || 0}</div>
-                <div className="text-xs text-blue-600 mt-1">{formatCurrency(closeData?.packages?.total || 0)}</div>
-              </div>
-
-              <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
-                <h3 className="font-bold text-sm text-green-700 mb-2">👥 Membresías</h3>
-                <div className="flex gap-4">
-                  <div>
-                    <div className="text-2xl font-bold text-green-600">{closeData?.memberships?.sold || 0}</div>
-                    <div className="text-xs text-green-600">Vendidas</div>
-                  </div>
-                  <div>
-                    <div className="text-2xl font-bold text-green-600">{closeData?.memberships?.recharged || 0}</div>
-                    <div className="text-xs text-green-600">Recargadas</div>
-                  </div>
-                </div>
-                {closeData?.memberships?.rechargeAmount > 0 && (
-                  <div className="text-xs text-green-600 mt-1">
-                    Recargas: {formatCurrency(closeData.memberships.rechargeAmount)}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Movimientos de Caja */}
-            {(closeData?.cashMovements?.incomeCount > 0 || closeData?.cashMovements?.expenseCount > 0) && (
-              <div className="p-4 bg-white border border-slate-200 rounded-lg">
-                <h3 className="font-bold text-sm text-slate-700 mb-3">💸 Movimientos de Caja</h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="p-3 bg-green-50 rounded-lg">
-                    <div className="text-xs text-green-700">Entradas</div>
-                    <div className="text-xl font-bold text-green-600">
-                      {formatCurrency(closeData.cashMovements.incomeTotal)}
-                    </div>
-                    <div className="text-xs text-green-600">{closeData.cashMovements.incomeCount} movimientos</div>
-                  </div>
-                  <div className="p-3 bg-red-50 rounded-lg">
-                    <div className="text-xs text-red-700">Salidas</div>
-                    <div className="text-xl font-bold text-red-600">
-                      {formatCurrency(closeData.cashMovements.expenseTotal)}
-                    </div>
-                    <div className="text-xs text-red-600">{closeData.cashMovements.expenseCount} movimientos</div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Top Productos */}
-            {closeData?.topProducts?.length > 0 && (
-              <div className="p-4 bg-white border border-slate-200 rounded-lg">
-                <h3 className="font-bold text-sm text-slate-700 mb-3">🏆 Top 5 Productos Más Vendidos</h3>
-                <div className="space-y-2">
-                  {closeData.topProducts.map((product: any, index: number) => (
-                    <div key={index} className="flex items-center justify-between p-2 bg-slate-50 rounded">
-                      <div className="flex items-center gap-2">
-                        <span className="text-lg font-bold text-slate-400">#{index + 1}</span>
-                        <div>
-                          <div className="text-sm font-semibold">{product.product_name}</div>
-                          <div className="text-xs text-slate-500">{product.product_type}</div>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-sm font-bold">{product.quantity} unidades</div>
-                        <div className="text-xs text-slate-600">{formatCurrency(product.total)}</div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
 
           <DialogFooter className="flex-col sm:flex-row gap-2">
@@ -872,10 +913,18 @@ export function CashManagement() {
             </Button>
             <Button
               onClick={handlePrintCloseTicket}
-              className="bg-blue-600 hover:bg-blue-700 gap-2 w-full sm:flex-1"
+              className="bg-blue-600 hover:bg-blue-700 gap-2 flex-1"
             >
               <Printer className="w-4 h-4" />
               Imprimir Ticket
+            </Button>
+            <Button
+              onClick={handlePrintSalesReportTicket}
+              variant="outline"
+              className="border-blue-600 text-blue-600 hover:bg-blue-50 gap-2 flex-1"
+            >
+              <Printer className="w-4 h-4" />
+              Detalle Ventas
             </Button>
           </DialogFooter>
         </DialogContent>

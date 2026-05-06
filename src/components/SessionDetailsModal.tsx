@@ -30,7 +30,12 @@ export const SessionDetailsModal: React.FC<SessionDetailsModalProps> = ({
   const now = new Date();
   
   // Si está en pending, el tiempo no ha comenzado
-  const elapsedMs = isPending ? 0 : Math.max(0, now.getTime() - startTime.getTime());
+  // Si está pausada, el tiempo transcurrido es hasta el momento de la pausa
+  const referenceTime = (isPaused && session.pause_start_time) 
+    ? new Date(session.pause_start_time) 
+    : now;
+    
+  const elapsedMs = isPending ? 0 : Math.max(0, referenceTime.getTime() - startTime.getTime());
   const elapsedSeconds = Math.floor(elapsedMs / 1000);
   const elapsedMinutes = Math.floor(elapsedSeconds / 60);
   const elapsedSecondsRemainder = elapsedSeconds % 60;
@@ -67,6 +72,16 @@ export const SessionDetailsModal: React.FC<SessionDetailsModalProps> = ({
               <p className="text-sm text-slate-600">Número de Ticket</p>
               <p className="text-lg font-semibold text-slate-900">
                 #{session.id.toString().padStart(4, "0")}
+              </p>
+            </CardContent>
+          </Card>
+          
+          {/* Niños */}
+          <Card className="shadow-md border-none">
+            <CardContent className="p-4 space-y-2">
+              <p className="text-sm text-slate-600">Cantidad de Niños</p>
+              <p className="text-lg font-semibold text-slate-900">
+                {session.children_count || 1} { (session.children_count || 1) === 1 ? 'niño' : 'niños'}
               </p>
             </CardContent>
           </Card>

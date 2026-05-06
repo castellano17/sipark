@@ -96,8 +96,8 @@ export function EquipmentInventory() {
         status: d.status === "active" ? "Activo" : d.status === "maintenance" ? "En Mantenimiento" : "Inactivo"
       })),
       summary: [
-        { label: "Total Registros", value: summaryData.totalItems },
-        { label: "Equipos en Mantenimiento", value: summaryData.maintenanceCount },
+        { label: "Total Tipos de Equipo", value: String(summaryData.totalItems) },
+        { label: "Equipos en Mantenimiento", value: String(summaryData.maintenanceCount) },
       ],
     };
   };
@@ -114,6 +114,14 @@ export function EquipmentInventory() {
     { value: "loss", label: "Baja / Destruido / Pérdida", color: "text-red-600" },
     { value: "damaged", label: "En Mantenimiento", color: "text-orange-600" },
   ];
+
+  const getAdjustmentTypeLabel = (type: string) => {
+    if (type === "in") return "Alta / Entrada";
+    if (type === "loss") return "Baja / Pérdida";
+    if (type === "damaged") return "Averiado / Mantenimiento";
+    if (type === "out") return "Salida / Uso";
+    return type;
+  };
 
   useEffect(() => {
     loadData();
@@ -575,8 +583,8 @@ export function EquipmentInventory() {
                         <td className="px-4 py-2 text-gray-500">
                           {new Date(log.created_at).toLocaleString()}
                         </td>
-                        <td className="px-4 py-2 font-medium capitalize">
-                          {log.adjustment_type}
+                        <td className="px-4 py-2 font-medium">
+                          {getAdjustmentTypeLabel(log.adjustment_type)}
                         </td>
                         <td className={`px-4 py-2 text-right font-bold ${log.adjustment_type === 'in' ? 'text-green-600' : 'text-red-500'}`}>
                           {log.adjustment_type === 'in' ? '+' : '-'}{log.quantity}

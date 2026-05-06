@@ -1,10 +1,18 @@
-import React from "react";
+import React, { useState } from "react";
 import { Card, CardContent } from "./ui/card";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
-import { LogOut, Pause, Eye } from "lucide-react";
+import { LogOut, Pause, Eye, X } from "lucide-react";
 import { useTimer, TimerStatus } from "@/hooks/useTimer";
 import { useNotification } from "@/hooks/useNotification";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "./ui/dialog";
 
 interface TimerCardProps {
   id: number;
@@ -18,6 +26,10 @@ interface TimerCardProps {
   isPaused?: boolean;
   isPending?: boolean;
   onStartTimer?: (id: number) => void;
+  onDelete?: (id: number) => void;
+  childrenCount?: number;
+  pauseStartTime?: string;
+  enableExtraTimeCharge?: boolean;
 }
 
 export const TimerCard: React.FC<TimerCardProps> = ({
@@ -32,8 +44,13 @@ export const TimerCard: React.FC<TimerCardProps> = ({
   isPaused = false,
   isPending = false,
   onStartTimer,
+  onDelete,
+   childrenCount = 1,
+  pauseStartTime,
+  enableExtraTimeCharge = true,
 }) => {
   const { warning } = useNotification();
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const handleExpire = () => {
     warning(`¡Tiempo vencido para ${clientName}!`, 6000);
@@ -45,12 +62,14 @@ export const TimerCard: React.FC<TimerCardProps> = ({
     handleExpire,
     isPaused,
     isPending,
+    pauseStartTime,
   );
 
   const getStatusStyles = (
     status: TimerStatus,
     isPaused: boolean,
     isPending: boolean,
+    enableExtraTimeCharge: boolean,
   ) => {
     if (isPending) {
       return {
@@ -91,25 +110,36 @@ export const TimerCard: React.FC<TimerCardProps> = ({
         };
       case "expired":
         return {
-          borderColor: "border-rose-500",
-          bgColor: "bg-rose-50",
-          indicatorColor: "bg-rose-500",
-          badgeColor: "bg-rose-100 text-rose-800",
-          badgeText: "Vencido",
+          borderColor: enableExtraTimeCharge ? "border-rose-500" : "border-blue-400",
+          bgColor: enableExtraTimeCharge ? "bg-rose-50" : "bg-blue-50",
+          indicatorColor: enableExtraTimeCharge ? "bg-rose-500" : "bg-blue-400",
+          badgeColor: enableExtraTimeCharge ? "bg-rose-100 text-rose-800" : "bg-blue-100 text-blue-800",
+          badgeText: enableExtraTimeCharge ? "Vencido" : "Tiempo Cumplido",
         };
     }
   };
 
-  const styles = getStatusStyles(status, isPaused, isPending);
+  const styles = getStatusStyles(status, isPaused, isPending, enableExtraTimeCharge);
 
   return (
     <Card
-      className={`shadow-md border-2 ${styles.borderColor} ${styles.bgColor} overflow-hidden hover:shadow-lg transition-shadow`}
+      className={`relative shadow-md border-2 ${styles.borderColor} ${styles.bgColor} overflow-hidden hover:shadow-lg transition-shadow`}
     >
       {/* Indicador superior */}
       <div className={`h-1 ${styles.indicatorColor}`} />
 
-      <CardContent className="p-4 space-y-3">
+      {/* Botón para eliminar */}
+      {onDelete && (
+        <button
+          onClick={() => setShowDeleteConfirm(true)}
+          className="absolute top-2 right-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 p-1 rounded-md transition-colors"
+          title="Eliminar tarjeta"
+        >
+          <X className="w-5 h-5" />
+        </button>
+      )}
+
+      <CardContent className="p-4 space-y-3 pt-6">
         {/* Header */}
         <div className="flex items-start justify-between gap-2">
           <div className="flex-1 min-w-0">
@@ -117,7 +147,7 @@ export const TimerCard: React.FC<TimerCardProps> = ({
               {clientName}
             </h3>
             <p className="text-xs text-slate-600 mt-1">
-              Ticket #{ticketNumber}
+              Ticket #{ticketNumber} • {childrenCount} {childrenCount === 1 ? 'niño' : 'niños'}
             </p>
           </div>
           <Badge
@@ -133,7 +163,7 @@ export const TimerCard: React.FC<TimerCardProps> = ({
             className="text-3xl sm:text-4xl font-bold font-mono text-slate-900"
             style={{ fontFamily: "'JetBrains Mono', monospace" }}
           >
-            {isPending ? "00:00:00" : isPaused ? "PAUSADA" : formattedTime}
+            {isPending ? "00:00:00" : formattedTime}
           </div>
           <div className="text-xs sm:text-sm text-slate-600 mt-2">
             {isPending ? (
@@ -196,6 +226,38 @@ export const TimerCard: React.FC<TimerCardProps> = ({
           )}
         </div>
       </CardContent>
+
+      <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-rose-600">
+              <X className="w-5 h-5" />
+              Eliminar Tarjeta
+            </DialogTitle>
+            <DialogDescription>
+              ¿Estás seguro de que deseas eliminar la sesión de <span className="font-semibold text-slate-900">{clientName}</span>? Esta acción no se puede deshacer.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="mt-4 gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              onClick={() => setShowDeleteConfirm(false)}
+            >
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              className="bg-rose-600 hover:bg-rose-700 text-white"
+              onClick={() => {
+                setShowDeleteConfirm(false);
+                if (onDelete) onDelete(id);
+              }}
+            >
+              Sí, eliminar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 };

@@ -1,3 +1,4 @@
+// ...existing code...
 const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("electron", {
@@ -5,6 +6,8 @@ contextBridge.exposeInMainWorld("electron", {
 });
 
 contextBridge.exposeInMainWorld("api", {
+  registerDiscountMembershipUse: (clientMembershipId, discountAmount) =>
+    ipcRenderer.invoke("api:registerDiscountMembershipUse", { clientMembershipId, discountAmount }),
   // Clients
   getClients: () => ipcRenderer.invoke("api:getClients"),
   createClient: (
@@ -65,8 +68,14 @@ contextBridge.exposeInMainWorld("api", {
       durationMinutes,
     }),
   getActiveSessions: () => ipcRenderer.invoke("api:getActiveSessions"),
+  deleteSession: (sessionId) =>
+    ipcRenderer.invoke("api:deleteSession", sessionId),
   endSession: (sessionId, finalPrice) =>
     ipcRenderer.invoke("api:endSession", { sessionId, finalPrice }),
+  pauseSession: (sessionId) =>
+    ipcRenderer.invoke("api:pauseSession", sessionId),
+  resumeSession: (sessionId) =>
+    ipcRenderer.invoke("api:resumeSession", sessionId),
   updateSessionPaidStatus: (sessionId, isPaid) =>
     ipcRenderer.invoke("api:updateSessionPaidStatus", { sessionId, isPaid }),
 
@@ -127,6 +136,7 @@ contextBridge.exposeInMainWorld("api", {
 
   // Sales
   getSales: (limit) => ipcRenderer.invoke("api:getSales", limit),
+  cancelSale: (saleId, userId, reason) => ipcRenderer.invoke("api:cancelSale", saleId, userId, reason),
 
   // Stats
   getDailyStats: () => ipcRenderer.invoke("api:getDailyStats"),
@@ -442,7 +452,7 @@ contextBridge.exposeInMainWorld("api", {
 
   // Memberships
   getMemberships: () => ipcRenderer.invoke("api:getMemberships"),
-  createMembership: (name, description, price, durationDays, autoRenew, isActive, totalHours) =>
+  createMembership: (name, description, price, durationDays, autoRenew, isActive, totalHours, discountPercentage) =>
     ipcRenderer.invoke("api:createMembership", {
       name,
       description,
@@ -450,9 +460,10 @@ contextBridge.exposeInMainWorld("api", {
       durationDays,
       autoRenew,
       isActive,
-      totalHours
+      totalHours,
+      discountPercentage
     }),
-  updateMembership: (id, name, description, price, durationDays, autoRenew, isActive, totalHours) =>
+  updateMembership: (id, name, description, price, durationDays, autoRenew, isActive, totalHours, discountPercentage) =>
     ipcRenderer.invoke("api:updateMembership", {
       id,
       name,
@@ -461,7 +472,8 @@ contextBridge.exposeInMainWorld("api", {
       durationDays,
       autoRenew,
       isActive,
-      totalHours
+      totalHours,
+      discountPercentage
     }),
   deleteMembership: (id) => ipcRenderer.invoke("api:deleteMembership", { id }),
 
@@ -580,8 +592,9 @@ contextBridge.exposeInMainWorld("api", {
   rechargeNfcCard: (data) => ipcRenderer.invoke("api:rechargeNfcCard", data),
   chargeNfcEntry: (data) => ipcRenderer.invoke("api:chargeNfcEntry", data),
   refundNfcCard: (data) => ipcRenderer.invoke("api:refundNfcCard", data),
-  getNfcTransactions: (clientMembershipId) => 
+  getNfcTransactions: (clientMembershipId) =>
     ipcRenderer.invoke("api:getNfcTransactions", clientMembershipId),
+  checkNfcCardAvailable: (uid) => ipcRenderer.invoke("api:checkNfcCardAvailable", uid),
 
   // NFC Hardware Integration
   getHidDevices: () => ipcRenderer.invoke("api:getHidDevices"),
@@ -656,6 +669,8 @@ contextBridge.exposeInMainWorld("api", {
     ipcRenderer.invoke("pdf:generateMembershipPDF", pdfData),
   generateReservationPDF: (reservationData) =>
     ipcRenderer.invoke("pdf:generateReservationPDF", reservationData),
+  generateReservationInvoicePDF: (reservationData) =>
+    ipcRenderer.invoke("pdf:generateReservationInvoicePDF", reservationData),
   generateQuotationPDF: (quotationData) =>
     ipcRenderer.invoke("pdf:generateQuotationPDF", quotationData),
 
@@ -728,4 +743,8 @@ contextBridge.exposeInMainWorld("api", {
     ipcRenderer.invoke("api:updateWaiterOrderStatus", data),
   deleteWaiterOrder: (orderId) =>
     ipcRenderer.invoke("api:deleteWaiterOrder", orderId),
+
+  // Debug - USB Devices
+  getUsbDevicesDebug: () => ipcRenderer.invoke("api:getUsbDevicesDebug"),
+  getConnectedDevices: () => ipcRenderer.invoke("api:getConnectedDevices"),
 });

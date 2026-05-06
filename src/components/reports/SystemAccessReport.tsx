@@ -44,8 +44,7 @@ export function SystemAccessReport({ onBack }: SystemAccessReportProps) {
     try {
       const result = await (window as any).api.getUsers();
       setUsers(result || []);
-    } catch (err) {
-    }
+    } catch (err) {}
   };
 
   const loadReport = async () => {
@@ -70,36 +69,35 @@ export function SystemAccessReport({ onBack }: SystemAccessReportProps) {
       return;
     }
 
+    const columns = [
+      { header: "Fecha", key: "created_at", width: 20, format: "datetime" },
+      { header: "Usuario", key: "username", width: 20 },
+      { header: "Nombre", key: "full_name", width: 25 },
+      { header: "Rol", key: "role", width: 15 },
+      { header: "Acción", key: "action", width: 20 },
+      { header: "Detalles", key: "details", width: 30 },
+      { header: "IP", key: "ip_address", width: 15 },
+    ];
+
+    const exportData = data.accesses.map((access: any) => ({
+      created_at: access.created_at,
+      username: access.username,
+      full_name: `${access.first_name} ${access.last_name}`,
+      role: access.role,
+      action: access.action,
+      details: access.details || "-",
+      ip_address: access.ip_address || "-",
+    }));
+
     const exportOptions = {
       title: "Reporte de Accesos al Sistema",
-      subtitle: `Período: ${new Date(startDate).toLocaleDateString()} - ${new Date(endDate).toLocaleDateString()}`,
-      filename: "accesos-sistema",
-      columns: [
-        {
-          header: "Fecha",
-          key: "created_at",
-          width: 20,
-          format: "datetime" as const,
-        },
-        { header: "Usuario", key: "username", width: 20 },
-        { header: "Nombre", key: "full_name", width: 25 },
-        { header: "Rol", key: "role", width: 15 },
-        { header: "Acción", key: "action", width: 20 },
-        { header: "Detalles", key: "details", width: 30 },
-        { header: "IP", key: "ip_address", width: 15 },
-      ],
-      data: data.accesses.map((access: any) => ({
-        created_at: access.created_at,
-        username: access.username,
-        full_name: `${access.first_name} ${access.last_name}`,
-        role: access.role,
-        action: access.action,
-        details: access.details || "-",
-        ip_address: access.ip_address || "-",
-      })),
+      subtitle: `Del ${startDate} al ${endDate}`,
+      filename: `accesos-sistema-${startDate}-${endDate}`,
+      columns,
+      data: exportData,
       summary: [
-        { label: "Total Accesos", value: data.totals.total_accesses },
-        { label: "Usuarios Únicos", value: data.totals.unique_users },
+        { label: "Total Accesos", value: data.totals?.total_accesses || 0 },
+        { label: "Usuarios Únicos", value: data.totals?.unique_users || 0 },
       ],
     };
 

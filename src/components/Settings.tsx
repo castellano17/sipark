@@ -29,6 +29,7 @@ import {
   CheckCircle,
   RefreshCw,
   Copy,
+  AlertTriangle,
 } from "lucide-react";
 import { useDatabase } from "@/hooks/useDatabase";
 import { useNotification } from "@/hooks/useNotification";
@@ -41,6 +42,7 @@ export const Settings: React.FC = () => {
   // Modales
   const [showEmailModal, setShowEmailModal] = useState(false);
   const [showGDriveModal, setShowGDriveModal] = useState(false);
+  const [showClearDbModal, setShowClearDbModal] = useState(false);
 
   // Empresa
   const [systemName, setSystemName] = useState("SIPARK");
@@ -64,8 +66,11 @@ export const Settings: React.FC = () => {
   const [extraMinutePrice, setExtraMinutePrice] = useState("1.00");
   const [nfcCustomMessage, setNfcCustomMessage] = useState("¡Bienvenido a SIPARK!");
   const [nfcSystemMode, setNfcSystemMode] = useState("production");
+  const [membershipMode, setMembershipMode] = useState<"ventas" | "descuentos">("ventas");
   const [nfcAlertDuration, setNfcAlertDuration] = useState("5");
   const [receiptCopies, setReceiptCopies] = useState("1"); // Número de copias de recibo
+  const [customerDisplayEnabled, setCustomerDisplayEnabled] = useState(true);
+  const [enableExtraTimeCharge, setEnableExtraTimeCharge] = useState(true);
 
   // Contabilidad
   const [enableTax, setEnableTax] = useState(false);
@@ -232,6 +237,10 @@ export const Settings: React.FC = () => {
             case "nfc_system_mode":
               setNfcSystemMode(setting.value);
               break;
+            case "membership_mode":
+              if (setting.value === "descuentos") setMembershipMode("descuentos");
+              else setMembershipMode("ventas");
+              break;
             case "nfc_alert_duration":
               setNfcAlertDuration(setting.value);
               break;
@@ -240,6 +249,12 @@ export const Settings: React.FC = () => {
               break;
             case "receipt_copies":
               setReceiptCopies(setting.value || "1");
+              break;
+            case "customer_display_enabled":
+              setCustomerDisplayEnabled(setting.value !== "false");
+              break;
+            case "enable_extra_time_charge":
+              setEnableExtraTimeCharge(setting.value !== "false");
               break;
             case "enable_tax":
               setEnableTax(setting.value === "true");
@@ -440,8 +455,11 @@ export const Settings: React.FC = () => {
       await setSetting("extra_minute_price", extraMinutePrice.toString());
       await setSetting("nfc_custom_message", nfcCustomMessage);
       await setSetting("nfc_system_mode", nfcSystemMode);
+      await setSetting("membership_mode", membershipMode);
       await setSetting("nfc_alert_duration", nfcAlertDuration.toString());
       await setSetting("receipt_copies", receiptCopies);
+      await setSetting("customer_display_enabled", customerDisplayEnabled.toString());
+      await setSetting("enable_extra_time_charge", enableExtraTimeCharge.toString());
       success("Configuración de operaciones guardada correctamente");
     } catch (err) {
       errorNotification("Error al guardar la configuración");
@@ -901,7 +919,8 @@ export const Settings: React.FC = () => {
                       step="0.01"
                       value={extraMinutePrice}
                       onChange={(e) => setExtraMinutePrice(e.target.value)}
-                      className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      disabled={!enableExtraTimeCharge}
+                      className={`w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${!enableExtraTimeCharge ? 'bg-slate-100 opacity-50 cursor-not-allowed' : ''}`}
                       placeholder="1.00"
                     />
                     <p className="text-xs text-slate-500 mt-1 italic">
@@ -943,27 +962,118 @@ export const Settings: React.FC = () => {
                       Tiempo que se mostrará antes de volver la publicidad.
                     </p>
                   </div>
+                  <div className="col-span-1 md:col-span-2 flex items-center justify-between p-3 border border-slate-200 rounded-lg">
+                    <div>
+                      <p className="font-semibold text-slate-900">
+                        Habilitar Pantalla Cliente (TV)
+                      </p>
+                      <p className="text-sm text-slate-600">
+                        Mostrar publicidad y alertas en el monitor secundario (Requiere reiniciar)
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setCustomerDisplayEnabled(!customerDisplayEnabled)}
+                      className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors ${
+                        customerDisplayEnabled ? "bg-blue-600" : "bg-slate-300"
+                      }`}
+                    >
+                      <span
+                        className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform ${
+                          customerDisplayEnabled ? "translate-x-7" : "translate-x-1"
+                        }`}
+                      />
+                    </button>
+                  </div>
+
+                  <div className="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-200">
+                    <div>
+                      <p className="font-semibold text-slate-900">
+                        Cobrar Tiempo Extra
+                      </p>
+                      <p className="text-sm text-slate-600">
+                        Si se deshabilita, no se cobrará cargo adicional aunque se pase el tiempo del paquete.
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setEnableExtraTimeCharge(!enableExtraTimeCharge)}
+                      className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors ${
+                        enableExtraTimeCharge ? "bg-blue-600" : "bg-slate-300"
+                      }`}
+                    >
+                      <span
+                        className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform ${
+                          enableExtraTimeCharge ? "translate-x-7" : "translate-x-1"
+                        }`}
+                      />
+                    </button>
+                  </div>
                 </div>
                 
                 <div className="mt-4 border-t border-slate-100 pt-4">
-                  <label className="block text-sm font-semibold text-slate-900 mb-2">
-                     Modo de Lector NFC
-                  </label>
-                  <div className="flex flex-col gap-2">
-                    <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
-                      <input type="radio" name="nfcMode" value="production" checked={nfcSystemMode === "production"} onChange={(e) => setNfcSystemMode(e.target.value)} className="w-4 h-4 text-blue-600" />
-                      <div>
-                        <p className="font-semibold">Modo Producción</p>
-                        <p className="text-xs text-slate-500">Usa Hardware USB Real (Node-HID). Previene bloqueos de teclado.</p>
+                  <div className="flex items-start justify-between gap-6 flex-wrap">
+                    {/* Modo de Lector NFC */}
+                    <div className="flex-1 min-w-[220px]">
+                      <label className="block text-sm font-semibold text-slate-900 mb-2">
+                         Modo de Lector NFC
+                      </label>
+                      <div className="flex flex-col gap-2">
+                        <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+                          <input type="radio" name="nfcMode" value="production" checked={nfcSystemMode === "production"} onChange={(e) => setNfcSystemMode(e.target.value)} className="w-4 h-4 text-blue-600" />
+                          <div>
+                            <p className="font-semibold">Modo Producción</p>
+                            <p className="text-xs text-slate-500">Usa Hardware USB Real (Node-HID). Previene bloqueos de teclado.</p>
+                          </div>
+                        </label>
+                        <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer mt-2">
+                          <input type="radio" name="nfcMode" value="development" checked={nfcSystemMode === "development"} onChange={(e) => setNfcSystemMode(e.target.value)} className="w-4 h-4 text-blue-600" />
+                          <div>
+                            <p className="font-semibold">Modo Desarrollo</p>
+                            <p className="text-xs text-slate-500">Muestra un botón flotante en POS para simular inserción manual de UIDs NFC.</p>
+                          </div>
+                        </label>
                       </div>
-                    </label>
-                    <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer mt-2">
-                      <input type="radio" name="nfcMode" value="development" checked={nfcSystemMode === "development"} onChange={(e) => setNfcSystemMode(e.target.value)} className="w-4 h-4 text-blue-600" />
-                      <div>
-                        <p className="font-semibold">Modo Desarrollo</p>
-                        <p className="text-xs text-slate-500">Muestra un botón flotante en POS para simular inserción manual de UIDs NFC.</p>
+                    </div>
+
+                    {/* Modo de Membresías */}
+                    <div className="flex-1 min-w-[220px]">
+                      <label className="block text-sm font-semibold text-slate-900 mb-2">
+                        Membresías por
+                      </label>
+                      <p className="text-xs text-slate-500 mb-3">
+                        Define si las membresías aplican un cobro por ventas o un descuento sobre el precio.
+                      </p>
+                      <div
+                        className="flex items-center gap-3 cursor-pointer select-none"
+                        onClick={async () => {
+                          const newMode = membershipMode === "ventas" ? "descuentos" : "ventas";
+                          setMembershipMode(newMode);
+                          try {
+                            setLoading(true);
+                            await setSetting("membership_mode", newMode);
+                            success("Modo de membresía guardado automáticamente");
+                          } catch (err) {
+                            errorNotification("Error al guardar el modo de membresía");
+                          } finally {
+                            setLoading(false);
+                          }
+                        }}
+                      >
+                        <span className={`text-sm font-semibold transition-colors ${membershipMode === "ventas" ? "text-blue-600" : "text-slate-400"}`}>
+                          Ventas
+                        </span>
+                        <div className={`relative w-12 h-6 rounded-full transition-colors duration-200 ${membershipMode === "descuentos" ? "bg-green-500" : "bg-blue-500"}`}>
+                          <div className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-all duration-200 ${membershipMode === "descuentos" ? "left-7" : "left-1"}`} />
+                        </div>
+                        <span className={`text-sm font-semibold transition-colors ${membershipMode === "descuentos" ? "text-green-600" : "text-slate-400"}`}>
+                          Descuentos
+                        </span>
                       </div>
-                    </label>
+                      <p className="text-xs text-slate-500 mt-2 italic">
+                        {membershipMode === "ventas"
+                          ? "La membresía genera una venta al usarse (cobra el precio configurado)."
+                          : "La membresía aplica un descuento porcentual sobre el precio normal."}
+                      </p>
+                    </div>
                   </div>
                 </div>
 
@@ -1456,7 +1566,7 @@ export const Settings: React.FC = () => {
                 <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
                   <p className="text-xs text-blue-800">
                     💡 <strong>Tip:</strong> Los respaldos se guardan
-                    automáticamente en formato .db y pueden ser restaurados en
+                    automáticamente en formato .sql y pueden ser restaurados en
                     cualquier momento.
                   </p>
                 </div>
@@ -1688,27 +1798,7 @@ export const Settings: React.FC = () => {
                     del sistema.
                   </p>
                   <Button
-                    onClick={async () => {
-                      if (
-                        window.confirm(
-                          "⚠️ ¿Estás COMPLETAMENTE SEGURO?\n\nEsta acción eliminará TODOS los datos:\n• Productos y servicios\n• Ventas e historial\n• Clientes\n• Proveedores y compras\n• Inventario y ajustes\n• Cajas y movimientos\n• Sesiones activas\n\nSolo se mantendrá la configuración del sistema.\n\n¿Deseas continuar?",
-                        )
-                      ) {
-                        try {
-                          setLoading(true);
-                          await (window as any).api.clearAllData();
-                          success(
-                            "Base de datos limpiada exitosamente. Reinicia la aplicación.",
-                          );
-                        } catch (err) {
-                          errorNotification(
-                            "Error al limpiar la base de datos",
-                          );
-                        } finally {
-                          setLoading(false);
-                        }
-                      }
-                    }}
+                    onClick={() => setShowClearDbModal(true)}
                     disabled={loading}
                     className="w-full bg-rose-600 hover:bg-rose-700 text-white font-semibold gap-2"
                   >
@@ -1716,6 +1806,63 @@ export const Settings: React.FC = () => {
                     {loading ? "Limpiando..." : "Limpiar Base de Datos"}
                   </Button>
                 </div>
+
+                {/* Modal de Confirmación para Limpiar Base de Datos */}
+                <Dialog open={showClearDbModal} onOpenChange={setShowClearDbModal}>
+                  <DialogContent className="sm:max-w-[500px] border-rose-100">
+                    <DialogHeader>
+                      <DialogTitle className="text-rose-700 flex items-center gap-2">
+                        <AlertTriangle className="w-5 h-5" />
+                        ¿Confirmar limpieza total?
+                      </DialogTitle>
+                      <DialogDescription className="text-slate-600 pt-2">
+                        Esta acción es <strong className="text-rose-700">irreversible</strong>. 
+                        Se eliminarán todos los registros de:
+                        <ul className="list-disc list-inside mt-2 space-y-1 text-xs">
+                          <li>Productos, servicios y stock</li>
+                          <li>Historial de ventas y facturas</li>
+                          <li>Clientes, proveedores y compras</li>
+                          <li>Reservaciones y sesiones activas</li>
+                          <li>Movimientos de caja y arqueos</li>
+                        </ul>
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="bg-rose-50 p-3 rounded-md text-xs text-rose-800 border border-rose-100">
+                      <strong>Nota:</strong> Solo se conservará la configuración del sistema (logo, nombre de empresa, configuración de red, etc).
+                    </div>
+                    <DialogFooter className="gap-2 sm:gap-0">
+                      <Button
+                        variant="outline"
+                        onClick={() => setShowClearDbModal(false)}
+                        disabled={loading}
+                      >
+                        Cancelar
+                      </Button>
+                      <Button
+                        className="bg-rose-600 hover:bg-rose-700 text-white"
+                        onClick={async () => {
+                          try {
+                            setLoading(true);
+                            const result = await (window as any).api.clearAllData();
+                            if (result.success) {
+                              success("Base de datos limpiada exitosamente. Reinicia la aplicación.");
+                              setShowClearDbModal(false);
+                            } else {
+                              errorNotification(result.error || "Error al limpiar la base de datos");
+                            }
+                          } catch (err: any) {
+                            errorNotification(err.message || "Error al limpiar la base de datos");
+                          } finally {
+                            setLoading(false);
+                          }
+                        }}
+                        disabled={loading}
+                      >
+                        {loading ? "Limpiando..." : "Sí, eliminar todo"}
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
               </CardContent>
             </Card>
 

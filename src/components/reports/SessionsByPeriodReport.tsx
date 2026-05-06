@@ -51,8 +51,7 @@ export function SessionsByPeriodReport({
       const result = await window.api.getProductsServices();
       const timePackages = result.filter((p: any) => p.type === "time");
       setPackages(timePackages);
-    } catch (err) {
-    }
+    } catch (err) {}
   };
 
   const loadReport = async () => {
@@ -392,20 +391,32 @@ export function SessionsByPeriodReport({
           <Card className="p-6">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-semibold text-lg">Detalle de Sesiones</h3>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2 min-w-[220px]">
                 <Button
-                        className="h-8 w-8 p-0" variant="outline" size="sm" onClick={handleExportExcel}>
-                  <FileDown className="w-4 h-4 mr-2" />
+                  variant="outline"
+                  size="sm"
+                  className="flex items-center gap-2 min-w-[80px]"
+                  onClick={handleExportExcel}
+                >
+                  <FileDown className="w-4 h-4" />
                   Excel
                 </Button>
                 <Button
-                        className="h-8 w-8 p-0" variant="outline" size="sm" onClick={handleExportPDF}>
-                  <FileDown className="w-4 h-4 mr-2" />
+                  variant="outline"
+                  size="sm"
+                  className="flex items-center gap-2 min-w-[80px]"
+                  onClick={handleExportPDF}
+                >
+                  <FileDown className="w-4 h-4" />
                   PDF
                 </Button>
                 <Button
-                        className="h-8 w-8 p-0" variant="outline" size="sm" onClick={handlePrint}>
-                  <Printer className="w-4 h-4 mr-2" />
+                  variant="outline"
+                  size="sm"
+                  className="flex items-center gap-2 min-w-[90px]"
+                  onClick={handlePrint}
+                >
+                  <Printer className="w-4 h-4" />
                   Imprimir
                 </Button>
               </div>

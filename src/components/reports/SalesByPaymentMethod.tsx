@@ -281,22 +281,31 @@ export function SalesByPaymentMethod({ onBack }: SalesByPaymentMethodProps) {
             <Card className="p-6">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="font-semibold text-lg">Detalle por Método</h3>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2 min-w-[220px]">
                   <Button
                     variant="outline"
                     size="sm"
+                    className="min-w-[90px] px-3"
                     onClick={handleExportExcel}
                   >
                     <FileDown className="w-4 h-4 mr-2" />
                     Excel
                   </Button>
                   <Button
-                        className="h-8 w-8 p-0" variant="outline" size="sm" onClick={handleExportPDF}>
+                    variant="outline"
+                    size="sm"
+                    className="min-w-[90px] px-3"
+                    onClick={handleExportPDF}
+                  >
                     <FileDown className="w-4 h-4 mr-2" />
                     PDF
                   </Button>
                   <Button
-                        className="h-8 w-8 p-0" variant="outline" size="sm" onClick={handlePrint}>
+                    variant="outline"
+                    size="sm"
+                    className="min-w-[110px] px-3"
+                    onClick={handlePrint}
+                  >
                     <Printer className="w-4 h-4 mr-2" />
                     Imprimir
                   </Button>

@@ -10,6 +10,10 @@ import {
   FileText,
   Printer,
   FileDown,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
 } from "lucide-react";
 import { Card } from "./ui/card";
 import { Button } from "./ui/button";
@@ -27,7 +31,7 @@ interface Product {
   type: string;
   category: string;
   barcode: string;
-  stock: number;
+  stock: number | null;
 }
 
 interface Category {
@@ -72,13 +76,17 @@ export function Inventory() {
   const [adjustmentTypeFilter, setAdjustmentTypeFilter] =
     useState<string>("all");
   const [showAuditModal, setShowAuditModal] = useState(false);
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
   const { success, error } = useNotification();
   const { canEdit } = usePermissions();
   const { formatCurrency } = useCurrency();
   const { exportToExcel: exportExcel, exportToPDF, printReport } = useReportExport();
 
-  const totalValue = products.reduce((sum, p) => sum + p.price * p.stock, 0);
-  const totalItems = products.reduce((sum, p) => sum + p.stock, 0);
+  const totalValue = products.reduce((sum, p) => sum + p.price * (p.stock || 0), 0);
+  const totalItems = products.reduce((sum, p) => sum + (p.stock || 0), 0);
 
 
 
@@ -115,8 +123,13 @@ export function Inventory() {
 
   const loadProducts = async () => {
     try {
-      const data = await window.api.getInventoryProducts();
-      setProducts(data);
+      const data = await window.api.getProductsServices();
+      // Mostramos todo excepto servicios de tiempo/paquetes para no perder productos "legacy"
+      // o productos que aún no tienen el flag de requiere_stock activado
+      const physicalProducts = data.filter((p: any) => 
+        p.type !== "time" && p.type !== "package" || p.requires_stock == 1
+      );
+      setProducts(physicalProducts);
     } catch (err) {
       error("Error cargando inventario");
     }
@@ -238,7 +251,18 @@ export function Inventory() {
     }
   };
 
-  const getStockStatus = (stock: number) => {
+  const getStockStatus = (product: Product) => {
+    const stock = product.stock;
+    const type = product.type;
+    
+    // Si es producto de preparación y tiene stock 0 o nulo, es ilimitado
+    if ((stock === null || stock === 0) && ["food", "drink", "snack", "rental"].includes(type)) {
+      return { color: "text-blue-600", bg: "bg-blue-50", label: "Ilimitado" };
+    }
+    
+    if (stock === null || stock === undefined)
+      return { color: "text-blue-600", bg: "bg-blue-50", label: "Ilimitado" };
+
     if (stock === 0)
       return { color: "text-red-600", bg: "bg-red-50", label: "Agotado" };
     if (stock <= 5)
@@ -282,6 +306,17 @@ export function Inventory() {
 
     return matchesSearch && matchesType;
   });
+
+  // Pagination logic for products
+  const totalPages = Math.ceil(filteredProducts.length / itemsPerPage);
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentItems = filteredProducts.slice(indexOfFirstItem, indexOfLastItem);
+
+  // Reset to first page when search or category changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, selectedCategory]);
 
 
 
@@ -512,8 +547,9 @@ export function Inventory() {
                 </tr>
               </thead>
               <tbody className="divide-y">
-                {filteredProducts.map((product) => {
-                  const status = getStockStatus(product.stock);
+                {currentItems.map((product) => {
+                  const status = getStockStatus(product);
+                  const isUnlimited = (product.stock === null || (product.stock === 0 && ["food", "drink", "snack", "rental"].includes(product.type)));
                   const isEditingCategoryRow = editingCategory === product.id;
 
                   return (
@@ -589,8 +625,8 @@ export function Inventory() {
                         </span>
                       </td>
                       <td className="px-6 py-4 text-center">
-                        <span className="text-lg font-bold">
-                          {product.stock}
+                        <span className={`font-bold ${isUnlimited ? 'text-blue-600 italic text-sm' : 'text-lg'}`}>
+                          {isUnlimited ? "Ilimitado" : product.stock}
                         </span>
                       </td>
                       <td className="px-6 py-4">
@@ -629,6 +665,106 @@ export function Inventory() {
               </div>
             )}
           </div>
+
+          {/* Modern Pagination UI */}
+          {filteredProducts.length > 0 && (
+            <div className="px-6 py-4 bg-white border-t flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="text-sm text-gray-500">
+                Mostrando <span className="font-semibold text-gray-900">{indexOfFirstItem + 1}</span> a{" "}
+                <span className="font-semibold text-gray-900">
+                  {Math.min(indexOfLastItem, filteredProducts.length)}
+                </span>{" "}
+                de <span className="font-semibold text-gray-900">{filteredProducts.length}</span> productos
+              </div>
+              
+              <div className="flex items-center gap-2">
+                <div className="flex items-center mr-4">
+                  <span className="text-xs text-gray-500 mr-2">Filas por página:</span>
+                  <select 
+                    className="text-xs border rounded px-2 py-1 bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 min-w-[60px]"
+                    value={itemsPerPage}
+                    onChange={(e) => {
+                      setItemsPerPage(Number(e.target.value));
+                      setCurrentPage(1);
+                    }}
+                  >
+                    {[5, 10, 20, 50].map(val => (
+                      <option key={val} value={val}>{val}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(1)}
+                    disabled={currentPage === 1}
+                    className="h-8 w-8 p-0"
+                    title="Primera página"
+                  >
+                    <ChevronsLeft className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                    disabled={currentPage === 1}
+                    className="h-8 w-8 p-0"
+                    title="Anterior"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </Button>
+                  
+                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                    let pageNum;
+                    if (totalPages <= 5) {
+                      pageNum = i + 1;
+                    } else if (currentPage <= 3) {
+                      pageNum = i + 1;
+                    } else if (currentPage >= totalPages - 2) {
+                      pageNum = totalPages - 4 + i;
+                    } else {
+                      pageNum = currentPage - 2 + i;
+                    }
+                    
+                    return (
+                      <Button
+                        key={pageNum}
+                        variant={currentPage === pageNum ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setCurrentPage(pageNum)}
+                        className={`h-8 w-8 p-0 ${currentPage === pageNum ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600'}`}
+                      >
+                        {pageNum}
+                      </Button>
+                    );
+                  })}
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                    disabled={currentPage === totalPages}
+                    className="h-8 w-8 p-0"
+                    title="Siguiente"
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(totalPages)}
+                    disabled={currentPage === totalPages}
+                    className="h-8 w-8 p-0"
+                    title="Última página"
+                  >
+                    <ChevronsRight className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
         </Card>
       </div>
 

@@ -65,22 +65,48 @@ export function InventoryChangesReport({
       return;
     }
 
+    const columns = [
+      { header: "Fecha", key: "created_at", width: 20, format: "datetime" },
+      { header: "Producto", key: "product_name", width: 30 },
+      { header: "Código", key: "barcode", width: 15 },
+      { header: "Tipo", key: "adjustment_type", width: 12 },
+      { header: "Cantidad", key: "quantity", width: 10 },
+      { header: "Stock Anterior", key: "previous_stock", width: 15 },
+      { header: "Stock Nuevo", key: "new_stock", width: 15 },
+      { header: "Razón", key: "reason", width: 20 },
+      { header: "Usuario", key: "created_by", width: 20 },
+    ];
+
     const exportData = data.changes.map((change: any) => ({
-      Fecha: new Date(change.created_at).toLocaleString("es-ES"),
-      Producto: change.product_name,
-      Código: change.barcode || "-",
-      Tipo: change.adjustment_type === "increase" ? "Aumento" : "Disminución",
-      Cantidad: change.quantity,
-      "Stock Anterior": change.previous_stock,
-      "Stock Nuevo": change.new_stock,
-      Razón: change.reason,
-      Usuario: change.created_by || "-",
+      created_at: change.created_at,
+      product_name: change.product_name,
+      barcode: change.barcode || "-",
+      adjustment_type:
+        change.adjustment_type === "increase" ? "Aumento" : "Disminución",
+      quantity: change.quantity,
+      previous_stock: change.previous_stock,
+      new_stock: change.new_stock,
+      reason: change.reason,
+      created_by: change.created_by || "-",
     }));
 
+    const exportOptions = {
+      title: "Auditoría de Cambios en Inventario",
+      subtitle: `Del ${startDate} al ${endDate}`,
+      filename: `cambios-inventario-${startDate}-${endDate}`,
+      columns,
+      data: exportData,
+      summary: [
+        { label: "Total Ajustes", value: data.stats?.total_adjustments || 0 },
+        { label: "Aumentos", value: data.stats?.increase_count || 0 },
+        { label: "Disminuciones", value: data.stats?.decrease_count || 0 },
+      ],
+    };
+
     if (format === "excel") {
-      exportToExcel(exportData, "cambios-inventario");
+      exportToExcel(exportOptions);
     } else {
-      exportToPDF(exportData, "Reporte de Cambios en Inventario");
+      exportToPDF(exportOptions);
     }
   };
 
@@ -167,6 +193,26 @@ export function InventoryChangesReport({
 
       {data && (
         <>
+          <div className="flex gap-2 mb-4">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleExport("excel")}
+              className="flex items-center gap-1.5 whitespace-nowrap"
+            >
+              <FileDown className="w-4 h-4" />
+              Excel
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleExport("pdf")}
+              className="flex items-center gap-1.5 whitespace-nowrap"
+            >
+              <FileDown className="w-4 h-4" />
+              PDF
+            </Button>
+          </div>
           {/* Stats Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
             <Card className="p-6 bg-gradient-to-br from-blue-50 to-blue-100">

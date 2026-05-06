@@ -134,17 +134,36 @@ export default function NewClients({ onBack }: NewClientsProps) {
               <h3 className="text-lg font-semibold">Clientes Nuevos</h3>
               <Button
                 onClick={() =>
-                  exportToExcel(
-                    reportData.clients.map((c: any) => ({
-                      Cliente: c.name,
-                      Email: c.email || "N/A",
-                      Teléfono: c.phone || "N/A",
-                      "Fecha Registro": c.registration_date,
-                      "Primera Compra": c.first_purchase || "Sin compras",
-                      "Total Compras": c.total_purchases || 0,
-                      "Total Gastado": c.total_spent || 0,
-                    })),
-                  )
+                  exportToExcel({
+                    title: "Nuevos Clientes",
+                    filename: "nuevos_clientes",
+                    columns: [
+                      { header: "Cliente", key: "name" },
+                      { header: "Email", key: "email" },
+                      { header: "Teléfono", key: "phone" },
+                      {
+                        header: "Fecha Registro",
+                        key: "registration_date",
+                        format: "date",
+                      },
+                      {
+                        header: "Primera Compra",
+                        key: "first_purchase",
+                        format: "date",
+                      },
+                      {
+                        header: "Total Compras",
+                        key: "total_purchases",
+                        format: "number",
+                      },
+                      {
+                        header: "Total Gastado",
+                        key: "total_spent",
+                        format: "currency",
+                      },
+                    ],
+                    data: reportData.clients,
+                  })
                 }
                 variant="outline"
                 size="sm"

@@ -45,8 +45,7 @@ export function UserActivityReport({ onBack }: UserActivityReportProps) {
     try {
       const result = await (window as any).api.getUsers();
       setUsers(result || []);
-    } catch (err) {
-    }
+    } catch (err) {}
   };
 
   const loadReport = async () => {
@@ -72,19 +71,43 @@ export function UserActivityReport({ onBack }: UserActivityReportProps) {
       return;
     }
 
+    const columns = [
+      { header: "Fecha", key: "created_at", width: 20, format: "datetime" },
+      { header: "Usuario", key: "user_fullname", width: 30 },
+      { header: "Rol", key: "role", width: 15 },
+      { header: "Acción", key: "action", width: 20 },
+      { header: "Detalles", key: "details", width: 30 },
+      { header: "IP", key: "ip_address", width: 15 },
+    ];
+
     const exportData = data.activities.map((activity: any) => ({
-      Fecha: new Date(activity.created_at).toLocaleString("es-ES"),
-      Usuario: `${activity.first_name} ${activity.last_name} (${activity.username})`,
-      Rol: activity.role,
-      Acción: activity.action,
-      Detalles: activity.details || "-",
-      IP: activity.ip_address || "-",
+      created_at: activity.created_at,
+      user_fullname: `${activity.first_name} ${activity.last_name} (${activity.username})`,
+      role: activity.role,
+      action: activity.action,
+      details: activity.details || "-",
+      ip_address: activity.ip_address || "-",
     }));
 
+    const exportOptions = {
+      title: "Actividad de Usuarios",
+      subtitle: `Del ${startDate} al ${endDate}`,
+      filename: `actividad-usuarios-${startDate}-${endDate}`,
+      columns,
+      data: exportData,
+      summary: [
+        {
+          label: "Total Actividades",
+          value: data.stats?.total_activities || 0,
+        },
+        { label: "Usuarios Únicos", value: data.stats?.unique_users || 0 },
+      ],
+    };
+
     if (format === "excel") {
-      exportToExcel(exportData, "actividad-usuarios");
+      exportToExcel(exportOptions);
     } else {
-      exportToPDF(exportData, "Reporte de Actividad de Usuarios");
+      exportToPDF(exportOptions);
     }
   };
 

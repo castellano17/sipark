@@ -149,7 +149,14 @@ async function initializeApp() {
   }
 }
 
-function createWindow() {
+async function createWindow() {
+  const api = require('./src-electron/api.cjs');
+  let customerDisplayEnabled = true;
+  try {
+    const setting = await api.getSetting("customer_display_enabled");
+    if (setting === "false") customerDisplayEnabled = false;
+  } catch (e) {}
+
   mainWindow = new BrowserWindow({
     width: 1400,
     height: 900,
@@ -196,7 +203,7 @@ function createWindow() {
   const primaryDisplay = screen.getPrimaryDisplay();
   const externalDisplay = displays.find((display) => display.id !== primaryDisplay.id);
 
-  if (externalDisplay) {
+  if (externalDisplay && customerDisplayEnabled) {
     customerWindow = new BrowserWindow({
       x: externalDisplay.bounds.x,
       y: externalDisplay.bounds.y,
@@ -277,7 +284,7 @@ app.on("ready", async () => {
     }
 
     setupIpcHandlers();
-    createWindow();
+    await createWindow();
     
     // Iniciar listener de node-hid para el lector NFC Exclusivo
     nfcHid.startListening(mainWindow, customerWindow);
@@ -310,6 +317,12 @@ app.on("activate", () => {
 });
 
 // ============ IPC HANDLERS ============
+
+// Handler para registrar uso de descuento en membresía
+const { apiRegisterDiscountMembershipUse } = require('./src-electron/api.cjs');
+ipcMain.handle("api:registerDiscountMembershipUse", async (event, payload) => {
+  return await apiRegisterDiscountMembershipUse(payload.clientMembershipId, payload.discountAmount);
+});
 
 // Función para transmitir eventos a la pantalla secundaria
 ipcMain.handle("api:broadcastToCustomer", async (event, payload) => {
@@ -686,8 +699,17 @@ function setupIpcHandlers() {
     api.startSession(data.clientId, data.packageId, data.durationMinutes),
   );
   ipcMain.handle("api:getActiveSessions", () => api.getActiveSessions());
+  ipcMain.handle("api:deleteSession", (event, sessionId) =>
+    api.deleteSession(sessionId),
+  );
   ipcMain.handle("api:endSession", (event, data) =>
     api.endSession(data.sessionId, data.finalPrice),
+  );
+  ipcMain.handle("api:pauseSession", (event, sessionId) =>
+    api.pauseSession(sessionId),
+  );
+  ipcMain.handle("api:resumeSession", (event, sessionId) =>
+    api.resumeSession(sessionId),
   );
 
   // Products/Services
@@ -702,6 +724,7 @@ function setupIpcHandlers() {
       data.stock,
       data.durationMinutes,
       data.imagePath,
+      data.requiresStock,
     ),
   );
   ipcMain.handle("api:updateProductService", (event, data) =>
@@ -715,6 +738,7 @@ function setupIpcHandlers() {
       data.stock,
       data.durationMinutes,
       data.imagePath,
+      data.requiresStock,
     ),
   );
   ipcMain.handle("api:deleteProductService", (event, data) =>
@@ -734,6 +758,7 @@ function setupIpcHandlers() {
 
   // Sales
   ipcMain.handle("api:getSales", (event, limit) => api.getSales(limit));
+  ipcMain.handle("api:cancelSale", (event, saleId, userId, reason) => api.cancelSale(saleId, userId, reason));
 
   // NFC
   ipcMain.handle("api:getNfcCardByUid", (event, uid) => nfcApi.getNfcCardByUid(uid));
@@ -749,8 +774,11 @@ function setupIpcHandlers() {
   ipcMain.handle("api:refundNfcCard", (event, data) => 
     nfcApi.refundNfcCard(data.clientMembershipId, data.amount, data.reason, data.userId)
   );
-  ipcMain.handle("api:getNfcTransactions", (event, clientMembershipId) => 
+  ipcMain.handle("api:getNfcTransactions", (event, clientMembershipId) =>
     nfcApi.getNfcTransactions(clientMembershipId)
+  );
+  ipcMain.handle("api:checkNfcCardAvailable", (event, uid) =>
+    nfcApi.checkNfcCardAvailable(uid)
   );
   ipcMain.handle("api:applyBranding", () => applyBranding());
   
@@ -1203,6 +1231,7 @@ function setupIpcHandlers() {
       data.autoRenew,
       data.isActive,
       data.totalHours,
+      data.discountPercentage
     ),
   );
   ipcMain.handle("api:updateMembership", (event, data) =>
@@ -1215,6 +1244,7 @@ function setupIpcHandlers() {
       data.autoRenew,
       data.isActive,
       data.totalHours,
+      data.discountPercentage
     ),
   );
   ipcMain.handle("api:deleteMembership", (event, data) =>
@@ -1430,15 +1460,16 @@ function setupIpcHandlers() {
   ipcMain.handle("pdf:generateReservationPDF", async (event, reservationData) => {
     try {
       const filepath = await pdfGenerator.generateReservationPDF(reservationData);
-      
-      const printerMode = (await api.getSetting("printer_mode")) || "test";
-      if (printerMode === "real") {
-        const normalPrinter = await api.getSetting("normal_printer");
-        if (normalPrinter) {
-          await printerModule.printPDF(normalPrinter, filepath);
-        }
-      }
+      shell.openPath(filepath);
+      return filepath;
+    } catch (error) {
+      throw error;
+    }
+  });
 
+  ipcMain.handle("pdf:generateReservationInvoicePDF", async (event, reservationData) => {
+    try {
+      const filepath = await pdfGenerator.generateReservationInvoicePDF(reservationData);
       shell.openPath(filepath);
       return filepath;
     } catch (error) {
@@ -1450,14 +1481,6 @@ function setupIpcHandlers() {
     try {
       const filepath = await pdfGenerator.generateQuotationPDF(quotationData);
       
-      const printerMode = (await api.getSetting("printer_mode")) || "test";
-      if (printerMode === "real") {
-        const normalPrinter = await api.getSetting("normal_printer");
-        if (normalPrinter) {
-          await printerModule.printPDF(normalPrinter, filepath);
-        }
-      }
-
       shell.openPath(filepath);
       return filepath;
     } catch (error) {

@@ -41,12 +41,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [expandedMenus, setExpandedMenus] = useState<string[]>(["operaciones"]);
   const [systemName, setSystemName] = useState("SIPARK");
   const [systemLogo, setSystemLogo] = useState("");
+  const [membershipMode, setMembershipMode] = useState<"ventas" | "descuentos">("ventas");
   const { getSetting } = useDatabase();
 
   useEffect(() => {
     loadSystemName();
     const interval = setInterval(loadSystemName, 5000); 
     return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    getSetting("membership_mode").then((val) => {
+      if (val === "descuentos") setMembershipMode("descuentos");
+      else setMembershipMode("ventas");
+    }).catch(() => {});
   }, []);
 
   const loadSystemName = async () => {
@@ -131,12 +139,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
           icon: <CreditCard className="w-4 h-4" />,
           path: "/operaciones/vender-membresia",
         },
+        ...(membershipMode === "ventas" ? [
         {
           id: "membresias-renovar",
           label: "Renovar Membresía",
           icon: <Package className="w-4 h-4" />,
           path: "/operaciones/renovar-membresia",
         },
+        ] : []),
         {
           id: "membresias-gestionar",
           label: "Gestionar Membresías",

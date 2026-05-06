@@ -46,8 +46,7 @@ export function PriceChangesReport({ onBack }: PriceChangesReportProps) {
     try {
       const result = await (window as any).api.getInventoryProducts();
       setProducts(result || []);
-    } catch (err) {
-    }
+    } catch (err) {}
   };
 
   const loadReport = async () => {
@@ -72,21 +71,60 @@ export function PriceChangesReport({ onBack }: PriceChangesReportProps) {
       return;
     }
 
+    const columns = [
+      { header: "Fecha", key: "created_at", width: 20, format: "datetime" },
+      { header: "Producto", key: "product_name", width: 30 },
+      {
+        header: "Precio Anterior",
+        key: "old_price",
+        width: 15,
+        format: "currency",
+      },
+      {
+        header: "Precio Nuevo",
+        key: "new_price",
+        width: 15,
+        format: "currency",
+      },
+      {
+        header: "Diferencia",
+        key: "price_difference",
+        width: 12,
+        format: "currency",
+      },
+      { header: "% Cambio", key: "percentage_change", width: 10 },
+      { header: "Razón", key: "reason", width: 20 },
+      { header: "Usuario", key: "changed_by", width: 20 },
+    ];
+
     const exportData = data.changes.map((change: any) => ({
-      Fecha: new Date(change.created_at).toLocaleString("es-ES"),
-      Producto: change.product_name,
-      "Precio Anterior": change.old_price,
-      "Precio Nuevo": change.new_price,
-      Diferencia: change.price_difference,
-      "% Cambio": change.percentage_change?.toFixed(2) + "%",
-      Razón: change.reason || "-",
-      Usuario: change.changed_by || "-",
+      created_at: change.created_at,
+      product_name: change.product_name,
+      old_price: change.old_price,
+      new_price: change.new_price,
+      price_difference: change.price_difference,
+      percentage_change: change.percentage_change?.toFixed(2) + "%",
+      reason: change.reason || "-",
+      changed_by: change.changed_by || "-",
     }));
 
+    const exportOptions = {
+      title: "Historial de Cambios de Precios",
+      subtitle: `Del ${startDate} al ${endDate}`,
+      filename: `cambios-precios-${startDate}-${endDate}`,
+      columns,
+      data: exportData,
+      summary: [
+        { label: "Total Cambios", value: data.stats?.total_changes || 0 },
+        { label: "Aumentos", value: data.stats?.price_increases || 0 },
+        { label: "Disminuciones", value: data.stats?.price_decreases || 0 },
+      ],
+    };
+
     if (format === "excel") {
-      exportToExcel(exportData, "cambios-precios");
+      exportToExcel(exportOptions);
     } else {
-      exportToPDF(exportData, "Reporte de Cambios de Precios");
+      exportToPDF(exportOptions);
     }
   };
 

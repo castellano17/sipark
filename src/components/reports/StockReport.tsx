@@ -288,7 +288,7 @@ export function StockReport({ onBack }: StockReportProps) {
                   className="flex items-center gap-2"
                 >
                   <FileDown className="w-4 h-4" />
-                  <span className="hidden sm:inline">Exportar Excel</span>
+                  Exportar Excel
                 </Button>
                 <Button
                   variant="outline"
@@ -297,7 +297,7 @@ export function StockReport({ onBack }: StockReportProps) {
                   className="flex items-center gap-2"
                 >
                   <FileDown className="w-4 h-4" />
-                  <span className="hidden sm:inline">Exportar PDF</span>
+                  Exportar PDF
                 </Button>
                 <Button
                   variant="outline"
@@ -306,7 +306,7 @@ export function StockReport({ onBack }: StockReportProps) {
                   className="flex items-center gap-2"
                 >
                   <Printer className="w-4 h-4" />
-                  <span className="hidden sm:inline">Imprimir</span>
+                  Imprimir
                 </Button>
               </div>
             </div>

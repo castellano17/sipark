@@ -9,8 +9,28 @@ import {
   Printer,
   CheckCircle,
   XCircle,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
 } from "lucide-react";
 import { useSnackbar } from "notistack";
+
+const formatTimeTo12h = (timeStr: string) => {
+  if (!timeStr) return "N/A";
+  try {
+    const parts = timeStr.split(':');
+    if (parts.length < 2) return timeStr;
+    let hours = parseInt(parts[0]);
+    const minutes = parts[1].substring(0, 2);
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    hours = hours % 12;
+    hours = hours === 0 ? 12 : hours;
+    return `${String(hours).padStart(2, '0')}:${minutes} ${ampm}`;
+  } catch (e) {
+    return timeStr;
+  }
+};
 
 interface Quotation {
   id: number;
@@ -46,7 +66,16 @@ interface Product {
   type: string;
 }
 
-export const Cotizaciones: React.FC = () => {
+interface CotizacionesProps {
+  onSendToPOS?: (data: {
+    clientName: string;
+    concept: string;
+    amount: number;
+    reservationId: number;
+  }) => void;
+}
+
+export const Cotizaciones: React.FC<CotizacionesProps> = ({ onSendToPOS }) => {
   const [quotations, setQuotations] = useState<Quotation[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [showModal, setShowModal] = useState(false);
@@ -63,6 +92,11 @@ export const Cotizaciones: React.FC = () => {
     null,
   );
   const [searchTerm, setSearchTerm] = useState("");
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+  
   const { enqueueSnackbar } = useSnackbar();
 
   const [formData, setFormData] = useState({
@@ -413,6 +447,17 @@ export const Cotizaciones: React.FC = () => {
         enqueueSnackbar("Cotización aprobada y reservación agendada", { variant: "success" });
         setShowApproveModal(false);
         loadQuotations();
+        
+        // Redirigir a POS si hay adelanto
+        if (approveData.deposit_amount > 0 && onSendToPOS && resResult.id) {
+          onSendToPOS({
+            clientName: quotationToApprove.client_name,
+            concept: `Adelanto Reservación (desde Cotización #${quotationToApprove.quotation_number})`,
+            amount: approveData.deposit_amount,
+            reservationId: resResult.id,
+          });
+        }
+
         if (selectedQuotation && selectedQuotation.id === quotationToApprove.id) {
           setSelectedQuotation({ ...selectedQuotation, status: "approved" });
         }
@@ -429,6 +474,17 @@ export const Cotizaciones: React.FC = () => {
       q.client_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       q.quotation_number.toLowerCase().includes(searchTerm.toLowerCase()),
   );
+
+  // Pagination logic
+  const totalPages = Math.ceil(filteredQuotations.length / itemsPerPage);
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentItems = filteredQuotations.slice(indexOfFirstItem, indexOfLastItem);
+
+  // Reset to first page when search changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -505,7 +561,7 @@ export const Cotizaciones: React.FC = () => {
                 </tr>
               </thead>
               <tbody>
-                {filteredQuotations.map((quotation) => (
+                {currentItems.map((quotation) => (
                   <tr key={quotation.id} className="border-b hover:bg-gray-50">
                     <td className="p-3 font-mono text-sm">
                       {quotation.quotation_number}
@@ -523,7 +579,32 @@ export const Cotizaciones: React.FC = () => {
                       </div>
                     </td>
                     <td className="p-3">
-                      {new Date(quotation.valid_until || quotation.created_at).toLocaleDateString()}
+                      {(() => {
+                        const d = quotation.valid_until || quotation.created_at;
+                        if (!d) return "N/A";
+                        try {
+                          const str = String(d).trim();
+                          let s = str.split('T')[0];
+                          
+                          if (s.includes('-') && s.split('-')[0].length !== 4) {
+                             const parts = s.split('-');
+                             if (parts.length === 3) s = `${parts[2]}-${parts[1]}-${parts[0]}`;
+                          }
+                          
+                          if (s.includes('/')) {
+                            const parts = s.split('/');
+                            if (parts.length === 3) {
+                              if (parts[0].length === 4) s = `${parts[0]}-${parts[1]}-${parts[2]}`;
+                              else s = `${parts[2]}-${parts[1]}-${parts[0]}`;
+                            }
+                          }
+
+                          const date = new Date(s.includes('-') ? `${s}T00:00:00` : str);
+                          return isNaN(date.getTime()) ? "F. Inválida" : date.toLocaleDateString();
+                        } catch {
+                          return "Error Fecha";
+                        }
+                      })()}
                     </td>
                     <td className="p-3 text-right font-medium">
                       ${Number(quotation.total).toFixed(2)}
@@ -566,6 +647,106 @@ export const Cotizaciones: React.FC = () => {
               </tbody>
             </table>
           </div>
+
+          {/* Modern Pagination UI */}
+          {filteredQuotations.length > 0 && (
+            <div className="mt-6 flex flex-col sm:flex-row items-center justify-between gap-4 border-t pt-4">
+              <div className="text-sm text-gray-500">
+                Mostrando <span className="font-semibold text-gray-900">{indexOfFirstItem + 1}</span> a{" "}
+                <span className="font-semibold text-gray-900">
+                  {Math.min(indexOfLastItem, filteredQuotations.length)}
+                </span>{" "}
+                de <span className="font-semibold text-gray-900">{filteredQuotations.length}</span> cotizaciones
+              </div>
+              
+              <div className="flex items-center gap-2">
+                <div className="flex items-center mr-4">
+                  <span className="text-xs text-gray-500 mr-2">Filas por página:</span>
+                  <select 
+                    className="text-xs border rounded px-2 py-1 bg-white focus:outline-none focus:ring-1 focus:ring-purple-500 min-w-[60px]"
+                    value={itemsPerPage}
+                    onChange={(e) => {
+                      setItemsPerPage(Number(e.target.value));
+                      setCurrentPage(1);
+                    }}
+                  >
+                    {[5, 10, 20, 50].map(val => (
+                      <option key={val} value={val}>{val}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(1)}
+                    disabled={currentPage === 1}
+                    className="h-8 w-8 p-0"
+                    title="Primera página"
+                  >
+                    <ChevronsLeft className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                    disabled={currentPage === 1}
+                    className="h-8 w-8 p-0"
+                    title="Anterior"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </Button>
+                  
+                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                    let pageNum;
+                    if (totalPages <= 5) {
+                      pageNum = i + 1;
+                    } else if (currentPage <= 3) {
+                      pageNum = i + 1;
+                    } else if (currentPage >= totalPages - 2) {
+                      pageNum = totalPages - 4 + i;
+                    } else {
+                      pageNum = currentPage - 2 + i;
+                    }
+                    
+                    return (
+                      <Button
+                        key={pageNum}
+                        variant={currentPage === pageNum ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setCurrentPage(pageNum)}
+                        className={`h-8 w-8 p-0 ${currentPage === pageNum ? 'bg-purple-600 text-white shadow-sm hover:bg-purple-700' : 'text-gray-600'}`}
+                      >
+                        {pageNum}
+                      </Button>
+                    );
+                  })}
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                    disabled={currentPage === totalPages}
+                    className="h-8 w-8 p-0"
+                    title="Siguiente"
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(totalPages)}
+                    disabled={currentPage === totalPages}
+                    className="h-8 w-8 p-0"
+                    title="Última página"
+                  >
+                    <ChevronsRight className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -908,7 +1089,32 @@ export const Cotizaciones: React.FC = () => {
                     Cotización {selectedQuotation.quotation_number}
                   </CardTitle>
                   <p className="text-sm text-purple-100 mt-1">
-                    Evento: {new Date(selectedQuotation.valid_until).toLocaleDateString()}
+                    Evento: {(() => {
+                      const d = selectedQuotation.valid_until;
+                      if (!d) return "N/A";
+                      try {
+                        const str = String(d).trim();
+                        let s = str.split('T')[0];
+                        
+                        if (s.includes('-') && s.split('-')[0].length !== 4) {
+                           const parts = s.split('-');
+                           if (parts.length === 3) s = `${parts[2]}-${parts[1]}-${parts[0]}`;
+                        }
+                        
+                        if (s.includes('/')) {
+                          const parts = s.split('/');
+                          if (parts.length === 3) {
+                            if (parts[0].length === 4) s = `${parts[0]}-${parts[1]}-${parts[2]}`;
+                            else s = `${parts[2]}-${parts[1]}-${parts[0]}`;
+                          }
+                        }
+
+                        const date = new Date(s.includes('-') ? `${s}T00:00:00` : str);
+                        return isNaN(date.getTime()) ? "Fecha Inválida" : date.toLocaleDateString();
+                      } catch {
+                        return "Error de Fecha";
+                      }
+                    })()}
                   </p>
                 </div>
                 <span
@@ -1091,15 +1297,49 @@ export const Cotizaciones: React.FC = () => {
                   <label className="block text-sm font-medium mb-1">
                     Hora del Evento *
                   </label>
-                  <input
-                    type="time"
-                    required
-                    className="w-full p-2 border rounded-md"
-                    value={approveData.event_time}
-                    onChange={(e) =>
-                      setApproveData({ ...approveData, event_time: e.target.value })
-                    }
-                  />
+                  <div className="flex gap-2">
+                    <select 
+                      className="p-2 border rounded w-full"
+                      value={approveData.event_time.split(':')[0] ? (parseInt(approveData.event_time.split(':')[0]) % 12 || 12).toString().padStart(2, '0') : "12"}
+                      onChange={(e) => {
+                        const h = parseInt(e.target.value);
+                        const currentMin = approveData.event_time.split(':')[1]?.substring(0,2) || "00";
+                        const currentIsPM = approveData.event_time.includes('PM') || (parseInt(approveData.event_time.split(':')[0]) >= 12);
+                        const finalH = currentIsPM ? (h === 12 ? 12 : h + 12) : (h === 12 ? 0 : h);
+                        setApproveData({ ...approveData, event_time: `${finalH.toString().padStart(2, '0')}:${currentMin}` });
+                      }}
+                    >
+                      {Array.from({length: 12}, (_, i) => i + 1).map(h => (
+                        <option key={h} value={h.toString().padStart(2, '0')}>{h.toString().padStart(2, '0')}</option>
+                      ))}
+                    </select>
+                    <select 
+                      className="p-2 border rounded w-full"
+                      value={approveData.event_time.split(':')[1]?.substring(0,2) || "00"}
+                      onChange={(e) => {
+                        const h = approveData.event_time.split(':')[0] || "12";
+                        setApproveData({ ...approveData, event_time: `${h}:${e.target.value}` });
+                      }}
+                    >
+                      {["00", "15", "30", "45"].map(m => (
+                        <option key={m} value={m}>{m}</option>
+                      ))}
+                    </select>
+                    <select 
+                      className="p-2 border rounded w-full font-bold bg-blue-50"
+                      value={approveData.event_time.includes('PM') || (parseInt(approveData.event_time.split(':')[0]) >= 12) ? "PM" : "AM"}
+                      onChange={(e) => {
+                        const isPM = e.target.value === "PM";
+                        let h = parseInt(approveData.event_time.split(':')[0] || "12") % 12;
+                        const finalH = isPM ? h + 12 : h;
+                        const m = approveData.event_time.split(':')[1] || "00";
+                        setApproveData({ ...approveData, event_time: `${finalH.toString().padStart(2, '0')}:${m}` });
+                      }}
+                    >
+                      <option value="AM">AM</option>
+                      <option value="PM">PM</option>
+                    </select>
+                  </div>
                 </div>
               </div>
 

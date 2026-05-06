@@ -92,6 +92,7 @@ async function createTables() {
       barcode VARCHAR(100) UNIQUE,
       stock INTEGER DEFAULT 0,
       min_stock INTEGER DEFAULT 0,
+      requires_stock BOOLEAN DEFAULT TRUE,
       duration_minutes INTEGER,
       is_standard_entry BOOLEAN DEFAULT FALSE,
       last_sale_date TIMESTAMP,
@@ -124,6 +125,8 @@ async function createTables() {
       children_count INTEGER DEFAULT 1,
       status VARCHAR(50) DEFAULT 'active',
       is_paid BOOLEAN DEFAULT FALSE,
+      is_paused BOOLEAN DEFAULT FALSE,
+      pause_start_time TIMESTAMP,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (client_id) REFERENCES clients(id)
     )`,
@@ -136,9 +139,9 @@ async function createTables() {
       subtotal DECIMAL(10,2) NOT NULL,
       discount DECIMAL(10,2) DEFAULT 0,
       timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      payment_method VARCHAR(50),
       cash_box_id INTEGER,
       user_id INTEGER,
+      status VARCHAR(50) DEFAULT 'completed',
       FOREIGN KEY (client_id) REFERENCES clients(id),
       FOREIGN KEY (cash_box_id) REFERENCES cash_boxes(id),
       FOREIGN KEY (user_id) REFERENCES users(id)
@@ -149,6 +152,7 @@ async function createTables() {
       sale_id INTEGER NOT NULL,
       product_id INTEGER,
       product_name VARCHAR(255) NOT NULL,
+      product_type VARCHAR(50),
       quantity INTEGER NOT NULL,
       unit_price DECIMAL(10,2) NOT NULL,
       subtotal DECIMAL(10,2) NOT NULL,
@@ -295,6 +299,14 @@ async function createTables() {
       FOREIGN KEY (client_id) REFERENCES clients(id),
       FOREIGN KEY (membership_id) REFERENCES memberships(id),
       FOREIGN KEY (created_by) REFERENCES users(id)
+    )`,
+
+    `CREATE TABLE IF NOT EXISTS membership_discount_uses (
+      id SERIAL PRIMARY KEY,
+      client_membership_id INTEGER NOT NULL,
+      discount_amount DECIMAL(10,2) NOT NULL,
+      used_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (client_membership_id) REFERENCES client_memberships(id)
     )`,
 
     `CREATE TABLE IF NOT EXISTS membership_renewals (
@@ -472,12 +484,18 @@ async function createTables() {
       status VARCHAR(20) DEFAULT 'pending',
       total_amount DECIMAL(10,2) NOT NULL,
       deposit_amount DECIMAL(10,2) DEFAULT 0,
+      payment_status VARCHAR(20) DEFAULT 'unpaid',
+      sale_id INTEGER,
+      final_sale_id INTEGER,
+      completed_at TIMESTAMP,
       notes TEXT,
       created_by INTEGER,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (client_id) REFERENCES clients(id),
       FOREIGN KEY (package_id) REFERENCES products_services(id),
-      FOREIGN KEY (created_by) REFERENCES users(id)
+      FOREIGN KEY (created_by) REFERENCES users(id),
+      FOREIGN KEY (sale_id) REFERENCES sales(id),
+      FOREIGN KEY (final_sale_id) REFERENCES sales(id)
     )`,
 
     `CREATE TABLE IF NOT EXISTS quotations (
@@ -706,6 +724,11 @@ async function createTables() {
         -- Asegurar índice explícito en uid de nfc_cards (UNIQUE ya lo crea pero lo hacemos visible)
         CREATE INDEX IF NOT EXISTS idx_nfc_cards_uid ON nfc_cards(uid);
 
+        -- Migración para status en sales
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='sales' AND column_name='status') THEN
+          ALTER TABLE sales ADD COLUMN status VARCHAR(50) DEFAULT 'completed';
+        END IF;
+
         -- Migración para client_name en sales (agregado aquí para asegurar ejecución)
         ALTER TABLE sales ADD COLUMN IF NOT EXISTS client_name VARCHAR(255);
 
@@ -723,6 +746,14 @@ async function createTables() {
           ALTER TABLE clients ALTER COLUMN phone DROP NOT NULL;
         END IF;
 
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='clients' AND column_name='email') THEN
+          ALTER TABLE clients ADD COLUMN email VARCHAR(255);
+        END IF;
+
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='clients' AND column_name='created_at') THEN
+          ALTER TABLE clients ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+        END IF;
+
         -- Migración para is_standard_entry en products_services
         IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='products_services' AND column_name='is_standard_entry') THEN
           ALTER TABLE products_services ADD COLUMN is_standard_entry BOOLEAN DEFAULT FALSE;
@@ -733,9 +764,19 @@ async function createTables() {
           ALTER TABLE products_services ADD COLUMN image_path TEXT;
         END IF;
 
+        -- Migración para requires_stock en products_services
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='products_services' AND column_name='requires_stock') THEN
+          ALTER TABLE products_services ADD COLUMN requires_stock BOOLEAN DEFAULT TRUE;
+        END IF;
+
         -- Migración para permitir product_id opcional en sale_items (Venta de membresías, etc.)
         IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='sale_items' AND column_name='product_id' AND is_nullable='NO') THEN
           ALTER TABLE sale_items ALTER COLUMN product_id DROP NOT NULL;
+        END IF;
+
+        -- Migración para product_type en sale_items
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='sale_items' AND column_name='product_type') THEN
+          ALTER TABLE sale_items ADD COLUMN product_type VARCHAR(50);
         END IF;
 
         -- Migración para children_count, duration_minutes, y elapsed_minutes en active_sessions
@@ -749,6 +790,19 @@ async function createTables() {
 
         IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='active_sessions' AND column_name='elapsed_minutes') THEN
           ALTER TABLE active_sessions ADD COLUMN elapsed_minutes INTEGER;
+        END IF;
+        
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='active_sessions' AND column_name='is_paused') THEN
+          ALTER TABLE active_sessions ADD COLUMN is_paused BOOLEAN DEFAULT FALSE;
+        END IF;
+
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='active_sessions' AND column_name='pause_start_time') THEN
+          ALTER TABLE active_sessions ADD COLUMN pause_start_time TIMESTAMP;
+        END IF;
+
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='membership_discount_uses' AND column_name='sale_id') THEN
+          ALTER TABLE membership_discount_uses ADD COLUMN sale_id INTEGER;
+          ALTER TABLE membership_discount_uses ADD CONSTRAINT fk_discount_uses_sale FOREIGN KEY (sale_id) REFERENCES sales(id);
         END IF;
 
         -- Migración para tipo en categorías
@@ -797,11 +851,43 @@ async function createTables() {
         -- 4. Eliminar todas las categorías genéricas que el usuario NO quiere ver
         DELETE FROM categories WHERE name IN ('Bebidas', 'Comida', 'Alquiler', 'Eventos', 'Membresía', 'Snacks', 'Tiempo');
         
+        -- Migración para nuevas columnas en reservaciones
+        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='reservations' AND column_name='client_id' AND is_nullable='NO') THEN
+          ALTER TABLE reservations ALTER COLUMN client_id DROP NOT NULL;
+        END IF;
+
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='reservations' AND column_name='payment_status') THEN
+          ALTER TABLE reservations ADD COLUMN payment_status VARCHAR(20) DEFAULT 'unpaid';
+        END IF;
+
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='reservations' AND column_name='sale_id') THEN
+          ALTER TABLE reservations ADD COLUMN sale_id INTEGER;
+          ALTER TABLE reservations ADD CONSTRAINT fk_reservation_sale FOREIGN KEY (sale_id) REFERENCES sales(id);
+        END IF;
+
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='reservations' AND column_name='final_sale_id') THEN
+          ALTER TABLE reservations ADD COLUMN final_sale_id INTEGER;
+          ALTER TABLE reservations ADD CONSTRAINT fk_reservation_final_sale FOREIGN KEY (final_sale_id) REFERENCES sales(id);
+        END IF;
+
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='reservations' AND column_name='completed_at') THEN
+          ALTER TABLE reservations ADD COLUMN completed_at TIMESTAMP;
+        END IF;
+
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='reservations' AND column_name='discount') THEN
+          ALTER TABLE reservations ADD COLUMN discount DECIMAL(10,2) DEFAULT 0;
+        END IF;
+
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='reservations' AND column_name='client_id_card') THEN
+          ALTER TABLE reservations ADD COLUMN client_id_card VARCHAR(100);
+        END IF;
+
         -- 5. Si eliminamos 'Bebidas' y quedaron productos ahí (porque no existía 'Bebidas embotelladas'), 
         --    podemos regresarlos a su tipo original o dejarlos para que el usuario les asigne una.
         END $$;
     `);
   } catch (error) {
+    console.error("ERROR EN MIGRACIONES:", error);
   }
 }
 
@@ -850,14 +936,14 @@ function convertSqliteToPostgres(sql) {
   pgSql = pgSql.replace(/date\('now'\)/gi, "CURRENT_DATE");
 
   // Convertir DATE(column) a column::DATE (DESPUÉS de las conversiones de 'now')
-  pgSql = pgSql.replace(/DATE\((\w+)\)/gi, "$1::DATE");
+  pgSql = pgSql.replace(/DATE\(([\w.]+)\)/gi, "$1::DATE");
 
   // Convertir strftime('%H', column) a EXTRACT(HOUR FROM column)
-  pgSql = pgSql.replace(/strftime\('%H',\s*(\w+)\)/gi, "EXTRACT(HOUR FROM $1)");
+  pgSql = pgSql.replace(/strftime\('%H',\s*([\w.]+)\)/gi, "EXTRACT(HOUR FROM $1)");
 
   // Convertir CAST(strftime('%H', column) AS INTEGER) a EXTRACT(HOUR FROM column)::INTEGER
   pgSql = pgSql.replace(
-    /CAST\(strftime\('%H',\s*(\w+)\)\s+AS\s+INTEGER\)/gi,
+    /CAST\(strftime\('%H',\s*([\w.]+)\)\s+AS\s+INTEGER\)/gi,
     "EXTRACT(HOUR FROM $1)::INTEGER",
   );
 
@@ -952,6 +1038,7 @@ async function closeDatabase() {
 module.exports = {
   initializeDatabase,
   getDatabase,
+  getConfig,
   runAsync,
   getAsync,
   allAsync,

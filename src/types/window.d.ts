@@ -207,6 +207,7 @@ type AppApi = {
   startSession: (clientId: number, packageId: number, durationMinutes: number) => Promise<any>;
   createSession: (clientName: string, parentName: string, phone: string, packageId: number, durationMinutes: number, isPaid?: boolean) => Promise<any>;
   getActiveSessions: () => Promise<any[]>;
+  deleteSession: (sessionId: number) => Promise<any>;
   endSession: (sessionId: number, totalAmount: number) => Promise<any>;
   startTimerSession: (sessionId: number) => Promise<boolean>;
   updateSessionPaidStatus: (sessionId: number, isPaid: boolean) => Promise<boolean>;

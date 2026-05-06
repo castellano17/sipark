@@ -26,7 +26,9 @@ contextBridge.exposeInMainWorld("api", {
       durationMinutes,
     }),
   getActiveSessions: () => ipcRenderer.invoke("api:getActiveSessions"),
-  endSession: (sessionId, finalPrice) =>
+  deleteSession: (sessionId: number) =>
+    ipcRenderer.invoke("api:deleteSession", sessionId),
+  endSession: (sessionId: number, finalPrice: number) =>
     ipcRenderer.invoke("api:endSession", { sessionId, finalPrice }),
 
   // Products/Services
@@ -50,7 +52,9 @@ contextBridge.exposeInMainWorld("api", {
     ipcRenderer.invoke("api:deleteProductService", { id }),
 
   // Sales
-  getSales: (limit) => ipcRenderer.invoke("api:getSales", limit),
+  getSales: (limit: number) => ipcRenderer.invoke("api:getSales", limit),
+  cancelSale: (saleId: number, userId: number, reason: string) =>
+    ipcRenderer.invoke("api:cancelSale", saleId, userId, reason),
 
   // Stats
   getDailyStats: () => ipcRenderer.invoke("api:getDailyStats"),

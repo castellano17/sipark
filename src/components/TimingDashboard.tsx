@@ -41,15 +41,32 @@ export const TimingDashboard: React.FC<TimingDashboardProps> = ({
   const [selectedSession, setSelectedSession] = useState<ActiveSession | null>(null);
   const [checkoutConfirmOpen, setCheckoutConfirmOpen] = useState(false);
   const [sessionToCheckout, setSessionToCheckout] = useState<ActiveSession | null>(null);
-  const [pausedSessions, setPausedSessions] = useState<Set<number>>(new Set());
-  const { getActiveSessions, endSession, startTimerSession } = useDatabase();
+  const [enableExtraTimeCharge, setEnableExtraTimeCharge] = useState(true);
+  const { 
+    getActiveSessions, 
+    endSession, 
+    startTimerSession, 
+    deleteSession,
+    pauseSession,
+    resumeSession 
+  } = useDatabase();
   const { success, error: errorNotification, warning } = useNotification();
 
   useEffect(() => {
     loadSessions();
+    loadSettings();
     const interval = setInterval(loadSessions, 5000);
     return () => clearInterval(interval);
   }, []);
+
+  const loadSettings = async () => {
+    try {
+      const setting = await (window as any).api.getSetting("enable_extra_time_charge");
+      setEnableExtraTimeCharge(setting !== "false");
+    } catch (err) {
+      console.error("Error loading settings:", err);
+    }
+  };
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -121,17 +138,21 @@ export const TimingDashboard: React.FC<TimingDashboardProps> = ({
     }
   };
 
-  const handlePause = (sessionId: number) => {
-    if (pausedSessions.has(sessionId)) {
-      setPausedSessions((prev) => {
-        const newSet = new Set(prev);
-        newSet.delete(sessionId);
-        return newSet;
-      });
-      success("Sesión reanudada");
-    } else {
-      setPausedSessions((prev) => new Set(prev).add(sessionId));
-      warning("Sesión pausada");
+  const handlePause = async (sessionId: number) => {
+    const session = sessions.find(s => s.id === sessionId);
+    if (!session) return;
+
+    try {
+      if (session.is_paused) {
+        await resumeSession(sessionId);
+        success("Sesión reanudada");
+      } else {
+        await pauseSession(sessionId);
+        warning("Sesión pausada");
+      }
+      await loadSessions();
+    } catch (err) {
+      errorNotification("Error al cambiar estado de pausa");
     }
   };
 
@@ -143,12 +164,26 @@ export const TimingDashboard: React.FC<TimingDashboardProps> = ({
     }
   };
 
+  const handleDeleteSession = async (sessionId: number) => {
+    try {
+      const res = await deleteSession(sessionId);
+      if (res) {
+        success("Sesión eliminada correctamente");
+        loadSessions();
+      } else {
+        errorNotification("Error al eliminar la sesión");
+      }
+    } catch (err) {
+      errorNotification("Error al eliminar la sesión");
+    }
+  };
+
   const filteredSessions = sessions.filter((session) =>
     (session.client_name || "").toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
   return (
-    <div className="flex flex-col h-full gap-4 p-6 overflow-hidden">
+    <div className="flex flex-col min-h-full gap-4 p-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Dashboard de Tiempos</h1>
@@ -213,9 +248,13 @@ export const TimingDashboard: React.FC<TimingDashboardProps> = ({
                   onCheckout={() => handleCheckout(session)}
                   onPause={handlePause}
                   onViewDetails={handleViewDetails}
-                  isPaused={pausedSessions.has(session.id)}
+                  isPaused={!!session.is_paused}
                   isPending={session.status === "pending"}
                   onStartTimer={handleStartTimer}
+                  onDelete={handleDeleteSession}
+                  childrenCount={session.children_count}
+                  pauseStartTime={session.pause_start_time}
+                  enableExtraTimeCharge={enableExtraTimeCharge}
                 />
               ))}
             </div>
@@ -233,6 +272,7 @@ export const TimingDashboard: React.FC<TimingDashboardProps> = ({
         open={detailsOpen}
         onOpenChange={setDetailsOpen}
         session={selectedSession}
+        isPaused={selectedSession?.is_paused}
       />
 
       <Dialog open={checkoutConfirmOpen} onOpenChange={setCheckoutConfirmOpen}>
@@ -243,7 +283,8 @@ export const TimingDashboard: React.FC<TimingDashboardProps> = ({
               Finalizar Sesión
             </DialogTitle>
             <DialogDescription>
-              Cliente: <span className="font-semibold text-slate-900">{sessionToCheckout?.client_name}</span>
+              Cliente: <span className="font-semibold text-slate-900">{sessionToCheckout?.client_name}</span> • 
+              Niños: <span className="font-semibold text-slate-900">{sessionToCheckout?.children_count || 1}</span>
             </DialogDescription>
           </DialogHeader>
 
@@ -308,7 +349,7 @@ export const TimingDashboard: React.FC<TimingDashboardProps> = ({
                 )}
 
                 {/* Tiempo Extra */}
-                {hasExtraTime && extraMinutes > 0 && (
+                {hasExtraTime && extraMinutes > 0 && enableExtraTimeCharge && (
                   <div className="flex items-center gap-3 p-3 bg-rose-50 border border-rose-200 rounded-lg">
                     <AlertTriangle className="w-5 h-5 text-rose-600" />
                     <div className="flex-1">
@@ -325,8 +366,8 @@ export const TimingDashboard: React.FC<TimingDashboardProps> = ({
 
                 {/* Opciones */}
                 <div className="grid gap-3">
-                  {/* Ir a POS - Siempre disponible si NO ha pagado, o si hay tiempo extra (opcional) */}
-                  {!isPaid || hasExtraTime ? (
+                  {/* Ir a POS - Siempre disponible si NO ha pagado, o si hay tiempo extra (y está habilitado) */}
+                  {!isPaid || (hasExtraTime && enableExtraTimeCharge) ? (
                     <button
                       onClick={handlePOSRedirect}
                       className="flex items-start gap-4 p-4 rounded-xl border-2 border-blue-200 hover:border-blue-500 hover:bg-blue-50 transition-all text-left"
@@ -337,7 +378,7 @@ export const TimingDashboard: React.FC<TimingDashboardProps> = ({
                       <div className="flex-1">
                         <p className="font-bold text-slate-900">Ir a Caja (POS)</p>
                         <p className="text-sm text-slate-600">
-                          {!isPaid && hasExtraTime 
+                          {!isPaid && hasExtraTime && enableExtraTimeCharge
                             ? `Cobrar entrada + ${extraMinutes} min de tiempo extra`
                             : !isPaid 
                             ? "Cobrar entrada del cliente"
@@ -359,7 +400,7 @@ export const TimingDashboard: React.FC<TimingDashboardProps> = ({
                       <div className="flex-1">
                         <p className="font-bold text-slate-900">Finalizar Directamente</p>
                         <p className="text-sm text-slate-600">
-                          {hasExtraTime 
+                          {hasExtraTime && enableExtraTimeCharge
                             ? `Cerrar sesión sin cobrar los ${extraMinutes} min extra`
                             : "Cerrar sesión sin cobros adicionales"}
                         </p>

@@ -45,8 +45,7 @@ export function InventoryMovementsReport({
     try {
       const result = await window.api.getInventoryProducts();
       setProducts(result);
-    } catch (err) {
-    }
+    } catch (err) {}
   };
 
   const loadReport = async () => {
@@ -194,6 +193,35 @@ export function InventoryMovementsReport({
               Historial de entradas y salidas de productos
             </p>
           </div>
+          <div className="flex gap-2 ml-auto">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleExportExcel}
+              className="flex items-center gap-1.5 whitespace-nowrap"
+            >
+              <FileDown className="w-4 h-4" />
+              Excel
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleExportPDF}
+              className="flex items-center gap-1.5 whitespace-nowrap"
+            >
+              <FileDown className="w-4 h-4" />
+              PDF
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handlePrint}
+              className="flex items-center gap-1.5 whitespace-nowrap"
+            >
+              <Printer className="w-4 h-4" />
+              Imprimir
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -332,19 +360,16 @@ export function InventoryMovementsReport({
                 Historial de Movimientos
               </h3>
               <div className="flex gap-2">
-                <Button
-                        className="h-8 w-8 p-0" variant="outline" size="sm" onClick={handleExportExcel}>
-                  <FileDown className="w-4 h-4 mr-2" />
+                <Button variant="outline" size="sm" onClick={handleExportExcel} className="flex items-center gap-1.5 whitespace-nowrap">
+                  <FileDown className="w-4 h-4" />
                   Excel
                 </Button>
-                <Button
-                        className="h-8 w-8 p-0" variant="outline" size="sm" onClick={handleExportPDF}>
-                  <FileDown className="w-4 h-4 mr-2" />
+                <Button variant="outline" size="sm" onClick={handleExportPDF} className="flex items-center gap-1.5 whitespace-nowrap">
+                  <FileDown className="w-4 h-4" />
                   PDF
                 </Button>
-                <Button
-                        className="h-8 w-8 p-0" variant="outline" size="sm" onClick={handlePrint}>
-                  <Printer className="w-4 h-4 mr-2" />
+                <Button variant="outline" size="sm" onClick={handlePrint} className="flex items-center gap-1.5 whitespace-nowrap">
+                  <Printer className="w-4 h-4" />
                   Imprimir
                 </Button>
               </div>

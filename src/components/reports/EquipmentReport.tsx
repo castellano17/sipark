@@ -1,5 +1,11 @@
 import { useState, useEffect } from "react";
-import { MonitorSpeaker, ShieldCheck, FileDown, Printer, AlertCircle } from "lucide-react";
+import {
+  MonitorSpeaker,
+  ShieldCheck,
+  FileDown,
+  Printer,
+  AlertCircle,
+} from "lucide-react";
 import { Card } from "../ui/card";
 import { Button } from "../ui/button";
 import { useNotification } from "../../hooks/useNotification";
@@ -38,17 +44,31 @@ export function EquipmentReport({ onBack }: EquipmentReportProps) {
   };
 
   const filteredData = data.filter((item: any) => {
-    if (categoryFilter !== "all" && item.category_id?.toString() !== categoryFilter) return false;
+    if (
+      categoryFilter !== "all" &&
+      item.category_id?.toString() !== categoryFilter
+    )
+      return false;
     if (statusFilter !== "all" && item.status !== statusFilter) return false;
     return true;
   });
 
   const getSummary = () => {
     const totalRecords = filteredData.length;
-    const totalUnits = filteredData.reduce((acc, curr) => acc + curr.quantity, 0);
-    const activeUnits = filteredData.filter(i => i.status === 'active').reduce((acc, curr) => acc + curr.quantity, 0);
-    const maintenanceUnits = filteredData.filter(i => i.status === 'maintenance').reduce((acc, curr) => acc + curr.quantity, 0);
-    return { totalRecords, totalUnits, activeUnits, maintenanceUnits };
+    const totalUnits = filteredData.reduce(
+      (acc, curr) => acc + curr.quantity,
+      0,
+    );
+    const maintenanceUnits = filteredData.reduce(
+      (acc, curr) => acc + (Number(curr.units_in_maintenance) || 0),
+      0,
+    );
+    const lostUnits = filteredData.reduce(
+      (acc, curr) => acc + (Number(curr.units_lost) || 0),
+      0,
+    );
+    const activeUnits = totalUnits;
+    return { totalRecords, totalUnits, activeUnits, maintenanceUnits, lostUnits };
   };
 
   const reportConfig = () => {
@@ -59,23 +79,25 @@ export function EquipmentReport({ onBack }: EquipmentReportProps) {
       filename: `mobiliario-${new Date().toISOString().split("T")[0]}`,
       columns: [
         { header: "ID", key: "id", width: 10 },
-        { header: "Equipo/Mobiliario", key: "name", width: 30 },
-        { header: "Categoría", key: "category_name", width: 20 },
-        { header: "Ubicación", key: "location", width: 20 },
-        { header: "Estado", key: "status", width: 15 },
-        { header: "Unidades (Físicas)", key: "quantity", width: 15 },
+        { header: "Equipo/Mobiliario", key: "name", width: 28 },
+        { header: "Categoría", key: "category_name", width: 18 },
+        { header: "Ubicación", key: "location", width: 18 },
+        { header: "Cant.", key: "quantity", format: "number" as const, width: 10 },
+        { header: "En Mant.", key: "units_in_maintenance", format: "number" as const, width: 10 },
+        { header: "Bajas", key: "units_lost", format: "number" as const, width: 10 },
       ],
-      data: filteredData.map(d => ({
+      data: filteredData.map((d) => ({
         ...d,
-        status: d.status === 'active' ? 'Operativo' : d.status === 'maintenance' ? 'Mantenimiento' : 'Inactivo',
         category_name: d.category_name || "Sin Categoría",
-        location: d.location || "N/A"
+        location: d.location || "N/A",
+        units_in_maintenance: Number(d.units_in_maintenance) || 0,
+        units_lost: Number(d.units_lost) || 0,
       })),
       summary: [
-        { label: "Total Registros Distintos", value: summaryData.totalRecords },
-        { label: "Total Unidades Físicas", value: summaryData.totalUnits },
-        { label: "Unidades Operativas", value: summaryData.activeUnits },
-        { label: "Unidades en Mantenimiento", value: summaryData.maintenanceUnits },
+        { label: "Total Tipos de Equipo", value: String(summaryData.totalRecords) },
+        { label: "Total Unidades Actuales", value: String(summaryData.totalUnits) },
+        { label: "Unidades en Mantenimiento", value: String(summaryData.maintenanceUnits) },
+        { label: "Unidades Dadas de Baja", value: String(summaryData.lostUnits) },
       ],
     };
   };
@@ -95,7 +117,7 @@ export function EquipmentReport({ onBack }: EquipmentReportProps) {
     );
   }
 
-  const { totalUnits, activeUnits, maintenanceUnits } = getSummary();
+  const { totalUnits, activeUnits, maintenanceUnits, lostUnits } = getSummary();
 
   return (
     <div className="h-full flex flex-col p-6 overflow-auto bg-gray-50">
@@ -106,7 +128,9 @@ export function EquipmentReport({ onBack }: EquipmentReportProps) {
             ← Volver
           </Button>
           <div>
-            <h1 className="text-3xl font-bold text-indigo-900">🪑 Reporte de Mobiliario y Equipos</h1>
+            <h1 className="text-3xl font-bold text-indigo-900">
+              🪑 Reporte de Mobiliario y Equipos
+            </h1>
             <p className="text-sm text-gray-600">
               Inventario de activos fijos operativos y en mantenimiento
             </p>
@@ -134,7 +158,9 @@ export function EquipmentReport({ onBack }: EquipmentReportProps) {
             </select>
           </div>
           <div>
-            <label className="text-sm font-medium mb-2 block">Estado Operativo</label>
+            <label className="text-sm font-medium mb-2 block">
+              Estado Operativo
+            </label>
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
@@ -168,19 +194,11 @@ export function EquipmentReport({ onBack }: EquipmentReportProps) {
             <div className="p-2 bg-indigo-500 rounded-lg">
               <MonitorSpeaker className="w-5 h-5 text-white" />
             </div>
-            <p className="text-sm font-medium text-indigo-700">Total Unidades Físicas</p>
+            <p className="text-sm font-medium text-indigo-700">
+              Unidades en Inventario
+            </p>
           </div>
           <p className="text-3xl font-bold text-indigo-900">{totalUnits}</p>
-        </Card>
-
-        <Card className="p-6 bg-gradient-to-br from-green-50 to-green-100">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="p-2 bg-green-500 rounded-lg">
-              <ShieldCheck className="w-5 h-5 text-white" />
-            </div>
-            <p className="text-sm font-medium text-green-700">Operativas</p>
-          </div>
-          <p className="text-3xl font-bold text-green-900">{activeUnits}</p>
         </Card>
 
         <Card className="p-6 bg-gradient-to-br from-orange-50 to-orange-100">
@@ -188,9 +206,21 @@ export function EquipmentReport({ onBack }: EquipmentReportProps) {
             <div className="p-2 bg-orange-500 rounded-lg">
               <AlertCircle className="w-5 h-5 text-white" />
             </div>
-            <p className="text-sm font-medium text-orange-700">En Mantenimiento</p>
+            <p className="text-sm font-medium text-orange-700">
+              Enviadas a Mantenimiento
+            </p>
           </div>
           <p className="text-3xl font-bold text-orange-900">{maintenanceUnits}</p>
+        </Card>
+
+        <Card className="p-6 bg-gradient-to-br from-red-50 to-red-100">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="p-2 bg-red-500 rounded-lg">
+              <ShieldCheck className="w-5 h-5 text-white" />
+            </div>
+            <p className="text-sm font-medium text-red-700">Dadas de Baja</p>
+          </div>
+          <p className="text-3xl font-bold text-red-900">{lostUnits}</p>
         </Card>
       </div>
 
@@ -199,16 +229,31 @@ export function EquipmentReport({ onBack }: EquipmentReportProps) {
         <div className="flex items-center justify-between mb-4">
           <h3 className="font-semibold text-lg">Detalle de Equipos</h3>
           <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={handleExportExcel}>
-              <FileDown className="w-4 h-4 mr-2" />
-              Exportar Excel
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleExportExcel}
+              className="flex items-center gap-1.5 whitespace-nowrap"
+            >
+              <FileDown className="w-4 h-4" />
+              Excel
             </Button>
-            <Button variant="outline" size="sm" onClick={handleExportPDF}>
-              <FileDown className="w-4 h-4 mr-2" />
-              Exportar PDF
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleExportPDF}
+              className="flex items-center gap-1.5 whitespace-nowrap"
+            >
+              <FileDown className="w-4 h-4" />
+              PDF
             </Button>
-            <Button variant="outline" size="sm" onClick={handlePrint}>
-              <Printer className="w-4 h-4 mr-2" />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handlePrint}
+              className="flex items-center gap-1.5 whitespace-nowrap"
+            >
+              <Printer className="w-4 h-4" />
               Imprimir
             </Button>
           </div>
@@ -221,45 +266,38 @@ export function EquipmentReport({ onBack }: EquipmentReportProps) {
                 <th className="px-4 py-3 text-left text-xs font-semibold">Equipo</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold">Categoría</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold">Ubicación</th>
-                <th className="px-4 py-3 text-center text-xs font-semibold">Estado</th>
-                <th className="px-4 py-3 text-right text-xs font-semibold">Cant. Física</th>
+                <th className="px-4 py-3 text-right text-xs font-semibold">Cant. Actual</th>
+                <th className="px-4 py-3 text-right text-xs font-semibold">En Mant.</th>
+                <th className="px-4 py-3 text-right text-xs font-semibold">Bajas</th>
               </tr>
             </thead>
             <tbody className="divide-y">
-              {filteredData.map((item: any) => (
-                <tr
-                  key={item.id}
-                  className={`hover:bg-gray-50 ${
-                    item.status === 'maintenance'
-                      ? "bg-orange-50"
-                      : item.status === 'inactive'
-                        ? "bg-red-50 text-gray-500"
-                        : ""
-                  }`}
-                >
-                  <td className="px-4 py-3 text-sm">#{item.id}</td>
-                  <td className="px-4 py-3 text-sm font-medium">{item.name}</td>
-                  <td className="px-4 py-3 text-sm">{item.category_name || "-"}</td>
-                  <td className="px-4 py-3 text-sm">{item.location || "-"}</td>
-                  <td className="px-4 py-3 text-sm text-center">
-                    <span
-                      className={`px-2 py-1 rounded text-xs font-semibold ${
-                        item.status === 'active'
-                          ? "bg-green-100 text-green-700"
-                          : item.status === 'maintenance'
-                            ? "bg-orange-100 text-orange-700"
-                            : "bg-red-100 text-red-700"
-                      }`}
-                    >
-                      {item.status === 'active' ? 'Operativo' : item.status === 'maintenance' ? 'Mantenimiento' : 'Inactivo'}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-sm text-right font-bold">{item.quantity}</td>
-                </tr>
-              ))}
+              {filteredData.map((item: any) => {
+                const inMaint = Number(item.units_in_maintenance) || 0;
+                const lost = Number(item.units_lost) || 0;
+                return (
+                  <tr key={item.id} className={`hover:bg-gray-50 ${inMaint > 0 ? "bg-orange-50" : ""}`}>
+                    <td className="px-4 py-3 text-sm">#{item.id}</td>
+                    <td className="px-4 py-3 text-sm font-medium">{item.name}</td>
+                    <td className="px-4 py-3 text-sm">{item.category_name || "-"}</td>
+                    <td className="px-4 py-3 text-sm">{item.location || "-"}</td>
+                    <td className="px-4 py-3 text-sm text-right font-bold">{item.quantity}</td>
+                    <td className="px-4 py-3 text-sm text-right">
+                      {inMaint > 0
+                        ? <span className="px-2 py-1 rounded text-xs font-semibold bg-orange-100 text-orange-700">{inMaint}</span>
+                        : <span className="text-gray-400">0</span>}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-right">
+                      {lost > 0
+                        ? <span className="px-2 py-1 rounded text-xs font-semibold bg-red-100 text-red-700">{lost}</span>
+                        : <span className="text-gray-400">0</span>}
+                    </td>
+                  </tr>
+                );
+              })}
               {filteredData.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-4 py-12 text-center text-gray-500">
+                  <td colSpan={7} className="px-4 py-12 text-center text-gray-500">
                     No se encontró mobiliario con los filtros actuales.
                   </td>
                 </tr>

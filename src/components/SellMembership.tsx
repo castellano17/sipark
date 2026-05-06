@@ -91,10 +91,11 @@ export function SellMembership() {
     // Escuchar el evento del Oído Global
     const handleGlobalNfc = (e: Event) => {
       const customEvent = e as CustomEvent;
-      // Prevenimos que el Escáner Global haga un "Cobro Rápido" indicando que esta pantalla lo atrapó
-      e.preventDefault(); 
+      // Solo llenar el campo, NO disparar enter ni submit
+      e.preventDefault();
       setNfcUid(customEvent.detail.uid);
       success(`Tarjeta física ID [${customEvent.detail.uid}] asociada lista para guardar.`);
+      // No hacer nada más
     };
     window.addEventListener('nfc-scanned', handleGlobalNfc);
     return () => window.removeEventListener('nfc-scanned', handleGlobalNfc);
@@ -193,7 +194,7 @@ export function SellMembership() {
       return;
     }
 
-    if (!totalHours) {
+    if (selectedMembership && selectedMembership.membership_type === "ventas" && !totalHours) {
       error("El campo N° de Entradas en horas es obligatorio");
       return;
     }
@@ -213,7 +214,61 @@ export function SellMembership() {
         localStorage.getItem("currentUser") || "{}",
       );
 
-      // 1. Registrar venta en caja PRIMERO
+
+      // 1. Si hay NFC, verificar disponibilidad sin crear ningún registro
+      if (nfcUid) {
+        try {
+          const availability = await (window as any).api.checkNfcCardAvailable(nfcUid);
+          if (!availability.available) {
+            error("Tarjeta NFC no disponible: " + (availability.reason || "Ya está en uso. No se creó la membresía ni la venta."));
+            setProcessing(false);
+            return;
+          }
+        } catch (nfcErr: any) {
+          error("Error verificando tarjeta NFC: " + (nfcErr.message || "Error desconocido"));
+          setProcessing(false);
+          return;
+        }
+      }
+
+      // 2. Crear la membresía
+      let membershipId;
+      try {
+        membershipId = await (window as any).api.assignMembership(
+          selectedClient.id,
+          selectedMembership.id,
+          paymentAmount,
+          notes,
+          currentUser.id || null,
+          phone,
+          idCard,
+          acquisitionDate,
+          totalHours
+        );
+      } catch (err) {
+        error("Error al asignar membresía: " + (err.message || "Error desconocido"));
+        setProcessing(false);
+        return;
+      }
+
+      // 3. Si hay NFC, asignarla a la membresía real (esto ya no debería fallar porque ya validamos antes)
+      if (nfcUid) {
+        try {
+          await (window as any).api.assignNfcCard({
+            clientId: selectedClient.id,
+            clientMembershipId: membershipId,
+            uid: nfcUid
+          });
+        } catch (nfcErr) {
+          // Esto no debería ocurrir, pero si ocurre, cancelar la membresía por seguridad
+          await (window as any).api.cancelClientMembership(membershipId, currentUser.id || null);
+          error("No se pudo asignar la tarjeta NFC: " + (nfcErr.message || "Ya está en uso. La membresía fue cancelada."));
+          setProcessing(false);
+          return;
+        }
+      }
+
+      // 3. Registrar venta en caja SOLO si todo lo anterior fue exitoso
       const saleData = {
         cash_box_id: activeCashBox.id,
         client_id: selectedClient.id,
@@ -236,33 +291,6 @@ export function SellMembership() {
       };
 
       await (window as any).api.createSaleWithItems(saleData);
-
-      // 2. Asignar membresía al cliente
-      const membershipId = await (window as any).api.assignMembership(
-        selectedClient.id,
-        selectedMembership.id,
-        paymentAmount,
-        notes,
-        currentUser.id || null,
-        phone,
-        idCard,
-        acquisitionDate,
-        totalHours
-      );
-
-      // Si se leyó una tarjeta física, asociarla a la membresía
-      if (nfcUid) {
-        try {
-          // format: assignNfcCard({ clientMembershipId, uid, clientId })
-          await (window as any).api.assignNfcCard({
-            clientId: selectedClient.id,
-            clientMembershipId: membershipId,
-            uid: nfcUid
-          });
-        } catch (nfcErr: any) {
-          error("Advertencia: No se pudo asignar la tarjeta NFC: " + (nfcErr.message || "Ya está en uso"));
-        }
-      }
 
       // Guardar datos para impresión
       const membershipData = {
@@ -600,17 +628,19 @@ export function SellMembership() {
                     onChange={(e) => setAcquisitionDate(e.target.value)}
                   />
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    N° de Entradas en horas
-                  </label>
-                      <Input
-                        value={totalHours}
-                        readOnly
-                        placeholder="Ej: 10 horas"
-                        className="bg-gray-50 cursor-not-allowed"
-                      />
-                </div>
+                {selectedMembership && selectedMembership.membership_type === "ventas" && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      N° de Entradas en horas
+                    </label>
+                    <Input
+                      value={totalHours}
+                      readOnly
+                      placeholder="Ej: 10 horas"
+                      className="bg-gray-50 cursor-not-allowed"
+                    />
+                  </div>
+                )}
                 <div className="sm:col-span-2">
                   <label className="block text-sm font-medium text-gray-700 mb-2 flex justify-between">
                     <span>Tarjeta Física NFC (Opcional)</span>
@@ -621,6 +651,13 @@ export function SellMembership() {
                     onChange={(e) => setNfcUid(e.target.value)}
                     placeholder="Escanear tarjeta..."
                     className="border-blue-200 bg-blue-50 focus:border-blue-500"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.keyCode === 13) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        return false;
+                      }
+                    }}
                   />
                 </div>
               </div>

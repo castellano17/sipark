@@ -55,6 +55,7 @@ export const CheckInModal: React.FC<CheckInModalProps> = ({
   const [formData, setFormData] = useState({
     packageId: 0,
     childrenCount: 1,
+    packageCount: 1,
   });
   const [selectedPackageIsStandard, setSelectedPackageIsStandard] = useState(false);
   const [packages, setPackages] = useState<ProductService[]>([]);
@@ -74,9 +75,19 @@ export const CheckInModal: React.FC<CheckInModalProps> = ({
       loadClients();
       resetForm();
     }
-  }, [open]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]); // Solo cuando open cambia (abre o cierra)
 
   useEffect(() => {
+    // Si el cliente seleccionado ya no existe en la lista (fue eliminado), limpiarlo
+    if (selectedClient && clients.length > 0) {
+      const stillExists = clients.some(c => c.id === selectedClient.id);
+      if (!stillExists) {
+        setSelectedClient(null);
+        setSearchQuery("");
+      }
+    }
+
     // Filtrar clientes según búsqueda
     if (searchQuery.trim() === "") {
       setFilteredClients(clients.slice(0, 5)); // Mostrar solo 5 inicialmente
@@ -109,14 +120,16 @@ export const CheckInModal: React.FC<CheckInModalProps> = ({
       allergies: "",
       specialNotes: "",
     });
-    setFormData({ packageId: packages[0]?.id || 0, childrenCount: 1 });
+    setFormData({ packageId: packages[0]?.id || 0, childrenCount: 1, packageCount: 1 });
   };
 
   const loadClients = async () => {
     try {
       const data = await getClients();
       setClients(data || []);
+      return data || [];
     } catch (err) {
+      return [];
     }
   };
 
@@ -164,7 +177,7 @@ export const CheckInModal: React.FC<CheckInModalProps> = ({
         parentName,
         phone,
         formData.packageId,
-        selectedPackage?.duration_minutes || 60,
+        (selectedPackage?.duration_minutes || 60) * formData.packageCount,
         false, // isPaid (placeholder for future logic)
         formData.childrenCount
       );
@@ -179,9 +192,11 @@ export const CheckInModal: React.FC<CheckInModalProps> = ({
         clientId: clientType === "registered" ? selectedClient?.id : undefined,
         clientName,
         packageId: formData.packageId,
-        packageName: selectedPackage?.name || "",
-        packagePrice: selectedPackage?.price || 0,
-        durationMinutes: selectedPackage?.duration_minutes || 60,
+        packageName: `${selectedPackage?.name || ""}${formData.packageCount > 1 ? ` (x${formData.packageCount})` : ""}`,
+        packagePrice: (selectedPackage?.price || 0) * formData.packageCount,
+        durationMinutes: (selectedPackage?.duration_minutes || 60) * formData.packageCount,
+        childrenCount: formData.childrenCount,
+        isStandardEntry: selectedPackageIsStandard,
       });
     } catch (err) {
       errorNotification("Error al registrar la entrada");
@@ -208,8 +223,10 @@ export const CheckInModal: React.FC<CheckInModalProps> = ({
       success("Cliente creado exitosamente");
 
       // Recargar clientes y seleccionar el nuevo
-      await loadClients();
-      const newClient = clients.find((c) => c.id === (result as any)?.id || result);
+      const updatedClients = await loadClients();
+      const newClientId = typeof result === 'object' ? (result as any)?.id : result;
+      const newClient = updatedClients.find((c: any) => c.id === newClientId);
+      
       if (newClient) {
         setSelectedClient(newClient);
         setSearchQuery(newClient.name);
@@ -354,6 +371,10 @@ export const CheckInModal: React.FC<CheckInModalProps> = ({
                           setShowClientDropdown(true);
                         }}
                         onFocus={() => setShowClientDropdown(true)}
+                        onKeyDown={(e) => {
+                          // Prevent Enter from submitting the form when searching
+                          if (e.key === 'Enter') e.preventDefault();
+                        }}
                         placeholder="Buscar por nombre, ID o teléfono..."
                         className="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       />
@@ -698,37 +719,69 @@ export const CheckInModal: React.FC<CheckInModalProps> = ({
               )}
             </div>
 
-            {/* Número de Niños */}
-            <div className="space-y-3 p-4 bg-blue-50/50 rounded-xl border border-blue-100">
-              <div className="flex items-center justify-between">
-                <div>
-                  <label className="block text-sm font-bold text-blue-900">
-                    Número de Niños
-                  </label>
-                  {selectedPackageIsStandard ? (
-                    <p className="text-xs text-amber-600 font-medium">⚠️ Entrada Estándar: solo 1 niño por entrada</p>
-                  ) : (
-                    <p className="text-xs text-blue-600">¿Cuántos niños entran con esta entrada?</p>
-                  )}
+            {/* Número de Niños y Cantidad de Paquetes */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Selector Niños */}
+              <div className="space-y-3 p-4 bg-blue-50/50 rounded-xl border border-blue-100">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <label className="block text-sm font-bold text-blue-900">
+                      Número de Niños
+                    </label>
+                    {selectedPackageIsStandard ? (
+                      <p className="text-xs text-amber-600 font-medium">⚠️ Entrada Estándar: solo 1 niño</p>
+                    ) : (
+                      <p className="text-xs text-blue-600">¿Cuántos niños entran?</p>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-3 bg-white p-2 rounded-lg border border-blue-200">
+                    <button
+                      type="button"
+                      disabled={selectedPackageIsStandard}
+                      onClick={() => setFormData(prev => ({ ...prev, childrenCount: Math.max(1, prev.childrenCount - 1) }))}
+                      className="p-1 hover:bg-slate-100 rounded text-blue-600 disabled:opacity-30"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                    </button>
+                    <span className="text-xl font-bold text-slate-800 w-8 text-center">{formData.childrenCount}</span>
+                    <button
+                      type="button"
+                      disabled={selectedPackageIsStandard}
+                      onClick={() => setFormData(prev => ({ ...prev, childrenCount: prev.childrenCount + 1 }))}
+                      className="p-1 hover:bg-slate-100 rounded text-blue-600 disabled:opacity-30"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                    </button>
+                  </div>
                 </div>
-                <div className="flex items-center gap-3 bg-white p-2 rounded-lg border border-blue-200">
-                  <button
-                    type="button"
-                    disabled={selectedPackageIsStandard}
-                    onClick={() => setFormData(prev => ({ ...prev, childrenCount: Math.max(1, prev.childrenCount - 1) }))}
-                    className="p-1 hover:bg-slate-100 rounded text-blue-600 disabled:opacity-30 disabled:cursor-not-allowed"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-                  </button>
-                  <span className="text-xl font-bold text-slate-800 w-8 text-center">{formData.childrenCount}</span>
-                  <button
-                    type="button"
-                    disabled={selectedPackageIsStandard}
-                    onClick={() => setFormData(prev => ({ ...prev, childrenCount: prev.childrenCount + 1 }))}
-                    className="p-1 hover:bg-slate-100 rounded text-blue-600 disabled:opacity-30 disabled:cursor-not-allowed"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-                  </button>
+              </div>
+
+              {/* Selector Paquetes (Horas) */}
+              <div className="space-y-3 p-4 bg-purple-50/50 rounded-xl border border-purple-100">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <label className="block text-sm font-bold text-purple-900">
+                      Cantidad de Paquetes
+                    </label>
+                    <p className="text-xs text-purple-600">Multiplica el tiempo y precio</p>
+                  </div>
+                  <div className="flex items-center gap-3 bg-white p-2 rounded-lg border border-purple-200">
+                    <button
+                      type="button"
+                      onClick={() => setFormData(prev => ({ ...prev, packageCount: Math.max(1, prev.packageCount - 1) }))}
+                      className="p-1 hover:bg-slate-100 rounded text-purple-600"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                    </button>
+                    <span className="text-xl font-bold text-slate-800 w-8 text-center">{formData.packageCount}</span>
+                    <button
+                      type="button"
+                      onClick={() => setFormData(prev => ({ ...prev, packageCount: prev.packageCount + 1 }))}
+                      className="p-1 hover:bg-slate-100 rounded text-purple-600"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>

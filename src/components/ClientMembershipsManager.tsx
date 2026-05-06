@@ -234,6 +234,7 @@ export function ClientMembershipsManager() {
     if (type === "charge") return <TrendingDown className="w-3.5 h-3.5 text-red-500" />;
     if (type === "recharge") return <TrendingUp className="w-3.5 h-3.5 text-green-600" />;
     if (type === "refund") return <RefreshCcw className="w-3.5 h-3.5 text-blue-500" />;
+    if (type === "discount") return <Award className="w-3.5 h-3.5 text-purple-500" />;
     return <DollarSign className="w-3.5 h-3.5 text-gray-400" />;
   };
 
@@ -241,6 +242,7 @@ export function ClientMembershipsManager() {
     if (type === "charge") return "Cobro";
     if (type === "recharge") return "Recarga";
     if (type === "refund") return "Reembolso";
+    if (type === "discount") return "Descuento";
     return type;
   };
 
@@ -248,10 +250,11 @@ export function ClientMembershipsManager() {
     if (type === "charge") return "text-red-600 font-bold";
     if (type === "recharge") return "text-green-600 font-bold";
     if (type === "refund") return "text-blue-600 font-bold";
+    if (type === "discount") return "text-purple-600 font-bold";
     return "text-gray-700 font-bold";
   };
 
-  const getTxAmountSign = (type: string) => (type === "charge" ? "-" : "+");
+  const getTxAmountSign = (type: string) => (type === "charge" || type === "discount" ? "-" : "+");
 
   if (loading) {
     return (

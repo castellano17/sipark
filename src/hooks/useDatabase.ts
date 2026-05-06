@@ -31,7 +31,10 @@ declare global {
         durationMinutes?: number,
       ) => Promise<any>;
       getActiveSessions: () => Promise<any[]>;
+      deleteSession: (sessionId: number) => Promise<any>;
       endSession: (sessionId: number, finalPrice: number) => Promise<any>;
+      pauseSession: (sessionId: number) => Promise<boolean>;
+      resumeSession: (sessionId: number) => Promise<boolean>;
       getProductsServices: () => Promise<any[]>;
       createProductService: (
         name: string,
@@ -316,6 +319,23 @@ export function useDatabase() {
     }
   }, [handleError]);
 
+  const deleteSession = useCallback(
+    async (sessionId: number) => {
+      try {
+        setLoading(true);
+        setError(null);
+        const result = await window.api.deleteSession(sessionId);
+        return result;
+      } catch (err) {
+        handleError(err);
+        return false;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [handleError]
+  );
+
   const endSession = useCallback(
     async (sessionId: number, finalPrice: number) => {
       try {
@@ -326,6 +346,38 @@ export function useDatabase() {
       } catch (err) {
         handleError(err);
         return null;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [handleError],
+  );
+
+  const pauseSession = useCallback(
+    async (sessionId: number) => {
+      try {
+        setLoading(true);
+        setError(null);
+        return await window.api.pauseSession(sessionId);
+      } catch (err) {
+        handleError(err);
+        return false;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [handleError],
+  );
+
+  const resumeSession = useCallback(
+    async (sessionId: number) => {
+      try {
+        setLoading(true);
+        setError(null);
+        return await window.api.resumeSession(sessionId);
+      } catch (err) {
+        handleError(err);
+        return false;
       } finally {
         setLoading(false);
       }
@@ -535,6 +587,7 @@ export function useDatabase() {
         await window.api.deleteProductService(id);
       } catch (err) {
         handleError(err);
+        throw err;
       } finally {
         setLoading(false);
       }
@@ -558,7 +611,10 @@ export function useDatabase() {
     createClient,
     startSession,
     getActiveSessions,
+    deleteSession,
     endSession,
+    pauseSession,
+    resumeSession,
     getProductsServices,
     getSales,
     getDailyStats,

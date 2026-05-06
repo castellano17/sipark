@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Search, Scan, User, Trash2, Plus, Minus, CreditCard, Wifi, Utensils, Package } from "lucide-react";
+import "../pos-header.css";
+import { Search, Scan, User, Trash2, Plus, Minus, CreditCard, Wifi, Utensils, Package, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
 import { Button } from "./ui/button";
 import { Card } from "./ui/card";
 import { Input } from "./ui/input";
@@ -34,6 +35,8 @@ interface POSScreenProps {
     isPaid?: boolean;
     startTime?: string;
     durationMinutes?: number;
+    childrenCount?: number;
+    isStandardEntry?: boolean;
   } | null;
   onCheckoutComplete?: () => void;
   onNavigate?: (path: string) => void;
@@ -63,23 +66,39 @@ export function POSScreen({
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [cashBoxOpen, setCashBoxOpen] = useState(false);
   const [isCheckingCashBox, setIsCheckingCashBox] = useState(true);
-  const [activeSessionId, setActiveSessionId] = useState<number | null>(null);
+  const [activeSessionId, setActiveSessionId] = useState<number | null>(() => {
+    const saved = localStorage.getItem('pos_active_session_id');
+    return saved ? JSON.parse(saved) : null;
+  });
   const [isMobileCartOpen, setIsMobileCartOpen] = useState(false);
   // Voucher modal state
   const [voucherInfo, setVoucherInfo] = useState<any>(null);
   const [showVoucherModal, setShowVoucherModal] = useState(false);
   const [pendingVoucherCode, setPendingVoucherCode] = useState("");
+  const [voucherClientName, setVoucherClientName] = useState(""); // nombre del cliente para el voucher
+  const [voucherClientSearch, setVoucherClientSearch] = useState(""); // búsqueda de clientes
+  const [voucherClientList, setVoucherClientList] = useState<any[]>([]);
+  const [voucherClientDropdown, setVoucherClientDropdown] = useState(false);
   const [showPackageSelectionModal, setShowPackageSelectionModal] = useState(false);
-  const [currentSale, setCurrentSale] = useState<CurrentSale>({
-    items: [],
-    subtotal: 0,
-    discount: 0,
-    total: 0,
+  const [currentSale, setCurrentSale] = useState<CurrentSale>(() => {
+    const saved = localStorage.getItem('pos_current_sale');
+    return saved ? JSON.parse(saved) : {
+      items: [],
+      subtotal: 0,
+      discount: 0,
+      total: 0,
+    };
   });
-  const [isCheckIn, setIsCheckIn] = useState(false);
+  const [isCheckIn, setIsCheckIn] = useState(() => {
+    const saved = localStorage.getItem('pos_is_check_in');
+    return saved ? JSON.parse(saved) : false;
+  });
   // Waiter pending orders
   const [showPendingOrders, setShowPendingOrders] = useState(false);
-  const [activeWaiterOrderId, setActiveWaiterOrderId] = useState<number | null>(null);
+  const [activeWaiterOrderId, setActiveWaiterOrderId] = useState<number | null>(() => {
+    const saved = localStorage.getItem('pos_active_waiter_order_id');
+    return saved ? JSON.parse(saved) : null;
+  });
 
   // NFC state
   type NfcMode = 'charge' | 'recharge' | null;
@@ -92,6 +111,11 @@ export function POSScreen({
   const [showNfcSim, setShowNfcSim] = useState(false);
   const [nfcSimUid, setNfcSimUid] = useState("04:4A:21:7C:5F:61:81");
   const nfcInputRef = useRef<HTMLInputElement>(null);
+  const [membershipMode, setMembershipMode] = useState<"ventas" | "descuentos">("ventas");
+
+  // Pagination state for POS products
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(12);
 
   const barcodeInputRef = useRef<HTMLInputElement>(null);
 
@@ -105,6 +129,8 @@ export function POSScreen({
       try {
         const mode = await (window as any).api.getSetting('nfc_system_mode');
         if (mode) setNfcSystemMode(mode);
+        const mmode = await (window as any).api.getSetting('membership_mode');
+        if (mmode) setMembershipMode(mmode === 'descuentos' ? 'descuentos' : 'ventas');
       } catch (e) {}
     };
     loadSettings();
@@ -132,6 +158,23 @@ export function POSScreen({
       window.removeEventListener('categories-updated', handleCategoriesUpdate);
     };
   }, []);
+
+  // Persistir estado en localStorage cuando cambie
+  useEffect(() => {
+    localStorage.setItem('pos_current_sale', JSON.stringify(currentSale));
+  }, [currentSale]);
+
+  useEffect(() => {
+    localStorage.setItem('pos_active_session_id', JSON.stringify(activeSessionId));
+  }, [activeSessionId]);
+
+  useEffect(() => {
+    localStorage.setItem('pos_is_check_in', JSON.stringify(isCheckIn));
+  }, [isCheckIn]);
+
+  useEffect(() => {
+    localStorage.setItem('pos_active_waiter_order_id', JSON.stringify(activeWaiterOrderId));
+  }, [activeWaiterOrderId]);
 
   // Atajos de teclado globales para el POS
   useEffect(() => {
@@ -229,17 +272,36 @@ export function POSScreen({
 
       let updatedItems: SaleItem[] = [];
 
-      // isCheckIn: usar datos directamente del checkoutData (paquete excluido de products list)
-      if (checkoutData.isCheckIn) {
+      // isReservationPayment: cobro de reservación (anticipo o saldo final)
+      if (checkoutData.isReservationPayment) {
         if (checkoutData.packageName && checkoutData.packagePrice) {
+          const price = Number(checkoutData.packagePrice);
           updatedItems.push({
-            id: crypto.randomUUID(),
-            product_id: checkoutData.packageId || -1,
-            product_name: checkoutData.packageName,
-            product_type: "package",
+            id: Date.now().toString(36) + Math.random().toString(36).substring(2),
+            product_id: -99,
+            product_name: `📋 ${checkoutData.packageName}`,
+            product_type: "service",
             quantity: 1,
-            unit_price: Number(checkoutData.packagePrice),
-            subtotal: Number(checkoutData.packagePrice),
+            unit_price: price,
+            subtotal: price,
+            duration_minutes: 0,
+            // Metadata de reservación para post-pago
+            _reservation_id: checkoutData.reservationId,
+          } as any);
+        }
+      } else if (checkoutData.isCheckIn) {
+        if (checkoutData.packageName && checkoutData.packagePrice) {
+          const quantity = (checkoutData.childrenCount && checkoutData.childrenCount > 1) ? checkoutData.childrenCount : 1;
+          const price = Number(checkoutData.packagePrice);
+
+          updatedItems.push({
+            id: Date.now().toString(36) + Math.random().toString(36).substring(2),
+            product_id: checkoutData.packageId || -1,
+            product_name: checkoutData.packageName + (quantity > 1 ? ` (${quantity} Niños)` : ''),
+            product_type: "package",
+            quantity: quantity,
+            unit_price: price,
+            subtotal: price * quantity,
             duration_minutes: checkoutData.durationMinutes || 60,
             active_session_id: checkoutData.sessionId, // Link session
           });
@@ -254,30 +316,35 @@ export function POSScreen({
           const product = products.find((p) => p.id === checkoutData.packageId);
           
           if (product) {
+            const quantity = (checkoutData.childrenCount && checkoutData.childrenCount > 1) ? checkoutData.childrenCount : 1;
+            const price = Number(product.price);
+
             updatedItems.push({
-              id: crypto.randomUUID(),
+              id: Date.now().toString(36) + Math.random().toString(36).substring(2),
               product_id: product.id,
-              product_name: product.name,
+              product_name: product.name + (quantity > 1 ? ` (${quantity} Niños)` : ''),
               product_type: product.type,
-              quantity: 1,
-              unit_price: Number(product.price),
-              subtotal: Number(product.price),
-              duration_minutes: product.duration_minutes,
-              active_session_id: checkoutData.sessionId,
+              quantity: quantity,
+              unit_price: price,
+              subtotal: price * quantity,
+              duration_minutes: checkoutData.durationMinutes || 60,
+              active_session_id: checkoutData.sessionId, // Link session
             });
           } else if (checkoutData.packageName && checkoutData.packagePrice) {
             // Si no se encuentra el producto (es paquete), usar datos de checkoutData
-            console.log("📦 Paquete no encontrado en products, usando checkoutData");
+            const quantity = (checkoutData.childrenCount && checkoutData.childrenCount > 1) ? checkoutData.childrenCount : 1;
+            const price = Number(checkoutData.packagePrice);
+
             updatedItems.push({
-              id: crypto.randomUUID(),
+              id: Date.now().toString(36) + Math.random().toString(36).substring(2),
               product_id: checkoutData.packageId || -1,
-              product_name: checkoutData.packageName,
+              product_name: checkoutData.packageName + (quantity > 1 ? ` (${quantity} Niños)` : ''),
               product_type: "package",
-              quantity: 1,
-              unit_price: Number(checkoutData.packagePrice),
-              subtotal: Number(checkoutData.packagePrice),
-              duration_minutes: checkoutData.durationMinutes,
-              active_session_id: checkoutData.sessionId,
+              quantity: quantity,
+              unit_price: price,
+              subtotal: price * quantity,
+              duration_minutes: checkoutData.durationMinutes || 60,
+              active_session_id: checkoutData.sessionId, // Link session
             });
           }
         }
@@ -307,26 +374,33 @@ export function POSScreen({
             console.log("Tiempo extra detectado:", extraMins, "minutos");
             
             if (extraMins > 0) {
-              const extraPriceStr = await (window as any).api.getSetting('extra_minute_price');
-              const extraPricePerMin = parseFloat(extraPriceStr || "1.0");
-              const totalExtraPrice = extraMins * extraPricePerMin;
+              const enableExtraTimeChargeStr = await (window as any).api.getSetting('enable_extra_time_charge');
+              const enableExtraTimeCharge = enableExtraTimeChargeStr !== "false";
 
-              console.log("Precio tiempo extra:", {
-                extraPricePerMin,
-                totalExtraPrice
-              });
+              if (enableExtraTimeCharge) {
+                const extraPriceStr = await (window as any).api.getSetting('extra_minute_price');
+                const extraPricePerMin = parseFloat(extraPriceStr || "1.0");
+                const totalExtraPrice = extraMins * extraPricePerMin;
 
-              updatedItems.push({
-                id: crypto.randomUUID(),
-                product_id: -1,
-                product_name: `Tiempo Extra (${extraMins} min)`,
-                product_type: "time",
-                quantity: 1,
-                unit_price: extraPricePerMin,
-                subtotal: totalExtraPrice,
-              });
+                console.log("Precio tiempo extra:", {
+                  extraPricePerMin,
+                  totalExtraPrice
+                });
 
-              warning(`¡Tiempo Excedido! ${extraMins} min extra registrados.`);
+                updatedItems.push({
+                  id: Date.now().toString(36) + Math.random().toString(36).substring(2),
+                  product_id: -1,
+                  product_name: `Tiempo Extra (${extraMins} min)`,
+                  product_type: "time",
+                  quantity: 1,
+                  unit_price: extraPricePerMin,
+                  subtotal: totalExtraPrice,
+                });
+
+                warning(`¡Tiempo Excedido! ${extraMins} min extra registrados.`);
+              } else {
+                console.log("Cobro de tiempo extra deshabilitado en configuración");
+              }
             }
           } else {
             console.log("No hay tiempo extra - aún dentro del tiempo");
@@ -432,6 +506,15 @@ export function POSScreen({
         if (result?.valid && result?.voucher) {
           setVoucherInfo(result.voucher);
           setPendingVoucherCode(codeCandidate);
+          setVoucherClientName("");
+          setVoucherClientSearch("");
+          setVoucherClientList([]);
+          setVoucherClientDropdown(false);
+          // Precargar clientes
+          try {
+            const clients = await (window as any).api.getClients();
+            setVoucherClientList(clients || []);
+          } catch {}
           setShowVoucherModal(true);
           setBarcodeInput("");
           return;
@@ -459,6 +542,8 @@ export function POSScreen({
     if (!voucherInfo) return;
     const benefitLabel = voucherInfo.type === "hours"
       ? `${voucherInfo.benefit_value}h de juego gratis`
+      : voucherInfo.type === "minutes"
+      ? `${voucherInfo.benefit_value} min de juego gratis`
       : voucherInfo.type === "discount_pct"
       ? `${voucherInfo.benefit_value}% descuento`
       : voucherInfo.type === "discount_fixed"
@@ -487,7 +572,7 @@ export function POSScreen({
     }
 
     const voucherItem: SaleItem = {
-      id: crypto.randomUUID(),
+      id: Date.now().toString(36) + Math.random().toString(36).substring(2),
       product_id: -98,                          // ID especial voucher
       product_name: `🎟 Voucher [${pendingVoucherCode}]: ${voucherInfo.campaign_name} (${benefitLabel})`,
       product_type: "service",
@@ -498,16 +583,16 @@ export function POSScreen({
       nfc_membership_id: undefined,
       voucher_code: pendingVoucherCode,          // guardado para redeemVoucher al pagar
       _voucher_info: voucherInfo,                // Guardar info completa del voucher
+      _voucher_client_name: voucherClientName.trim() || undefined, // nombre del cliente
     } as any;
 
-    setCurrentSale(prev => {
-      const items = [...prev.items, voucherItem];
-      const subtotal = items.reduce((sum, i) => sum + i.subtotal, 0);
-      const totalDiscount = prev.discount + discountAmount;
-      return { ...prev, items, subtotal, discount: totalDiscount, total: Math.max(0, subtotal - totalDiscount) };
-    });
+    const newItems = [...currentSale.items, voucherItem];
+    updateSaleTotals(newItems, currentSale.discount + discountAmount);
+    
     setShowVoucherModal(false);
     setVoucherInfo(null);
+    setVoucherClientName("");
+    setVoucherClientSearch("");
     success(`Voucher ${pendingVoucherCode} agregado. Descuento aplicado: C$${discountAmount.toFixed(2)}`);
   };
 
@@ -522,28 +607,27 @@ export function POSScreen({
       const customEvent = e as CustomEvent;
       const uid = customEvent.detail.uid;
 
+      // Solo llenar el campo, NO ejecutar cobro ni descuento automáticamente
       if (nfcMode !== null) {
-         e.preventDefault(); // Detenemos el cobro rápido
+         e.preventDefault();
          setNfcInput(uid);
-         handleNfcScan(uid);
-         success(`¡Tarjeta escaneada automáticamente! (${uid})`);
+         success(`Tarjeta escaneada: ${uid}. Listo para cobrar o aplicar descuento.`);
          return;
       }
 
+      // Para barcode/cédula: solo llenar input, no cobrar
       const { handleBarcodeSearch: searchFn, products: currentProducts } = handlersRef.current;
       const cleanBarcode = uid.trim();
       const VOUCHER_OLD = "SIPARK-VOUCHER:";
       const VOUCHER_NEW = "SIPARK-VOUCHER-";
-      
       const isVoucher = cleanBarcode.toUpperCase().startsWith(VOUCHER_OLD) || cleanBarcode.toUpperCase().startsWith(VOUCHER_NEW);
-      // Solo interceptamos como producto si el barcode coincide
       const isProduct = currentProducts.some(p => p.barcode === cleanBarcode);
 
       if (isProduct || isVoucher) {
-         e.preventDefault(); // Detenemos el cobro NFC global
-         if (document.activeElement !== barcodeInputRef.current) {
-             searchFn(cleanBarcode);
-         }
+         e.preventDefault();
+         setBarcodeInput(cleanBarcode);
+         success(`Código escaneado: ${cleanBarcode}. Listo para agregar al carrito.`);
+         // No llamar a searchFn automáticamente
       }
     };
     window.addEventListener('nfc-scanned', handleGlobalNfc);
@@ -578,6 +662,21 @@ export function POSScreen({
       if (cardInfo) {
         setNfcCardInfo(cardInfo);
         setNfcStatus('found');
+        if (membershipMode === 'descuentos' && cardInfo.discount_percentage > 0) {
+          const pct = parseFloat(cardInfo.discount_percentage);
+          applyDiscount(0, pct);
+          success(`Membresía "${cardInfo.membership_name}" — ${pct}% de descuento aplicado`);
+          if (cardInfo.client_membership_id) {
+            setCurrentSale(prev => ({
+              ...prev,
+              nfc_membership_id: cardInfo.client_membership_id
+            }));
+          }
+          const tvMsg = await (window as any).api.getSetting('membership_discount_tv_message');
+          if (tvMsg) {
+            (window as any).api.broadcastToCustomer({ type: 'membership-discount', message: tvMsg, client: cardInfo.client_name, discount: pct });
+          }
+        }
       } else {
         setNfcStatus('error');
         error("Tarjeta no encontrada o membresía inactiva");
@@ -647,7 +746,7 @@ export function POSScreen({
 
     // Agrega la recarga al carrito para que pase por caja
     const rechargeItem: SaleItem = {
-      id: crypto.randomUUID(),
+      id: Date.now().toString(36) + Math.random().toString(36).substring(2),
       product_id: -99,                              // ID especial para recarga NFC
       product_name: `Recargar Membresía – ${nfcCardInfo.client_name}`,
       product_type: 'membership',
@@ -670,22 +769,12 @@ export function POSScreen({
       return;
     }
 
-    if (["snack", "drink", "food"].includes(product.type) && product.stock !== undefined && product.stock !== null && product.stock <= 0) {
-      warning("Este producto no tiene stock disponible.");
-      return;
-    }
-
     const existingItem = currentSale.items.find(
       (item) => item.product_id === product.id,
     );
 
     let updatedItems: SaleItem[];
     if (existingItem) {
-      if (["snack", "drink", "food"].includes(product.type) && product.stock !== undefined && product.stock !== null && (existingItem.quantity + 1) > product.stock) {
-        warning(`Solo hay ${product.stock} unidades disponibles de este producto.`);
-        return;
-      }
-
       updatedItems = currentSale.items.map((item) =>
         item.product_id === product.id
           ? {
@@ -697,7 +786,7 @@ export function POSScreen({
       );
     } else {
       const newItem: SaleItem = {
-        id: crypto.randomUUID(),
+        id: Date.now().toString(36) + Math.random().toString(36).substring(2),
         product_id: product.id,
         product_name: product.name,
         product_type: product.type,
@@ -720,15 +809,6 @@ export function POSScreen({
           const newQuantity = item.quantity + delta;
           if (newQuantity <= 0) return null;
           
-          if (delta > 0) {
-            const prodRef = products.find(p => p.id === item.product_id);
-            if (prodRef && ["snack", "drink", "food"].includes(prodRef.type) && prodRef.stock !== undefined && prodRef.stock !== null) {
-              if (newQuantity > prodRef.stock) {
-                // Return same item array element (UI warning could be dispatched)
-                return item; 
-              }
-            }
-          }
           return {
             ...item,
             quantity: newQuantity,
@@ -743,39 +823,87 @@ export function POSScreen({
   };
 
   // Eliminar item
-  const removeItem = (itemId: string) => {
+  const removeItem = async (itemId: string) => {
     const updatedItems = currentSale.items.filter((item) => item.id !== itemId);
+    
+    // Si quitamos el último producto y teníamos una sesión de check-in pendiente, la cancelamos
+    if (updatedItems.length === 0 && isCheckIn && activeSessionId) {
+      try {
+        await (window as any).api.deleteSession(activeSessionId);
+        success("La tarjeta pendiente ha sido destruida.");
+      } catch (err) {
+        console.error("Error al eliminar sesión cancelada por vaciar carrito", err);
+      }
+      setActiveSessionId(null);
+      setIsCheckIn(false);
+      if (onCheckoutComplete) onCheckoutComplete();
+    }
+    
     updateSaleTotals(updatedItems, currentSale.discount);
   };
 
-  const updateSaleTotals = (items: SaleItem[], discount: number) => {
+  const updateSaleTotals = (items: SaleItem[], discount: number, discountPercentage?: number) => {
     const subtotal = items.reduce((sum, item) => sum + Number(item.subtotal), 0);
-    const total = subtotal - Number(discount);
+    
+    let finalDiscount = discount;
+    const finalPct = discountPercentage !== undefined ? discountPercentage : (currentSale.discount_percentage || 0);
 
-    setCurrentSale({
-      ...currentSale,
+    if (finalPct > 0) {
+      finalDiscount = (subtotal * finalPct) / 100;
+    }
+
+    const total = subtotal - Number(finalDiscount);
+
+    setCurrentSale(prev => ({
+      ...prev,
       items,
       subtotal,
-      discount,
+      discount: finalDiscount,
+      discount_percentage: finalPct,
       total: Math.max(0, total),
-    });
+    }));
   };
 
   // Aplicar descuento
-  const applyDiscount = (amount: number) => {
-    updateSaleTotals(currentSale.items, amount);
+  const applyDiscount = (amount: number, percentage?: number) => {
+    updateSaleTotals(currentSale.items, amount, percentage);
   };
 
   // Limpiar venta
-  const clearSale = () => {
+  const clearSale = async (isCancel: boolean | any = true) => {
+    const isActuallyCancel = typeof isCancel === 'boolean' ? isCancel : true;
+
+    // Si era un registro de entrada (check-in pendiente) y el cajero cancela, borramos la sesión
+    if (isActuallyCancel && isCheckIn && activeSessionId) {
+      try {
+        await (window as any).api.deleteSession(activeSessionId);
+        success("La tarjeta pendiente ha sido destruida.");
+      } catch (err) {
+        console.error("Error al eliminar sesión cancelada", err);
+      }
+    }
+
     setCurrentSale({
       items: [],
       subtotal: 0,
       discount: 0,
+      discount_percentage: 0,
       total: 0,
     });
-    setActiveSessionId(null); // Limpiar sessionId también
-    setActiveWaiterOrderId(null); // Limpiar waiter order también
+    setActiveSessionId(null);
+    setIsCheckIn(false);
+    setActiveWaiterOrderId(null);
+
+    // Limpiar localStorage
+    localStorage.removeItem('pos_current_sale');
+    localStorage.removeItem('pos_active_session_id');
+    localStorage.removeItem('pos_is_check_in');
+    localStorage.removeItem('pos_active_waiter_order_id');
+
+    // Avisar al layout que la orden se limpió (para que borre checkoutData y no re-cargue)
+    if (onCheckoutComplete) {
+      onCheckoutComplete();
+    }
   };
 
   const handleSelectClient = (client: Client) => {
@@ -794,11 +922,11 @@ export function POSScreen({
       return;
     }
     const items: SaleItem[] = order.items.map((item: any) => ({
-      id: crypto.randomUUID(),
+      id: Date.now().toString(36) + Math.random().toString(36).substring(2),
       product_id: item.product_id ?? -1,
       product_name: item.product_name,
       product_type: item.product_type || "service",
-      quantity: item.quantity,
+      quantity: parseInt(item.quantity) || item.quantity,
       unit_price: parseFloat(item.unit_price),
       subtotal: parseFloat(item.subtotal),
     }));
@@ -807,6 +935,7 @@ export function POSScreen({
       items,
       subtotal,
       discount: 0,
+      discount_percentage: 0,
       total: subtotal,
       client_name: order.table_or_client_name,
     });
@@ -833,6 +962,7 @@ export function POSScreen({
         total: currentSale.total,
         payment_method: payment.method,
         cash_box_id: activeCashBox.id,
+        discount_membership_id: currentSale.nfc_membership_id,
       });
 
       if (!saleId) {
@@ -874,14 +1004,19 @@ export function POSScreen({
               benefitApplied: { type: (item as any).product_name },
             });
             
-            // Si el voucher es de tipo "hours", crear sesión en el dashboard de tiempos
+            // Si el voucher es de tipo "hours" o "minutes", crear sesión en el dashboard de tiempos
             const voucherInfo = (item as any)._voucher_info;
-            if (voucherInfo && voucherInfo.type === "hours") {
-              const durationMinutes = Math.round(parseFloat(voucherInfo.benefit_value) * 60);
+            if (voucherInfo && (voucherInfo.type === "hours" || voucherInfo.type === "minutes")) {
+              const durationMinutes = voucherInfo.type === "hours"
+                ? Math.round(parseFloat(voucherInfo.benefit_value) * 60)
+                : Math.round(parseFloat(voucherInfo.benefit_value)); // ya en minutos
+              
+              // Usar el nombre del cliente del voucher si fue especificado
+              const clientNameForSession = (item as any)._voucher_client_name || currentSale.client_name || "Cliente General";
               
               try {
                 const sessionResult = await (window as any).api.createSession(
-                  currentSale.client_name || "Cliente General",
+                  clientNameForSession,
                   "", // parentName
                   "", // phone
                   voucherInfo.benefit_package_id || -1, // packageId
@@ -892,7 +1027,10 @@ export function POSScreen({
                 
                 console.log("✅ Sesión creada por voucher:", sessionResult);
                 voucherSessionCreated = true;
-                success(`Sesión de ${voucherInfo.benefit_value}h creada. Ir a Operaciones para iniciar el timer.`);
+                const label = voucherInfo.type === "hours"
+                  ? `${voucherInfo.benefit_value}h`
+                  : `${voucherInfo.benefit_value} min`;
+                success(`Sesión de ${label} creada. Ir a Operaciones para iniciar el timer.`);
               } catch (sessionErr: any) {
                 console.error("Error creando sesión por voucher:", sessionErr);
                 error(`No se pudo crear la sesión: ${sessionErr.message}`);
@@ -924,6 +1062,35 @@ export function POSScreen({
         } catch { /* silencioso */ }
       }
 
+      // Si hay items de reservación, registrar el pago en la reservación
+      for (const item of currentSale.items) {
+        const reservationId = (item as any)._reservation_id;
+        if (reservationId) {
+          try {
+            const cashBox = await (window as any).api.getActiveCashBox();
+            const res = await (window as any).api.registerReservationPayment(reservationId, {
+              amount: item.subtotal,
+              paymentMethod: payment.method,
+              cashBoxId: cashBox?.id || null,
+              userId: null,
+              saleId: saleId,
+            });
+            
+            if (res && res.success) {
+              success(`Pago de reservación registrado correctamente`);
+              window.dispatchEvent(new CustomEvent('reservations-updated'));
+            } else {
+              const errMsg = res?.error || "Error desconocido";
+              error(`Error al registrar pago en reservación: ${errMsg}`);
+              console.error("Error reservación:", errMsg);
+            }
+          } catch (resErr: any) {
+            console.error("Error crítico registrando pago de reservación:", resErr);
+            error(`Error crítico: No se pudo conectar con el servidor de reservaciones`);
+          }
+        }
+      }
+
       // Imprimir ticket
       await printTicket({
         saleId,
@@ -937,9 +1104,11 @@ export function POSScreen({
         change: payment.change,
       });
 
-      clearSale();
+      clearSale(false);
       setShowPaymentModal(false);
       success("Venta procesada exitosamente");
+      loadProducts(); // Recargar productos para actualizar stock visualmente
+
 
       // Si se creó una sesión por voucher, navegar a Operaciones
       if (voucherSessionCreated && onNavigate) {
@@ -984,6 +1153,19 @@ export function POSScreen({
     }
   };
 
+
+
+  // Pagination logic for POS products
+  const totalPages = Math.ceil(filteredProducts.length / itemsPerPage);
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentItems = filteredProducts.slice(indexOfFirstItem, indexOfLastItem);
+
+  // Reset to first page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, selectedCategory]);
+
   return (
     <div className="h-full flex flex-col p-4 gap-4">
       {/* Alerta de Caja Cerrada */}
@@ -1020,7 +1202,7 @@ export function POSScreen({
           {canOpenDrawer("pos") && (
             <Button
               variant="outline"
-              className="flex-1 md:flex-none gap-2 bg-slate-100 font-semibold text-slate-700 hover:bg-slate-200"
+              className="pos-header-btn flex-1 md:flex-none gap-2 bg-slate-100 font-semibold text-slate-700 hover:bg-slate-200"
               onClick={() => openDrawer("Apertura manual desde Punto de Venta")}
               disabled={!cashBoxOpen}
               title="Abrir cajón de dinero manualmente"
@@ -1031,7 +1213,7 @@ export function POSScreen({
           {/* Pedidos Pendientes de Meseros */}
           <Button
             variant="outline"
-            className="flex-1 md:flex-none gap-2 border-orange-400 text-orange-700 hover:bg-orange-50 font-semibold relative"
+            className="pos-header-btn flex-1 md:flex-none gap-2 border-orange-400 text-orange-700 hover:bg-orange-50 font-semibold relative"
             onClick={() => setShowPendingOrders(true)}
             disabled={!cashBoxOpen}
             title="Ver pedidos pendientes de los meseros"
@@ -1042,30 +1224,47 @@ export function POSScreen({
               <span className="absolute -top-1.5 -right-1.5 bg-orange-500 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center">1</span>
             )}
           </Button>
-          {/* NFC Buttons */}
+          {/* NFC Buttons — solo en modo Ventas */}
+          {membershipMode === 'ventas' && (
+            <>
+              <Button
+                variant="outline"
+                className="pos-header-btn flex-1 md:flex-none gap-2 border-purple-400 text-purple-700 hover:bg-purple-50 font-semibold"
+                onClick={() => openNfcModal('charge')}
+                disabled={!cashBoxOpen}
+                title="Cobrar entrada con tarjeta de membresía"
+              >
+                <Wifi className="w-4 h-4" />
+                <span className="hidden md:inline">Cobrar Membresía</span>
+              </Button>
+              <Button
+                variant="outline"
+                className="pos-header-btn flex-1 md:flex-none gap-2 border-blue-400 text-blue-700 hover:bg-blue-50 font-semibold"
+                onClick={() => openNfcModal('recharge')}
+                disabled={!cashBoxOpen}
+                title="Recargar membresía"
+              >
+                <CreditCard className="w-4 h-4" />
+                <span className="hidden md:inline">Recargar Membresía</span>
+              </Button>
+            </>
+          )}
+          {/* En modo Descuentos: botón para escanear tarjeta y aplicar descuento */}
+          {membershipMode === 'descuentos' && (
           <Button
             variant="outline"
-            className="flex-1 md:flex-none gap-2 border-purple-400 text-purple-700 hover:bg-purple-50 font-semibold"
+            className="pos-header-btn flex-1 md:flex-none gap-2 border-green-400 text-green-700 hover:bg-green-50 font-semibold"
             onClick={() => openNfcModal('charge')}
             disabled={!cashBoxOpen}
-            title="Cobrar entrada con tarjeta de membresía"
+            title="Escanear membresía para aplicar descuento"
           >
             <Wifi className="w-4 h-4" />
-            <span className="hidden md:inline">Cobrar Membresía</span>
+            <span className="hidden md:inline">Descuento Membresía</span>
           </Button>
+          )}
           <Button
             variant="outline"
-            className="flex-1 md:flex-none gap-2 border-blue-400 text-blue-700 hover:bg-blue-50 font-semibold"
-            onClick={() => openNfcModal('recharge')}
-            disabled={!cashBoxOpen}
-            title="Recargar membresía"
-          >
-            <CreditCard className="w-4 h-4" />
-            <span className="hidden md:inline">Recargar Membresía</span>
-          </Button>
-          <Button
-            variant="outline"
-            className="w-full md:w-auto gap-2"
+            className="pos-header-btn w-full md:w-auto gap-2"
             onClick={() => setShowClientSelector(true)}
             disabled={!cashBoxOpen}
           >
@@ -1163,7 +1362,7 @@ export function POSScreen({
             </div>
           ) : (
             <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-              {filteredProducts.map((product) => (
+              {currentItems.map((product) => (
                 <Card
                   key={product.id}
                   className="p-0 cursor-pointer hover:shadow-lg transition-all overflow-hidden flex flex-col"
@@ -1178,10 +1377,10 @@ export function POSScreen({
                         className="w-full h-full object-contain p-2"
                       />
                       {/* Badge de stock */}
-                      {["snack", "drink", "food"].includes(product.type) && product.stock !== undefined && product.stock !== null && (
-                        <div className={`absolute top-2 right-2 px-2 py-1 rounded-full text-xs font-bold ${
+                      {product.stock !== undefined && product.stock !== null && !(product.stock === 0 && ["food", "drink", "snack", "rental"].includes(product.type)) && (
+                        <div className={`absolute top-2 right-2 px-2 py-1 rounded-full text-xs font-bold shadow-md z-10 ${
                           product.stock === 0 ? 'bg-red-500 text-white' :
-                          product.stock <= ((product as any).min_stock || 5) ? 'bg-yellow-500 text-white' :
+                          product.stock <= ((product as any).min_stock || 5) ? 'bg-orange-500 text-white' :
                           'bg-green-500 text-white'
                         }`}>
                           {product.stock}
@@ -1192,10 +1391,10 @@ export function POSScreen({
                     <div className="w-full h-32 bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center relative">
                       <Package className="w-12 h-12 text-gray-400" />
                       {/* Badge de stock */}
-                      {["snack", "drink", "food"].includes(product.type) && product.stock !== undefined && product.stock !== null && (
-                        <div className={`absolute top-2 right-2 px-2 py-1 rounded-full text-xs font-bold ${
+                      {product.stock !== undefined && product.stock !== null && !(product.stock === 0 && ["food", "drink", "snack", "rental"].includes(product.type)) && (
+                        <div className={`absolute top-2 right-2 px-2 py-1 rounded-full text-xs font-bold shadow-md z-10 ${
                           product.stock === 0 ? 'bg-red-500 text-white' :
-                          product.stock <= ((product as any).min_stock || 5) ? 'bg-yellow-500 text-white' :
+                          product.stock <= ((product as any).min_stock || 5) ? 'bg-orange-500 text-white' :
                           'bg-green-500 text-white'
                         }`}>
                           {product.stock}
@@ -1225,6 +1424,76 @@ export function POSScreen({
                   </div>
                 </Card>
               ))}
+            </div>
+          )}
+
+          {/* Pagination for POS Products */}
+          {filteredProducts.length > itemsPerPage && !isCheckingCashBox && cashBoxOpen && (
+            <div className="mt-4 flex flex-col sm:flex-row items-center justify-between gap-4 bg-white/50 p-2 rounded-lg border border-gray-100">
+              <div className="flex items-center gap-4">
+                <div className="text-xs text-gray-500">
+                  {filteredProducts.length} productos
+                </div>
+                <div className="flex items-center">
+                  <span className="text-[10px] text-gray-400 mr-2 uppercase font-bold tracking-wider">Ver:</span>
+                  <select 
+                    className="text-xs border rounded px-2 py-1 bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 min-w-[60px]"
+                    value={itemsPerPage}
+                    onChange={(e) => {
+                      setItemsPerPage(Number(e.target.value));
+                      setCurrentPage(1);
+                    }}
+                  >
+                    {[8, 12, 16, 24, 48].map(val => (
+                      <option key={val} value={val}>{val}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(1)}
+                  disabled={currentPage === 1}
+                  className="h-8 w-8 p-0"
+                >
+                  <ChevronsLeft className="w-4 h-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  disabled={currentPage === 1}
+                  className="h-8 w-8 p-0"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </Button>
+                
+                <span className="text-sm font-medium px-2">
+                  {currentPage} / {totalPages}
+                </span>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                  disabled={currentPage === totalPages}
+                  className="h-8 w-8 p-0"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(totalPages)}
+                  disabled={currentPage === totalPages}
+                  className="h-8 w-8 p-0"
+                >
+                  <ChevronsRight className="w-4 h-4" />
+                </Button>
+              </div>
             </div>
           )}
         </div>
@@ -1297,12 +1566,12 @@ export function POSScreen({
               <span>{formatCurrency(currentSale.subtotal)}</span>
             </div>
             <div className="flex justify-between text-sm items-center">
-              <span>Descuento:</span>
+              <span>Descuento{currentSale.discount_percentage && currentSale.discount_percentage > 0 ? ` (${currentSale.discount_percentage}%):` : ':'}</span>
               <Input
                 type="number"
                 value={currentSale.discount}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                  applyDiscount(Number(e.target.value))
+                  applyDiscount(Number(e.target.value), 0)
                 }
                 className="w-24 h-8 text-right"
               />
@@ -1396,11 +1665,11 @@ export function POSScreen({
                 <span>{formatCurrency(currentSale.subtotal)}</span>
               </div>
               <div className="flex justify-between items-center bg-white p-2 rounded-lg border">
-                <span className="text-sm font-semibold text-gray-700">Descuento:</span>
+                <span className="text-sm font-semibold text-gray-700">Descuento{currentSale.discount_percentage && currentSale.discount_percentage > 0 ? ` (${currentSale.discount_percentage}%):` : ':'}</span>
                 <Input
                   type="number"
                   value={currentSale.discount}
-                  onChange={(e) => applyDiscount(Number(e.target.value))}
+                  onChange={(e) => applyDiscount(Number(e.target.value), 0)}
                   className="w-24 h-8 text-right font-bold"
                 />
               </div>
@@ -1473,7 +1742,7 @@ export function POSScreen({
                     value={nfcInput}
                     onChange={(e) => setNfcInput(e.target.value)}
                     onKeyDown={(e) => {
-                      if (e.key === 'Enter') handleNfcScan(nfcInput);
+                      if (e.key === 'Enter') handleNfcScan(e.currentTarget.value);
                     }}
                     placeholder="Acerque la tarjeta al lector..."
                     className="w-full pl-10 pr-4 py-3 border-2 border-dashed border-purple-300 rounded-lg focus:outline-none focus:border-purple-500 text-center font-mono text-sm bg-purple-50"
@@ -1503,9 +1772,15 @@ export function POSScreen({
                   <div className="mt-2 text-sm space-y-1 text-gray-700">
                     <p><span className="font-semibold">Cliente:</span> {nfcCardInfo.client_name}</p>
                     <p><span className="font-semibold">Membresía:</span> {nfcCardInfo.membership_name}</p>
-                    <p className="text-lg font-bold text-green-800">
-                      Saldo: C$ {Number(nfcCardInfo.balance).toFixed(2)}
-                    </p>
+                    {membershipMode === 'descuentos' ? (
+                      <p className="text-lg font-bold text-green-800">
+                        Descuento: {Number(nfcCardInfo.discount_percentage).toFixed(0)}%
+                      </p>
+                    ) : (
+                      <p className="text-lg font-bold text-green-800">
+                        Saldo: C$ {Number(nfcCardInfo.balance).toFixed(2)}
+                      </p>
+                    )}
                   </div>
                 </div>
               )}
@@ -1543,13 +1818,22 @@ export function POSScreen({
               >
                 Cancelar
               </button>
-              {nfcMode === 'charge' && nfcStatus === 'found' && (
+              {nfcMode === 'charge' && nfcStatus === 'found' && membershipMode === 'ventas' && (
                 <button
                   type="button"
                   onClick={handleNfcChargeEntry}
                   className="px-5 py-2 bg-purple-600 text-white rounded-lg text-sm font-bold hover:bg-purple-700"
                 >
                   ✓ Cobrar Entrada
+                </button>
+              )}
+              {nfcMode === 'charge' && nfcStatus === 'found' && membershipMode === 'descuentos' && (
+                <button
+                  type="button"
+                  onClick={closeNfcModal}
+                  className="px-5 py-2 bg-green-600 text-white rounded-lg text-sm font-bold hover:bg-green-700"
+                >
+                  ✓ Descuento Aplicado
                 </button>
               )}
               {nfcMode === 'recharge' && nfcStatus === 'found' && (
@@ -1603,6 +1887,59 @@ export function POSScreen({
                 </div>
               )}
             </div>
+
+            {/* Campo de cliente */}
+            <div className="mb-4">
+              <label className="block text-xs font-semibold text-slate-600 mb-1">
+                👤 Nombre del Cliente <span className="text-slate-400 font-normal">(opcional)</span>
+              </label>
+              <div className="relative">
+                <input
+                  type="text"
+                  value={voucherClientSearch}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setVoucherClientSearch(val);
+                    setVoucherClientName(val); // permite escribir nombre libre
+                    setVoucherClientDropdown(val.trim().length > 0);
+                  }}
+                  onFocus={() => setVoucherClientDropdown(voucherClientSearch.trim().length > 0 || true)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') e.preventDefault(); }}
+                  placeholder="Buscar cliente o escribir nombre..."
+                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400"
+                />
+                {voucherClientDropdown && voucherClientList.length > 0 && (
+                  <div className="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-44 overflow-y-auto">
+                    {voucherClientList
+                      .filter((c: any) =>
+                        !voucherClientSearch.trim() ||
+                        (c.name && c.name.toLowerCase().includes(voucherClientSearch.toLowerCase())) ||
+                        (c.parent_name && c.parent_name.toLowerCase().includes(voucherClientSearch.toLowerCase()))
+                      )
+                      .slice(0, 8)
+                      .map((c: any) => (
+                        <div
+                          key={c.id}
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => {
+                            setVoucherClientName(c.name);
+                            setVoucherClientSearch(c.name);
+                            setVoucherClientDropdown(false);
+                          }}
+                          className="px-3 py-2 hover:bg-purple-50 cursor-pointer text-sm border-b border-slate-100 last:border-0"
+                        >
+                          <span className="font-medium text-slate-800">{c.name}</span>
+                          {c.parent_name && <span className="text-xs text-slate-400 ml-1">— Tutor: {c.parent_name}</span>}
+                        </div>
+                      ))}
+                  </div>
+                )}
+              </div>
+              {voucherClientName.trim() && (
+                <p className="text-xs text-purple-600 mt-1">✓ Se registrará como: <strong>{voucherClientName.trim()}</strong></p>
+              )}
+            </div>
+
             <p className="text-xs text-slate-400 text-center mb-4">
               Se agregará al carrito con total C$0.00 y quedará registrado en el sistema al procesar la venta.
             </p>

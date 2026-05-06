@@ -9,6 +9,10 @@ import {
   Printer,
   Upload,
   X,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
 } from "lucide-react";
 import { useDropzone } from "react-dropzone";
 import { Card } from "./ui/card";
@@ -55,16 +59,18 @@ export function Products() {
   const { canCreate, canEdit, canDelete } = usePermissions();
   const { exportToExcel, exportToPDF, printReport } = useReportExport();
   const [searchTerm, setSearchTerm] = useState("");
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
 
   const [formData, setFormData] = useState({
     name: "",
     price: "",
     type: "food",
     category: "",
-    barcode: "",
-    stock: "0",
+    stock: "",
     duration_minutes: "",
-    requires_stock: false,
   });
 
   useEffect(() => {
@@ -193,7 +199,7 @@ export function Products() {
           formData.type,
           formData.category || null,
           formData.barcode || null,
-          formData.requires_stock ? parseInt(formData.stock) : null,
+          formData.stock.trim() !== "" ? parseInt(formData.stock) : null,
           formData.duration_minutes ? parseInt(formData.duration_minutes) : null,
           imagePath
         );
@@ -206,7 +212,7 @@ export function Products() {
           formData.type,
           formData.category || null,
           formData.barcode || null,
-          formData.requires_stock ? parseInt(formData.stock) : null,
+          formData.stock.trim() !== "" ? parseInt(formData.stock) : null,
           formData.duration_minutes ? parseInt(formData.duration_minutes) : null,
           null
         );
@@ -228,7 +234,7 @@ export function Products() {
             formData.type,
             formData.category || null,
             formData.barcode || null,
-            formData.requires_stock ? parseInt(formData.stock) : null,
+            formData.stock.trim() !== "" ? parseInt(formData.stock) : null,
             formData.duration_minutes ? parseInt(formData.duration_minutes) : null,
             imagePath
           );
@@ -251,9 +257,8 @@ export function Products() {
       type: product.type,
       category: product.category || "",
       barcode: product.barcode || "",
-      stock: product.stock?.toString() || "0",
+      stock: product.stock?.toString() || "",
       duration_minutes: product.duration_minutes?.toString() || "",
-      requires_stock: product.stock !== null && product.stock !== undefined,
     });
     
     // Cargar imagen si existe
@@ -288,8 +293,9 @@ export function Products() {
       await window.api.deleteProductService(productToDelete.id);
       success("Producto eliminado");
       loadProducts();
-    } catch (err) {
-      error("Error eliminando producto");
+    } catch (err: any) {
+      const errorMsg = err.message ? err.message.split('Error: ').pop() : "Error eliminando producto";
+      error(errorMsg);
     } finally {
       setShowDeleteConfirm(false);
       setProductToDelete(null);
@@ -306,20 +312,29 @@ export function Products() {
       price: "",
       type: "food",
       category: "",
-      barcode: "",
-      stock: "0",
+      stock: "",
       duration_minutes: "",
-      requires_stock: false,
     });
   };
 
-  const isPhysicalProduct = (type: string) => ["drink", "snack", "rental"].includes(type);
-  const isTimeBasedService = (type: string) => ["time", "package"].includes(type);
+  const isPhysicalProduct = (product: any) => !["time", "package"].includes(product.type);
+  const isTimeBasedService = (product: any) => product.type === "time" || product.type === "package";
 
   const filteredProducts = products.filter((p) =>
     p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     p.barcode?.includes(searchTerm)
   );
+
+  // Pagination logic
+  const totalPages = Math.ceil(filteredProducts.length / itemsPerPage);
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentItems = filteredProducts.slice(indexOfFirstItem, indexOfLastItem);
+
+  // Reset to first page when search changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
 
   const reportConfig = {
     title: "Catálogo de Productos y Servicios",
@@ -335,12 +350,12 @@ export function Products() {
     ],
     data: filteredProducts.map((p) => ({
       ...p,
-      stock_label: isPhysicalProduct(p.type) ? p.stock : "N/A",
+      stock_label: isPhysicalProduct(p) ? (p.stock !== null ? p.stock : "Ilimitado") : "N/A",
     })),
   };
 
   return (
-    <div className="h-full flex flex-col bg-gray-50">
+    <div className="h-full flex flex-col bg-gray-50 overflow-hidden">
       <div className="bg-white border-b px-6 py-4">
         <div className="flex items-center justify-between">
           <div>
@@ -366,11 +381,12 @@ export function Products() {
         </div>
       </div>
 
-      <div className="mb-4 px-6 pt-4">
+      <div className="px-6 pt-4">
         <Input placeholder="Buscar por nombre o código de barras..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full" />
       </div>
 
-      <Card className="mx-6 mb-6 overflow-hidden">
+      <div className="flex-1 overflow-auto p-6">
+        <Card className="overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
           <thead className="bg-gray-50 border-b">
@@ -384,14 +400,14 @@ export function Products() {
             </tr>
           </thead>
           <tbody className="divide-y text-sm">
-            {filteredProducts.map((product) => (
+            {currentItems.map((product) => (
               <tr key={product.id} className="hover:bg-gray-50">
                 <td className="px-4 py-3 font-medium">{product.name}</td>
                 <td className="px-4 py-3 capitalize">{product.category || "-"}</td>
                 <td className="px-4 py-3 font-mono">{product.barcode || "-"}</td>
                 <td className="px-4 py-3 text-right">{formatCurrency(product.price)}</td>
                 <td className="px-4 py-3 text-center">
-                  {isPhysicalProduct(product.type) ? product.stock : "N/A"}
+                  {product.stock !== undefined && product.stock !== null && !(product.stock === 0 && ["food", "drink", "snack", "rental"].includes(product.type)) ? product.stock : <span className="text-blue-600 font-medium italic">Ilimitado</span>}
                 </td>
                 <td className="px-4 py-3 text-center">
                   <div className="flex justify-center gap-1">
@@ -407,14 +423,116 @@ export function Products() {
             ))}
           </tbody>
         </table>
-        {products.length === 0 && (
-          <div className="text-center py-12">
-            <Package className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-            <p className="text-gray-500">No hay productos registrados</p>
+          {filteredProducts.length === 0 && (
+            <div className="text-center py-12">
+              <Package className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+              <p className="text-gray-500">No se encontraron productos</p>
+            </div>
+          )}
+        </div>
+
+        {/* Modern Pagination UI */}
+        {filteredProducts.length > 0 && (
+          <div className="px-6 py-4 bg-white border-t flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="text-sm text-gray-500">
+              Mostrando <span className="font-semibold text-gray-900">{indexOfFirstItem + 1}</span> a{" "}
+              <span className="font-semibold text-gray-900">
+                {Math.min(indexOfLastItem, filteredProducts.length)}
+              </span>{" "}
+              de <span className="font-semibold text-gray-900">{filteredProducts.length}</span> productos
+            </div>
+            
+            <div className="flex items-center gap-2">
+              <div className="flex items-center mr-4">
+                <span className="text-xs text-gray-500 mr-2">Filas por página:</span>
+                <select 
+                  className="text-xs border rounded px-2 py-1 bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 min-w-[60px]"
+                  value={itemsPerPage}
+                  onChange={(e) => {
+                    setItemsPerPage(Number(e.target.value));
+                    setCurrentPage(1);
+                  }}
+                >
+                  {[5, 10, 20, 50].map(val => (
+                    <option key={val} value={val}>{val}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(1)}
+                  disabled={currentPage === 1}
+                  className="h-8 w-8 p-0"
+                  title="Primera página"
+                >
+                  <ChevronsLeft className="w-4 h-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  disabled={currentPage === 1}
+                  className="h-8 w-8 p-0"
+                  title="Anterior"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </Button>
+                
+                {/* Generate page numbers */}
+                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                  let pageNum;
+                  if (totalPages <= 5) {
+                    pageNum = i + 1;
+                  } else if (currentPage <= 3) {
+                    pageNum = i + 1;
+                  } else if (currentPage >= totalPages - 2) {
+                    pageNum = totalPages - 4 + i;
+                  } else {
+                    pageNum = currentPage - 2 + i;
+                  }
+                  
+                  return (
+                    <Button
+                      key={pageNum}
+                      variant={currentPage === pageNum ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setCurrentPage(pageNum)}
+                      className={`h-8 w-8 p-0 ${currentPage === pageNum ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600'}`}
+                    >
+                      {pageNum}
+                    </Button>
+                  );
+                })}
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                  disabled={currentPage === totalPages}
+                  className="h-8 w-8 p-0"
+                  title="Siguiente"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(totalPages)}
+                  disabled={currentPage === totalPages}
+                  className="h-8 w-8 p-0"
+                  title="Última página"
+                >
+                  <ChevronsRight className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
           </div>
         )}
-        </div>
       </Card>
+      </div>
 
       {showModal && (
         <Dialog open={showModal} onOpenChange={handleCloseModal}>
@@ -465,29 +583,13 @@ export function Products() {
                        <Input value={formData.barcode} onChange={(e) => setFormData({...formData, barcode: e.target.value})} placeholder="7501055302000" />
                     </div>
                     
-                    {/* Switch para control de stock */}
-                    <div className="md:col-span-2 flex items-center gap-3 p-3 bg-gray-50 rounded-lg border">
-                      <label className="flex items-center gap-2 cursor-pointer flex-1">
-                        <input
-                          type="checkbox"
-                          checked={formData.requires_stock}
-                          onChange={(e) => setFormData({...formData, requires_stock: e.target.checked})}
-                          className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                        />
-                        <div>
-                          <span className="text-sm font-medium text-gray-900">Este producto requiere control de stock</span>
-                          <p className="text-xs text-gray-500">Activar si el producto es físico y necesita inventario</p>
-                        </div>
-                      </label>
-                    </div>
-                    
-                    {formData.requires_stock && editingProduct && (
+                    {isPhysicalProduct(formData) && (
                       <div>
                         <label className="block text-sm font-medium mb-1">Stock Actual</label>
                         <Input type="number" value={formData.stock} onChange={(e) => setFormData({...formData, stock: e.target.value})} />
                       </div>
                     )}
-                    {isTimeBasedService(formData.type) && (
+                    {isTimeBasedService(formData) && (
                       <div>
                         <label className="block text-sm font-medium mb-1">Duración (minutos)</label>
                         <Input type="number" min="1" value={formData.duration_minutes} onChange={(e) => setFormData({...formData, duration_minutes: e.target.value})} />

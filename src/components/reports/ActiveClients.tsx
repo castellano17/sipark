@@ -4,7 +4,7 @@ import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { useCurrency } from "../../hooks/useCurrency";
 import { useReportExport } from "../../hooks/useReportExport";
-import { Download, FileSpreadsheet, Users } from "lucide-react";
+import { FileDown, FileSpreadsheet, Printer, Users } from "lucide-react";
 
 interface ActiveClientsProps {
   onBack: () => void;
@@ -12,7 +12,7 @@ interface ActiveClientsProps {
 
 export default function ActiveClients({ onBack }: ActiveClientsProps) {
   const { formatCurrency } = useCurrency();
-  const { exportToExcel, exportToPDF } = useReportExport();
+  const { exportToExcel, exportToPDF, printReport } = useReportExport();
 
   const [days, setDays] = useState(30);
   const [reportData, setReportData] = useState<any>(null);
@@ -35,32 +35,51 @@ export default function ActiveClients({ onBack }: ActiveClientsProps) {
 
   const handleExportExcel = () => {
     if (!reportData) return;
-
-    const data = reportData.clients.map((c: any) => ({
-      Cliente: c.name,
-      Email: c.email || "N/A",
-      Teléfono: c.phone || "N/A",
-      "Última Visita": c.last_visit,
-      "Total Visitas": c.total_visits,
-      "Total Gastado": c.total_spent,
-      "Ticket Promedio": c.avg_ticket,
-    }));
-
-    exportToExcel(data, "clientes-activos");
+    exportToExcel({
+      title: "Clientes Activos",
+      filename: "clientes-activos",
+      subtitle: `Últimos ${days} días`,
+      columns: [
+        { header: "Cliente", key: "name" },
+        { header: "Email", key: "email" },
+        { header: "Teléfono", key: "phone" },
+        { header: "Última Visita", key: "last_visit", format: "date" },
+        { header: "Total Visitas", key: "total_visits", format: "number" },
+        { header: "Total Gastado", key: "total_spent", format: "currency" },
+        { header: "Ticket Promedio", key: "avg_ticket", format: "currency" },
+      ],
+      data: reportData.clients,
+    });
   };
+
+  const pdfColumns = [
+    { header: "Cliente", key: "name", width: 30 },
+    { header: "Última Visita", key: "last_visit", format: "date" as const, width: 20 },
+    { header: "Total Visitas", key: "total_visits", format: "number" as const, width: 15 },
+    { header: "Total Gastado", key: "total_spent", format: "currency" as const, width: 20 },
+    { header: "Ticket Promedio", key: "avg_ticket", format: "currency" as const, width: 20 },
+  ];
 
   const handleExportPDF = () => {
     if (!reportData) return;
+    exportToPDF({
+      title: "Clientes Activos",
+      filename: "clientes-activos",
+      subtitle: `Últimos ${days} días`,
+      columns: pdfColumns,
+      data: reportData.clients,
+    });
+  };
 
-    const columns = ["Cliente", "Última Visita", "Visitas", "Total Gastado"];
-    const data = reportData.clients.map((c: any) => [
-      c.name,
-      new Date(c.last_visit).toLocaleDateString(),
-      c.total_visits,
-      formatCurrency(c.total_spent),
-    ]);
-
-    exportToPDF("Clientes Activos", columns, data, `Últimos ${days} días`);
+  const handlePrint = () => {
+    if (!reportData) return;
+    printReport({
+      title: "Clientes Activos",
+      filename: "clientes-activos",
+      subtitle: `Últimos ${days} días`,
+      columns: pdfColumns,
+      data: reportData.clients,
+    });
   };
 
   if (loading && !reportData) {
@@ -86,15 +105,17 @@ export default function ActiveClients({ onBack }: ActiveClientsProps) {
           </div>
         </div>
         <div className="flex gap-2">
-          <Button
-                        className="h-8 w-8 p-0" onClick={handleExportExcel} variant="outline" size="sm">
-            <FileSpreadsheet className="w-4 h-4 mr-2" />
+          <Button onClick={handleExportExcel} variant="outline" size="sm" className="flex items-center gap-1.5 whitespace-nowrap">
+            <FileSpreadsheet className="w-4 h-4" />
             Excel
           </Button>
-          <Button
-                        className="h-8 w-8 p-0" onClick={handleExportPDF} variant="outline" size="sm">
-            <Download className="w-4 h-4 mr-2" />
+          <Button onClick={handleExportPDF} variant="outline" size="sm" className="flex items-center gap-1.5 whitespace-nowrap">
+            <FileDown className="w-4 h-4" />
             PDF
+          </Button>
+          <Button onClick={handlePrint} variant="outline" size="sm" className="flex items-center gap-1.5 whitespace-nowrap">
+            <Printer className="w-4 h-4" />
+            Imprimir
           </Button>
         </div>
       </div>

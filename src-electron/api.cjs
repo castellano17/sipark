@@ -8,13 +8,13 @@ function getLocalTimestamp() {
   // Devolver timestamp en hora local, no UTC
   // Esto asegura que el frontend y backend usen la misma zona horaria
   const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  const hours = String(date.getHours()).padStart(2, '0');
-  const minutes = String(date.getMinutes()).padStart(2, '0');
-  const seconds = String(date.getSeconds()).padStart(2, '0');
-  const ms = String(date.getMilliseconds()).padStart(3, '0');
-  
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  const hours = String(date.getHours()).padStart(2, "0");
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+  const seconds = String(date.getSeconds()).padStart(2, "0");
+  const ms = String(date.getMilliseconds()).padStart(3, "0");
+
   return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}.${ms}Z`;
 }
 
@@ -41,8 +41,10 @@ async function createClient(
   specialNotes,
 ) {
   try {
-    if (!name || typeof name !== 'string' || !name.trim()) {
-      throw new Error("El campo 'Nombre del padre/madre/tutor' es obligatorio.");
+    if (!name || typeof name !== "string" || !name.trim()) {
+      throw new Error(
+        "El campo 'Nombre del padre/madre/tutor' es obligatorio.",
+      );
     }
 
     // Verificar si ya existe un cliente con el mismo nombre y teléfono
@@ -185,9 +187,9 @@ async function startSession(clientId, packageId, durationMinutes = 60) {
 }
 
 async function getActiveSessions() {
-  const os = require('os');
-  const fs = require('fs');
-  const path = require('path');
+  const os = require("os");
+  const fs = require("fs");
+  const path = require("path");
   const logFile = path.join(os.homedir(), "sipark_api_debug.txt");
   try {
     // Consulta ULTRA SIMPLE sin filtros complejos para asegurar que devuelva ALGO
@@ -202,28 +204,50 @@ async function getActiveSessions() {
       ORDER BY s.id DESC
       LIMIT 50
     `);
-    
+
     // Filtrar en memoria por seguridad pero loguear el total
-    const activeOnes = sessions.filter(s => 
-       s.status && (s.status.toLowerCase() === 'active' || s.status.toLowerCase() === 'pending')
+    const activeOnes = sessions.filter(
+      (s) =>
+        s.status &&
+        (s.status.toLowerCase() === "active" ||
+          s.status.toLowerCase() === "pending"),
     );
 
-    try { fs.appendFileSync(logFile, `[${new Date().toISOString()}] Dashboard: Total DB=${sessions.length}, Activos=${activeOnes.length}\n`); } catch(e) {}
-    
+    try {
+      fs.appendFileSync(
+        logFile,
+        `[${new Date().toISOString()}] Dashboard: Total DB=${sessions.length}, Activos=${activeOnes.length}\n`,
+      );
+    } catch (e) {}
+
     // EXTREMADAMENTE IMPORTANTE PARA WINDOWS / ELECTRON IPC:
     // Destruir cualquier rastro de objetos nativos (Dates de Postgres, Buffers, etc.)
     // transformándolos forzosamente en strings puros de JSON.
     // Si Electron detecta un objeto desconocido de C++, aborta la transmisión en silencio y devuelve [].
-    // ADEMÁS, PostgreSQL 'pg' driver a menudo devuelve BIGINTs como objetos BigInt natively. 
+    // ADEMÁS, PostgreSQL 'pg' driver a menudo devuelve BIGINTs como objetos BigInt natively.
     // JSON.stringify tira un FATAL ERROR de TYPE si encuentra un BigInt, causando que la pantalla quede en 0.
     const safePayloadJson = JSON.stringify(activeOnes, (key, value) =>
-      typeof value === 'bigint' ? Number(value) : value
+      typeof value === "bigint" ? Number(value) : value,
     );
     const safePayload = JSON.parse(safePayloadJson);
 
     return safePayload;
   } catch (error) {
-    try { fs.appendFileSync(logFile, `[${new Date().toISOString()}] FALLO CRITICO: ${error.message}\n`); } catch(e) {}
+    try {
+      fs.appendFileSync(
+        logFile,
+        `[${new Date().toISOString()}] FALLO CRITICO: ${error.message}\n`,
+      );
+    } catch (e) {}
+    throw error;
+  }
+}
+
+async function deleteSession(sessionId) {
+  try {
+    await runAsync("DELETE FROM active_sessions WHERE id = $1", [sessionId]);
+    return true;
+  } catch (error) {
     throw error;
   }
 }
@@ -247,13 +271,42 @@ async function endSession(sessionId, finalPrice) {
     );
 
     // Actualizar estado de sesión con tiempo final
+    const endTimestamp = getLocalTimestamp();
     await runAsync(
       "UPDATE active_sessions SET status = ?, end_time = ?, elapsed_minutes = ? WHERE id = ?",
-      ["completed", getLocalTimestamp(), elapsedMinutes, sessionId],
+      ["completed", endTimestamp, elapsedMinutes, sessionId],
     );
 
-    // NO crear venta aquí - la venta se crea en POSScreen con createSaleWithItems
-    // Solo retornar info de la sesión
+    // Registrar o actualizar visita del cliente
+    // Buscar si ya existe una visita para este cliente y este inicio de sesión
+    let visit = await getAsync(
+      `SELECT * FROM client_visits WHERE client_id = ? AND visit_date = ? AND check_in_time = ?`,
+      [session.client_id, session.start_time.split("T")[0], session.start_time],
+    );
+
+    if (!visit) {
+      // Crear visita
+      await createClientVisit(
+        session.client_id,
+        session.start_time.split("T")[0],
+        session.start_time,
+        finalPrice || 0,
+        "",
+        "auto",
+      );
+      // Buscar de nuevo para obtener el id
+      visit = await getAsync(
+        `SELECT * FROM client_visits WHERE client_id = ? AND visit_date = ? AND check_in_time = ?`,
+        [
+          session.client_id,
+          session.start_time.split("T")[0],
+          session.start_time,
+        ],
+      );
+    }
+    if (visit) {
+      await updateClientVisitCheckout(visit.id, endTimestamp, elapsedMinutes);
+    }
 
     return {
       session_id: sessionId,
@@ -337,10 +390,14 @@ async function updateProductService(
 async function updateProductCategory(productId, categoryName) {
   try {
     // Buscar el tipo de la categoría seleccionada
-    const category = await getAsync("SELECT type FROM categories WHERE name = ?", [categoryName]);
+    const category = await getAsync(
+      "SELECT type FROM categories WHERE name = ?",
+      [categoryName],
+    );
     const type = category ? category.type : "food";
 
-    const sql = "UPDATE products_services SET category = ?, type = ? WHERE id = ?";
+    const sql =
+      "UPDATE products_services SET category = ?, type = ? WHERE id = ?";
     await runAsync(sql, [categoryName, type, productId]);
     return true;
   } catch (error) {
@@ -350,6 +407,35 @@ async function updateProductCategory(productId, categoryName) {
 
 async function deleteProductService(id) {
   try {
+    const hasSessions = await getAsync(
+      "SELECT COUNT(*) as count FROM active_sessions WHERE package_id = ?",
+      [id],
+    );
+    const hasReservations = await getAsync(
+      "SELECT COUNT(*) as count FROM reservations WHERE package_id = ?",
+      [id],
+    );
+    const hasSales = await getAsync(
+      "SELECT COUNT(*) as count FROM sale_items WHERE product_id = ?",
+      [id],
+    );
+    const hasQuotations = await getAsync(
+      "SELECT COUNT(*) as count FROM quotation_items WHERE product_id = ?",
+      [id],
+    );
+
+    const totalRecords =
+      (hasSessions?.count || 0) +
+      (hasReservations?.count || 0) +
+      (hasSales?.count || 0) +
+      (hasQuotations?.count || 0);
+
+    if (totalRecords > 0) {
+      throw new Error(
+        `No se puede eliminar el producto/paquete porque está en uso en ${totalRecords} registro(s) (sesiones, reservaciones, ventas o cotizaciones)`,
+      );
+    }
+
     const sql = "DELETE FROM products_services WHERE id = ?";
     await runAsync(sql, [id]);
   } catch (error) {
@@ -359,22 +445,88 @@ async function deleteProductService(id) {
 
 // ============ SALES ============
 
-async function getSales(limit = 100) {
+async function getSales(limit = 100, saleType = null) {
   try {
-    const sql = `
+    const saleTypeSubquery = `
+      CASE 
+        WHEN EXISTS (SELECT 1 FROM voucher_redemptions vr WHERE vr.sale_id = s.id) THEN 'promo'
+        WHEN EXISTS (
+          SELECT 1 FROM sale_items si2
+          WHERE si2.sale_id = s.id AND (
+            si2.product_type = 'membership'
+            OR LOWER(si2.product_name) LIKE '%membres%'
+          )
+        ) THEN 'membership'
+        WHEN EXISTS (
+          SELECT 1 FROM sale_items si2
+          WHERE si2.sale_id = s.id AND (
+            si2.product_type IN ('package', 'time')
+            OR LOWER(si2.product_name) LIKE '%paquete%'
+          )
+        ) THEN 'package'
+        ELSE 'product'
+      END`;
+
+    let sql = `
       SELECT 
         s.id,
         s.client_id,
         COALESCE(c.name, 'Cliente General') as client_name,
         s.total,
         s.timestamp,
-        s.payment_method
+        s.payment_method,
+        (
+          SELECT STRING_AGG(si.product_name || ' x' || si.quantity, ', ' ORDER BY si.id)
+          FROM sale_items si
+          WHERE si.sale_id = s.id
+        ) as products,
+        (${saleTypeSubquery}) as sale_type
       FROM sales s
       LEFT JOIN clients c ON s.client_id = c.id
-      ORDER BY s.timestamp DESC
-      LIMIT ?
     `;
-    const sales = await allAsync(sql, [limit]);
+
+    const params = [];
+    const conditions = [];
+
+    if (saleType && saleType !== "all") {
+      if (saleType === "promo") {
+        conditions.push(
+          `EXISTS (SELECT 1 FROM voucher_redemptions vr WHERE vr.sale_id = s.id)`,
+        );
+      } else if (saleType === "membership") {
+        conditions.push(`EXISTS (
+          SELECT 1 FROM sale_items si2 WHERE si2.sale_id = s.id AND (
+            si2.product_type = 'membership' OR LOWER(si2.product_name) LIKE '%membres%'
+          )
+        ) AND NOT EXISTS (SELECT 1 FROM voucher_redemptions vr WHERE vr.sale_id = s.id)`);
+      } else if (saleType === "package") {
+        conditions.push(`EXISTS (
+          SELECT 1 FROM sale_items si2 WHERE si2.sale_id = s.id AND (
+            si2.product_type IN ('package', 'time') OR LOWER(si2.product_name) LIKE '%paquete%'
+          )
+        ) AND NOT EXISTS (
+          SELECT 1 FROM sale_items si2 WHERE si2.sale_id = s.id AND (
+            si2.product_type = 'membership' OR LOWER(si2.product_name) LIKE '%membres%'
+          )
+        ) AND NOT EXISTS (SELECT 1 FROM voucher_redemptions vr WHERE vr.sale_id = s.id)`);
+      } else if (saleType === "product") {
+        conditions.push(`NOT EXISTS (SELECT 1 FROM voucher_redemptions vr WHERE vr.sale_id = s.id) AND NOT EXISTS (
+          SELECT 1 FROM sale_items si2 WHERE si2.sale_id = s.id AND (
+            si2.product_type = 'membership' OR LOWER(si2.product_name) LIKE '%membres%'
+            OR si2.product_type IN ('package', 'time') OR LOWER(si2.product_name) LIKE '%paquete%'
+          )
+        )`);
+      }
+    }
+
+    if (conditions.length > 0) {
+      sql += ` WHERE ` + conditions.join(" AND ");
+    }
+
+    params.push(limit);
+    sql += ` ORDER BY s.timestamp DESC LIMIT $${params.length}`;
+
+    const sales = await allAsync(sql, params);
     return sales;
   } catch (error) {
     throw error;
@@ -477,7 +629,8 @@ async function getExecutiveDashboard() {
     const lowStock = await allAsync(
       `SELECT id, name, stock, price
       FROM products_services
-      WHERE type IN ('food', 'drink', 'snack', 'rental') AND stock < 10
+      WHERE type IN ('food', 'drink', 'snack', 'rental') 
+      AND stock IS NOT NULL AND stock < 10
       ORDER BY stock ASC
       LIMIT 5`,
     );
@@ -591,8 +744,33 @@ async function getExecutiveDashboard() {
 
 // ============ REPORTES ============
 
-async function getSalesByPeriod(startDate, endDate, paymentMethod = null) {
+async function getSalesByPeriod(
+  startDate,
+  endDate,
+  paymentMethod = null,
+  saleType = null,
+) {
   try {
+    const saleTypeSubquery = `
+      CASE 
+        WHEN EXISTS (SELECT 1 FROM voucher_redemptions vr WHERE vr.sale_id = s.id) THEN 'promo'
+        WHEN EXISTS (
+          SELECT 1 FROM sale_items si2
+          WHERE si2.sale_id = s.id AND (
+            si2.product_type = 'membership'
+            OR LOWER(si2.product_name) LIKE '%membres%'
+          )
+        ) THEN 'membership'
+        WHEN EXISTS (
+          SELECT 1 FROM sale_items si2
+          WHERE si2.sale_id = s.id AND (
+            si2.product_type IN ('package', 'time')
+            OR LOWER(si2.product_name) LIKE '%paquete%'
+          )
+        ) THEN 'package'
+        ELSE 'product'
+      END`;
+
     let sql = `
       SELECT 
         s.id,
@@ -603,24 +781,61 @@ async function getSalesByPeriod(startDate, endDate, paymentMethod = null) {
         s.total,
         s.payment_method,
         s.timestamp,
-        DATE(s.timestamp) as date
+        DATE(s.timestamp) as date,
+        (
+          SELECT STRING_AGG(si.product_name || ' x' || si.quantity, ', ' ORDER BY si.id)
+          FROM sale_items si
+          WHERE si.sale_id = s.id
+        ) as products,
+        (${saleTypeSubquery}) as sale_type
       FROM sales s
       LEFT JOIN clients c ON s.client_id = c.id
-      WHERE DATE(s.timestamp) >= ? AND DATE(s.timestamp) <= ?
     `;
 
     const params = [startDate, endDate];
+    const conditions = [
+      "DATE(s.timestamp) >= $1",
+      "DATE(s.timestamp) <= $2",
+      "s.status != 'cancelled'",
+    ];
 
     if (paymentMethod && paymentMethod !== "all") {
-      sql += ` AND s.payment_method = ?`;
       params.push(paymentMethod);
+      conditions.push(`s.payment_method = $${params.length}`);
     }
 
+    if (saleType && saleType !== "all") {
+      if (saleType === "promo") {
+        conditions.push(
+          `EXISTS (SELECT 1 FROM voucher_redemptions vr WHERE vr.sale_id = s.id)`,
+        );
+      } else if (saleType === "membership") {
+        conditions.push(
+          `EXISTS (SELECT 1 FROM sale_items si2 WHERE si2.sale_id = s.id AND (si2.product_type = 'membership' OR LOWER(si2.product_name) LIKE '%membres%'))`,
+        );
+      } else if (saleType === "package") {
+        conditions.push(
+          `EXISTS (SELECT 1 FROM sale_items si2 WHERE si2.sale_id = s.id AND (si2.product_type IN ('package', 'time') OR LOWER(si2.product_name) LIKE '%paquete%')) AND NOT EXISTS (SELECT 1 FROM sale_items si2 WHERE si2.sale_id = s.id AND (si2.product_type = 'membership' OR LOWER(si2.product_name) LIKE '%membres%')) AND NOT EXISTS (SELECT 1 FROM voucher_redemptions vr WHERE vr.sale_id = s.id)`,
+        );
+      } else if (saleType === "product") {
+        conditions.push(
+          `NOT EXISTS (SELECT 1 FROM voucher_redemptions vr WHERE vr.sale_id = s.id) AND NOT EXISTS (SELECT 1 FROM sale_items si2 WHERE si2.sale_id = s.id AND (si2.product_type IN ('membership', 'package', 'time') OR LOWER(si2.product_name) LIKE '%membres%' OR LOWER(si2.product_name) LIKE '%paquete%'))`,
+        );
+      }
+    }
+
+    sql += " WHERE " + conditions.join(" AND ");
     sql += ` ORDER BY s.timestamp DESC`;
 
     const sales = await allAsync(sql, params);
 
     // Resumen
+    const summaryParams =
+      paymentMethod && paymentMethod !== "all"
+        ? [startDate, endDate, paymentMethod]
+        : [startDate, endDate];
+    const summaryPaymentClause =
+      paymentMethod && paymentMethod !== "all" ? `AND payment_method = $3` : "";
     const summary = await getAsync(
       `SELECT 
         COUNT(*) as total_sales,
@@ -628,14 +843,19 @@ async function getSalesByPeriod(startDate, endDate, paymentMethod = null) {
         COALESCE(AVG(total), 0) as average_ticket,
         COALESCE(SUM(discount), 0) as total_discount
       FROM sales
-      WHERE DATE(timestamp) >= ? AND DATE(timestamp) <= ?
-      ${paymentMethod && paymentMethod !== "all" ? "AND payment_method = ?" : ""}`,
-      paymentMethod && paymentMethod !== "all"
-        ? [startDate, endDate, paymentMethod]
-        : [startDate, endDate],
+      WHERE DATE(timestamp) >= $1 AND DATE(timestamp) <= $2
+        AND status != 'cancelled'
+      ${summaryPaymentClause}`,
+      summaryParams,
     );
 
     // Ventas por día
+    const dailyParams =
+      paymentMethod && paymentMethod !== "all"
+        ? [startDate, endDate, paymentMethod]
+        : [startDate, endDate];
+    const dailyPaymentClause =
+      paymentMethod && paymentMethod !== "all" ? `AND payment_method = $3` : "";
     const dailyBreakdown = await allAsync(
       `SELECT 
         DATE(timestamp) as date,
@@ -643,13 +863,12 @@ async function getSalesByPeriod(startDate, endDate, paymentMethod = null) {
         COALESCE(SUM(total), 0) as total,
         COALESCE(AVG(total), 0) as average
       FROM sales
-      WHERE DATE(timestamp) >= ? AND DATE(timestamp) <= ?
-      ${paymentMethod && paymentMethod !== "all" ? "AND payment_method = ?" : ""}
+      WHERE DATE(timestamp) >= $1 AND DATE(timestamp) <= $2
+        AND status != 'cancelled'
+      ${dailyPaymentClause}
       GROUP BY DATE(timestamp)
       ORDER BY date ASC`,
-      paymentMethod && paymentMethod !== "all"
-        ? [startDate, endDate, paymentMethod]
-        : [startDate, endDate],
+      dailyParams,
     );
 
     // Ventas por método de pago
@@ -659,7 +878,8 @@ async function getSalesByPeriod(startDate, endDate, paymentMethod = null) {
         COUNT(*) as count,
         COALESCE(SUM(total), 0) as total
       FROM sales
-      WHERE DATE(timestamp) >= ? AND DATE(timestamp) <= ?
+      WHERE DATE(timestamp) >= $1 AND DATE(timestamp) <= $2
+        AND status != 'cancelled'
       GROUP BY payment_method
       ORDER BY total DESC`,
       [startDate, endDate],
@@ -684,7 +904,7 @@ async function getSalesByPeriod(startDate, endDate, paymentMethod = null) {
 async function getCashBoxReport(cashBoxId) {
   try {
     // Información de la caja
-    const cashBox = await getAsync(`SELECT * FROM cash_boxes WHERE id = ?`, [
+    const cashBox = await getAsync(`SELECT * FROM cash_boxes WHERE id = $1`, [
       cashBoxId,
     ]);
 
@@ -699,10 +919,28 @@ async function getCashBoxReport(cashBoxId) {
         s.total,
         s.payment_method,
         s.timestamp,
-        COALESCE(c.name, 'Cliente General') as client_name
+        COALESCE(c.name, 'Cliente General') as client_name,
+        (
+          SELECT STRING_AGG(si.product_name || ' x' || si.quantity, ', ' ORDER BY si.id)
+          FROM sale_items si
+          WHERE si.sale_id = s.id
+        ) as products,
+        CASE 
+          WHEN EXISTS (
+            SELECT 1 FROM sale_items si2 WHERE si2.sale_id = s.id AND (
+              si2.product_type = 'membership' OR LOWER(si2.product_name) LIKE '%membres%'
+            )
+          ) THEN 'membership'
+          WHEN EXISTS (
+            SELECT 1 FROM sale_items si2 WHERE si2.sale_id = s.id AND (
+              si2.product_type IN ('package', 'time') OR LOWER(si2.product_name) LIKE '%paquete%'
+            )
+          ) THEN 'package'
+          ELSE 'product'
+        END as sale_type
       FROM sales s
       LEFT JOIN clients c ON s.client_id = c.id
-      WHERE s.cash_box_id = ?
+      WHERE s.cash_box_id = $1 AND s.status != 'cancelled'
       ORDER BY s.timestamp ASC`,
       [cashBoxId],
     );
@@ -710,7 +948,7 @@ async function getCashBoxReport(cashBoxId) {
     // Movimientos de efectivo
     const movements = await allAsync(
       `SELECT * FROM cash_movements 
-      WHERE cash_box_id = ?
+      WHERE cash_box_id = $1
       ORDER BY timestamp ASC`,
       [cashBoxId],
     );
@@ -722,7 +960,7 @@ async function getCashBoxReport(cashBoxId) {
         COUNT(*) as count,
         COALESCE(SUM(total), 0) as total
       FROM sales
-      WHERE cash_box_id = ?
+      WHERE cash_box_id = $1
       GROUP BY payment_method`,
       [cashBoxId],
     );
@@ -743,7 +981,6 @@ async function getCashBoxReport(cashBoxId) {
 
     const expectedCash =
       cashBox.opening_amount + cashSales + incomeMovements - expenseMovements;
-
 
     const difference = cashBox.closing_amount
       ? cashBox.closing_amount - expectedCash
@@ -802,8 +1039,12 @@ async function getStockReport(categoryFilter = null, lowStockOnly = false) {
     // Resumen
     const totalValue = products.reduce((sum, p) => sum + p.stock * p.price, 0);
     const totalProducts = products.length;
-    const lowStockCount = products.filter((p) => p.stock < 10).length;
-    const outOfStockCount = products.filter((p) => p.stock === 0).length;
+    const lowStockCount = products.filter(
+      (p) => p.stock !== null && p.stock < 10,
+    ).length;
+    const outOfStockCount = products.filter(
+      (p) => p.stock !== null && p.stock === 0,
+    ).length;
 
     return {
       products,
@@ -892,34 +1133,34 @@ async function setSetting(key, value) {
 }
 
 async function selectSystemLogo() {
-  const { dialog, app } = require('electron');
-  const fs = require('fs');
-  const path = require('path');
+  const { dialog, app } = require("electron");
+  const fs = require("fs");
+  const path = require("path");
 
   const result = await dialog.showOpenDialog({
-    properties: ['openFile'],
-    filters: [{ name: 'Imágenes', extensions: ['jpg', 'png', 'jpeg'] }]
+    properties: ["openFile"],
+    filters: [{ name: "Imágenes", extensions: ["jpg", "png", "jpeg"] }],
   });
 
   if (!result.canceled && result.filePaths.length > 0) {
     const sourcePath = result.filePaths[0];
     const extension = path.extname(sourcePath);
-    const destDir = path.join(app.getPath('userData'), 'brand');
-    
+    const destDir = path.join(app.getPath("userData"), "brand");
+
     if (!fs.existsSync(destDir)) fs.mkdirSync(destDir, { recursive: true });
-    
+
     // Generar un nombre único para forzar refresco del navegador (cache bust)
     const fileName = `logo_${Date.now()}${extension}`;
     const destPath = path.join(destDir, fileName);
     fs.copyFileSync(sourcePath, destPath);
-    
+
     // Guardar solo el nombre del archivo en la DB (Express servirá la carpeta 'brand')
-    await setSetting('system_logo', fileName);
-    
+    await setSetting("system_logo", fileName);
+
     // Actualizar icono de ventana manualmente (Electron Main Process)
     try {
-      const { ipcMain } = require('electron');
-      ipcMain.emit('api:updateAppIcon', { sender: null }, destPath);
+      const { ipcMain } = require("electron");
+      ipcMain.emit("api:updateAppIcon", { sender: null }, destPath);
     } catch (e) {}
 
     return fileName;
@@ -948,8 +1189,6 @@ async function checkDatabaseConnection() {
   }
 }
 
-
-
 // ============ CREATE SESSION (Check-in) ============
 
 async function createSession(
@@ -959,38 +1198,60 @@ async function createSession(
   packageId,
   durationMinutes = 60,
   isPaid = false,
-  childrenCount = 1
+  childrenCount = 1,
 ) {
-  const os = require('os');
-  const fs = require('fs');
-  const path = require('path');
+  const os = require("os");
+  const fs = require("fs");
+  const path = require("path");
   const logFile = path.join(os.tmpdir(), "sipark_api_logs.txt");
-  try { fs.appendFileSync(logFile, `[${new Date().toISOString()}] createSession called: ${clientName}, ${packageId}\n`); } catch(e) {}
+  try {
+    fs.appendFileSync(
+      logFile,
+      `[${new Date().toISOString()}] createSession called: ${clientName}, ${packageId}\n`,
+    );
+  } catch (e) {}
   try {
     let clientId;
 
-    // Si no hay teléfono, buscar o crear cliente "Cliente General"
-    if (!phone || phone.trim() === "") {
-      const sqlClient = "SELECT id FROM clients WHERE name = $1 AND phone = $2";
-      const generalClient = await getAsync(sqlClient, ["Cliente General", "0000000000"]);
+    // Determinar si es cliente general basado en el nombre, no en el teléfono
+    if (!clientName || clientName === "Cliente General") {
+      const sqlClient = "SELECT id FROM clients WHERE name = $1";
+      const generalClient = await getAsync(sqlClient, ["Cliente General"]);
 
       if (generalClient) {
         clientId = generalClient.id;
       } else {
-        const sqlInsert = "INSERT INTO clients (name, parent_name, phone) VALUES ($1, $2, $3) RETURNING id";
-        const result = await runAsync(sqlInsert, ["Cliente General", "Sin Registro", "0000000000"]);
+        const sqlInsert =
+          "INSERT INTO clients (name, parent_name, phone) VALUES ($1, $2, $3) RETURNING id";
+        const result = await runAsync(sqlInsert, [
+          "Cliente General",
+          "Sin Registro",
+          "0000000000",
+        ]);
         clientId = result.lastID;
       }
     } else {
-      // Cliente con teléfono - buscar o crear
-      const sqlClient = "SELECT id FROM clients WHERE name = $1 AND phone = $2";
-      const existingClient = await getAsync(sqlClient, [clientName, phone]);
+      // Cliente registrado - buscar por nombre exacto
+      const sqlClient = "SELECT id FROM clients WHERE name = $1";
+      const existingClient = await getAsync(sqlClient, [clientName]);
 
       if (existingClient) {
         clientId = existingClient.id;
+        // Opcionalmente actualizar teléfono si ahora lo proveyeron
+        if (phone && phone.trim() !== "") {
+          await runAsync("UPDATE clients SET phone = $1 WHERE id = $2", [
+            phone,
+            clientId,
+          ]);
+        }
       } else {
-        const sqlInsert = "INSERT INTO clients (name, parent_name, phone) VALUES ($1, $2, $3) RETURNING id";
-        const result = await runAsync(sqlInsert, [clientName, parentName, phone]);
+        const sqlInsert =
+          "INSERT INTO clients (name, parent_name, phone) VALUES ($1, $2, $3) RETURNING id";
+        const result = await runAsync(sqlInsert, [
+          clientName,
+          parentName || "Sin Registro",
+          phone || "",
+        ]);
         clientId = result.lastID;
       }
     }
@@ -999,7 +1260,15 @@ async function createSession(
     const startTime = getLocalTimestamp();
     const sessionResult = await runAsync(
       "INSERT INTO active_sessions (client_id, start_time, package_id, duration_minutes, status, is_paid, children_count) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id",
-      [clientId, startTime, packageId, durationMinutes, "pending", isPaid, childrenCount],
+      [
+        clientId,
+        startTime,
+        packageId,
+        durationMinutes,
+        "pending",
+        isPaid,
+        childrenCount,
+      ],
     );
 
     return {
@@ -1011,7 +1280,7 @@ async function createSession(
       status: "pending",
       duration_minutes: durationMinutes,
       is_paid: isPaid,
-      children_count: childrenCount
+      children_count: childrenCount,
     };
   } catch (error) {
     throw error;
@@ -1019,19 +1288,76 @@ async function createSession(
 }
 
 async function startTimerSession(sessionId) {
-  const os = require('os');
-  const fs = require('fs');
-  const path = require('path');
+  const os = require("os");
+  const fs = require("fs");
+  const path = require("path");
   const logFile = path.join(os.tmpdir(), "sipark_api_logs.txt");
-  try { fs.appendFileSync(logFile, `[${new Date().toISOString()}] startTimerSession: ${sessionId}\n`); } catch(e) {}
+  try {
+    fs.appendFileSync(
+      logFile,
+      `[${new Date().toISOString()}] startTimerSession: ${sessionId}\n`,
+    );
+  } catch (e) {}
   try {
     const startTime = getLocalTimestamp();
     await runAsync(
-      "UPDATE active_sessions SET status = 'active', start_time = $1 WHERE id = $2",
-      [startTime, sessionId]
+      "UPDATE active_sessions SET status = 'active', start_time = $1, is_paused = FALSE WHERE id = $2",
+      [startTime, sessionId],
     );
     return true;
   } catch (error) {
+    throw error;
+  }
+}
+
+async function pauseSession(sessionId) {
+  try {
+    const pauseTime = getLocalTimestamp();
+    await runAsync(
+      "UPDATE active_sessions SET is_paused = TRUE, pause_start_time = $1 WHERE id = $2",
+      [pauseTime, sessionId],
+    );
+    return true;
+  } catch (error) {
+    throw error;
+  }
+}
+
+async function resumeSession(sessionId) {
+  try {
+    const session = await getAsync(
+      "SELECT start_time, pause_start_time FROM active_sessions WHERE id = $1",
+      [sessionId],
+    );
+
+    if (!session || !session.pause_start_time) {
+      await runAsync(
+        "UPDATE active_sessions SET is_paused = FALSE, pause_start_time = NULL WHERE id = $1",
+        [sessionId],
+      );
+      return true;
+    }
+
+    const startTime = new Date(session.start_time);
+    const pauseStartTime = new Date(session.pause_start_time);
+    const now = new Date();
+
+    // Calcular cuánto tiempo estuvo pausado en milisegundos
+    const pausedDurationMs = now.getTime() - pauseStartTime.getTime();
+
+    // Nueva hora de inicio = hora de inicio anterior + duración de la pausa
+    const newStartTime = new Date(startTime.getTime() + pausedDurationMs);
+
+    // Formatear para BD
+    const formattedNewStartTime = newStartTime.toISOString();
+
+    await runAsync(
+      "UPDATE active_sessions SET is_paused = FALSE, pause_start_time = NULL, start_time = $1 WHERE id = $2",
+      [formattedNewStartTime, sessionId],
+    );
+    return true;
+  } catch (error) {
+    console.error("Error resuming session:", error);
     throw error;
   }
 }
@@ -1040,7 +1366,7 @@ async function setPackageIsStandardEntry(packageId, isStandardEntry) {
   try {
     await runAsync(
       "UPDATE products_services SET is_standard_entry = $1 WHERE id = $2",
-      [isStandardEntry ? 1 : 0, packageId]
+      [isStandardEntry ? 1 : 0, packageId],
     );
     return true;
   } catch (error) {
@@ -1048,13 +1374,12 @@ async function setPackageIsStandardEntry(packageId, isStandardEntry) {
   }
 }
 
-
 async function updateSessionPaidStatus(sessionId, isPaid) {
   try {
-    await runAsync(
-      "UPDATE active_sessions SET is_paid = ? WHERE id = ?",
-      [isPaid, sessionId]
-    );
+    await runAsync("UPDATE active_sessions SET is_paid = ? WHERE id = ?", [
+      isPaid,
+      sessionId,
+    ]);
     return true;
   } catch (error) {
     throw error;
@@ -1104,9 +1429,9 @@ async function closeCashBox(
       throw new Error("Caja no encontrada");
     }
 
-    // Calcular totales de ventas
+    // Calcular totales de ventas (solo efectivo, excluir canceladas)
     const salesTotal = await getAsync(
-      "SELECT COALESCE(SUM(total), 0) as total FROM sales WHERE cash_box_id = ?",
+      "SELECT COALESCE(SUM(total), 0) as total FROM sales WHERE cash_box_id = ? AND payment_method = 'cash' AND status != 'cancelled'",
       [cashBoxId],
     );
 
@@ -1116,24 +1441,24 @@ async function closeCashBox(
     );
 
     // ===== INFORMACIÓN ADICIONAL DETALLADA =====
-    
-    // 1. Número total de transacciones
+
+    // 1. Número total de transacciones (excluir canceladas)
     const transactionCount = await getAsync(
-      "SELECT COUNT(*) as count FROM sales WHERE cash_box_id = ?",
+      "SELECT COUNT(*) as count FROM sales WHERE cash_box_id = ? AND status != 'cancelled'",
       [cashBoxId],
     );
 
-    // 2. Desglose por método de pago
+    // 2. Desglose por método de pago (excluir canceladas)
     const paymentMethods = await allAsync(
-      `SELECT payment_method, COUNT(*) as count, COALESCE(SUM(total), 0) as total 
-       FROM sales WHERE cash_box_id = ? 
+      `SELECT payment_method, COUNT(*) as count, COALESCE(SUM(total), 0) as total
+       FROM sales WHERE cash_box_id = ? AND status != 'cancelled'
        GROUP BY payment_method`,
       [cashBoxId],
     );
 
-    // 3. Descuentos aplicados
+    // 3. Descuentos aplicados (excluir canceladas)
     const discountsTotal = await getAsync(
-      "SELECT COALESCE(SUM(discount), 0) as total FROM sales WHERE cash_box_id = ?",
+      "SELECT COALESCE(SUM(discount), 0) as total FROM sales WHERE cash_box_id = ? AND status != 'cancelled'",
       [cashBoxId],
     );
 
@@ -1193,8 +1518,11 @@ async function closeCashBox(
     );
 
     const expectedAmount =
-      parseFloat(cashBox.opening_amount) + parseFloat(salesTotal.total) - parseFloat(expensesTotal.total);
-    const difference = closingAmount - expectedAmount;
+      (parseFloat(cashBox.opening_amount) || 0) +
+      (parseFloat(salesTotal?.total) || 0) +
+      (parseFloat(cashMovements?.income_total) || 0) -
+      (parseFloat(expensesTotal?.total) || 0);
+    const difference = (parseFloat(closingAmount) || 0) - expectedAmount;
 
     // Cerrar caja
     const sql = `
@@ -1214,18 +1542,19 @@ async function closeCashBox(
     ]);
 
     // Calcular ticket promedio
-    const avgTicket = transactionCount.count > 0 
-      ? parseFloat(salesTotal.total) / transactionCount.count 
-      : 0;
+    const avgTicket =
+      transactionCount.count > 0
+        ? parseFloat(salesTotal.total) / transactionCount.count
+        : 0;
 
     return {
       cashBoxId,
-      openingAmount: cashBox.opening_amount,
-      closingAmount,
+      openingAmount: parseFloat(cashBox.opening_amount) || 0,
+      closingAmount: parseFloat(closingAmount) || 0,
       expectedAmount,
       difference,
-      salesTotal: salesTotal.total,
-      expensesTotal: expensesTotal.total,
+      salesTotal: parseFloat(salesTotal?.total) || 0,
+      expensesTotal: parseFloat(expensesTotal?.total) || 0,
       // Información adicional detallada
       transactionCount: transactionCount.count,
       avgTicket,
@@ -1289,7 +1618,26 @@ async function getCashBoxMovements(cashBoxId) {
 async function getCashBoxSales(cashBoxId) {
   try {
     const sql = `
-      SELECT s.*, c.name as client_name
+      SELECT 
+        s.*, 
+        c.name as client_name,
+        (
+          SELECT STRING_AGG(si.product_name || ' x' || si.quantity, ', ' ORDER BY si.id)
+          FROM sale_items si
+          WHERE si.sale_id = s.id
+        ) as products,
+        (
+          SELECT COUNT(*) 
+          FROM sale_items si 
+          LEFT JOIN products_services ps ON si.product_id = ps.id 
+          WHERE si.sale_id = s.id AND (ps.type IN ('package', 'time') OR si.product_name LIKE '%Paquete%' OR si.product_name LIKE '%Tiempo%')
+        ) as time_items_count,
+        (
+          SELECT COUNT(*) 
+          FROM sale_items si 
+          LEFT JOIN products_services ps ON si.product_id = ps.id 
+          WHERE si.sale_id = s.id AND (ps.type NOT IN ('package', 'time') AND si.product_name NOT LIKE '%Paquete%' AND si.product_name NOT LIKE '%Tiempo%')
+        ) as product_items_count
       FROM sales s
       LEFT JOIN clients c ON s.client_id = c.id
       WHERE s.cash_box_id = ?
@@ -1314,6 +1662,7 @@ async function createSaleWithItems(saleData) {
       total,
       payment_method,
       cash_box_id,
+      discount_membership_id,
     } = saleData;
 
     // Crear venta
@@ -1338,7 +1687,8 @@ async function createSaleWithItems(saleData) {
     // Crear items de venta
     for (const item of items) {
       // product_id negativo (voucher=-98, NFC=-99, etc.) → NULL para respetar FK
-      const productId = (item.product_id && item.product_id > 0) ? item.product_id : null;
+      const productId =
+        item.product_id && item.product_id > 0 ? item.product_id : null;
       const itemSql = `
         INSERT INTO sale_items (sale_id, product_id, product_name, quantity, unit_price, subtotal)
         VALUES ($1, $2, $3, $4, $5, $6)
@@ -1352,45 +1702,80 @@ async function createSaleWithItems(saleData) {
         item.subtotal,
       ]);
 
-      // Actualizar stock solo si hay product_id y es producto físico
-      if (productId && ["snack", "drink", "food"].includes(item.product_type)) {
+      // Actualizar stock solo si hay product_id, es un producto físico/artículo y TIENE stock definido (no es NULL)
+      if (
+        productId &&
+        !["time", "package", "membership"].includes(item.product_type)
+      ) {
         await runAsync(
-          "UPDATE products_services SET stock = stock - $1 WHERE id = $2",
-          [item.quantity, productId]
+          "UPDATE products_services SET stock = GREATEST(0, stock - $1) WHERE id = $2 AND stock IS NOT NULL",
+          [item.quantity, productId],
         );
       }
 
       // CASO ESPECIAL: Si es un Paquete (Entrada) vendido directamente en el POS
       // y NO viene vinculado de una sesión ya creada (como en el flujo de Check-In)
-      if (item.product_type === 'package' && !item.active_session_id) {
+      if (item.product_type === "package" && !item.active_session_id) {
         try {
           // Crear sesión automática marcada como pagada
           const startTime = getLocalTimestamp();
           // Intentar obtener el duration_minutes por defecto si no viene
           let duration = item.duration_minutes || 60;
           if (!item.duration_minutes && productId) {
-             const p = await getAsync("SELECT duration_minutes FROM products_services WHERE id = ?", [productId]);
-             if (p?.duration_minutes) duration = p.duration_minutes;
+            const p = await getAsync(
+              "SELECT duration_minutes FROM products_services WHERE id = ?",
+              [productId],
+            );
+            if (p?.duration_minutes) duration = p.duration_minutes;
           }
 
           // Obtener o crear clientId fallback (Cliente General)
           let finalClientId = client_id;
           if (!finalClientId) {
-            const general = await getAsync("SELECT id FROM clients WHERE name = $1", ["Cliente General"]);
+            const general = await getAsync(
+              "SELECT id FROM clients WHERE name = $1",
+              ["Cliente General"],
+            );
             if (general) finalClientId = general.id;
             else {
-              const res = await runAsync("INSERT INTO clients (name, parent_name) VALUES ($1, $2) RETURNING id", ["Cliente General", "Sin Registro"]);
+              const res = await runAsync(
+                "INSERT INTO clients (name, parent_name) VALUES ($1, $2) RETURNING id",
+                ["Cliente General", "Sin Registro"],
+              );
               finalClientId = res.lastID;
             }
           }
 
           await runAsync(
             "INSERT INTO active_sessions (client_id, start_time, package_id, duration_minutes, status, is_paid, children_count) VALUES ($1, $2, $3, $4, $5, $6, $7)",
-            [finalClientId, startTime, productId, duration, "active", true, item.quantity || 1]
+            [
+              finalClientId,
+              startTime,
+              productId,
+              duration,
+              "active",
+              true,
+              item.quantity || 1,
+            ],
           );
         } catch (sessionErr) {
-          console.error("Error creando sesión automática desde POS:", sessionErr);
+          console.error(
+            "Error creando sesión automática desde POS:",
+            sessionErr,
+          );
         }
+      }
+    }
+
+    if (discount_membership_id && discount > 0) {
+      try {
+        await runAsync(
+          `INSERT INTO membership_discount_uses (client_membership_id, discount_amount, used_at, sale_id)
+           VALUES ($1, $2, NOW(), $3)`,
+          [discount_membership_id, discount, saleId],
+        );
+      } catch (e) {
+        console.error("Error registrando uso de descuento:", e);
       }
     }
 
@@ -1400,24 +1785,67 @@ async function createSaleWithItems(saleData) {
   }
 }
 
+async function cancelSale(saleId, userId, reason = "Cancelación manual") {
+  try {
+    // 1. Obtener datos de la venta y sus items
+    const sale = await getAsync("SELECT * FROM sales WHERE id = $1", [saleId]);
+    if (!sale) throw new Error("Venta no encontrada");
+    if (sale.status === "cancelled")
+      throw new Error("La venta ya está anulada");
+
+    const items = await allAsync(
+      "SELECT * FROM sale_items WHERE sale_id = $1",
+      [saleId],
+    );
+
+    // 2. Marcar venta como anulada
+    await runAsync("UPDATE sales SET status = 'cancelled' WHERE id = $1", [
+      saleId,
+    ]);
+
+    // 3. Devolver stock (solo para productos físicos, no tiempo ni membresías)
+    for (const item of items) {
+      if (item.product_id) {
+        // Solo devolver stock si el producto tiene stock contable (stock IS NOT NULL)
+        await runAsync(
+          "UPDATE products_services SET stock = stock + $1 WHERE id = $2 AND stock IS NOT NULL",
+          [item.quantity, item.product_id],
+        );
+      }
+    }
+
+    // 4. Registrar en auditoría
+    await runAsync(
+      "INSERT INTO sales_audit (sale_id, user_id, action, details) VALUES ($1, $2, $3, $4)",
+      [saleId, userId || 1, "cancelled", reason],
+    );
+
+    return true;
+  } catch (error) {
+    console.error("Error en cancelSale:", error);
+    throw error;
+  }
+}
 
 async function getSaleWithItems(saleId) {
   try {
     const sale = await getAsync(
       `SELECT 
-        s.*,
-        COALESCE(c.name, 'Cliente General') as client_name
+        s.*, 
+        c.name as client_name,
+        u.username as cashier_name
       FROM sales s
       LEFT JOIN clients c ON s.client_id = c.id
+      LEFT JOIN users u ON s.user_id = u.id
       WHERE s.id = ?`,
       [saleId],
     );
-
     if (!sale) return null;
 
     const items = await allAsync("SELECT * FROM sale_items WHERE sale_id = ?", [
       saleId,
     ]);
+
     return { ...sale, items };
   } catch (error) {
     throw error;
@@ -1644,7 +2072,8 @@ async function createCategory(name, description, type = "food") {
 
 async function updateCategory(id, name, description, type = "food") {
   try {
-    const sql = "UPDATE categories SET name = ?, description = ?, type = ? WHERE id = ?";
+    const sql =
+      "UPDATE categories SET name = ?, description = ?, type = ? WHERE id = ?";
     await runAsync(sql, [name, description, type, id]);
     return true;
   } catch (error) {
@@ -1708,8 +2137,8 @@ async function createPurchaseOrder(purchaseData) {
       ]);
 
       // Actualizar stock del producto
-      const updateResult = await runAsync(
-        "UPDATE products_services SET stock = stock + ? WHERE id = ?",
+      await runAsync(
+        "UPDATE products_services SET stock = COALESCE(stock, 0) + ? WHERE id = ?",
         [item.quantity, item.product_id],
       );
     }
@@ -1763,13 +2192,7 @@ async function getPurchaseOrderWithItems(purchaseOrderId) {
 
 async function clearAllData() {
   try {
-
-    // Deshabilitar temporalmente las claves foráneas
-    await runAsync("PRAGMA foreign_keys = OFF");
-
-    // Orden importante: primero las tablas dependientes, luego las principales
     const tables = [
-      // Tablas con dependencias múltiples (primero)
       "quotation_items",
       "membership_usage",
       "membership_renewals",
@@ -1784,16 +2207,12 @@ async function clearAllData() {
       "purchase_items",
       "sale_items",
       "cash_movements",
-
-      // Tablas con dependencias simples
       "purchase_orders",
       "sales",
       "client_memberships",
       "active_sessions",
       "quotations",
       "cash_boxes",
-
-      // Tablas base (sin dependencias)
       "products_services",
       "clients",
       "categories",
@@ -1804,32 +2223,13 @@ async function clearAllData() {
       "users",
     ];
 
-    for (const table of tables) {
-      try {
-        await runAsync(`DELETE FROM ${table}`);
-      } catch (err) {
-        // Si la tabla no existe, continuar
-        if (!err.message.includes("no such table")) {
-        }
-      }
-    }
+    const query = `TRUNCATE TABLE ${tables.join(", ")} RESTART IDENTITY CASCADE`;
+    await runAsync(query);
 
-    // Reiniciar los autoincrement
-    await runAsync("DELETE FROM sqlite_sequence");
-
-    // Reactivar las claves foráneas
-    await runAsync("PRAGMA foreign_keys = ON");
-
-
-    return { success: true, message: "Base de datos limpiada exitosamente" };
-  } catch (error) {
-    // Asegurar que las claves foráneas se reactiven incluso si hay error
-    try {
-      await runAsync("PRAGMA foreign_keys = ON");
-    } catch (e) {
-      // Ignorar error al reactivar
-    }
-    throw error;
+    return { success: true };
+  } catch (err) {
+    console.error("Error al limpiar base de datos:", err);
+    throw err;
   }
 }
 
@@ -1837,8 +2237,7 @@ async function clearAllData() {
 
 async function getMemberships() {
   try {
-    const sql =
-      "SELECT * FROM memberships WHERE is_active = TRUE ORDER BY name ASC";
+    const sql = "SELECT * FROM memberships ORDER BY name ASC";
     return await allAsync(sql);
   } catch (error) {
     throw error;
@@ -1853,12 +2252,12 @@ async function createMembership(
   auto_renew = false,
   is_active = true,
   total_hours = null,
-  membership_type = "standard",
+  discount_percentage = 0,
 ) {
   try {
     const benefits = ""; // No se usa por ahora, pero lo mantenemos para compatibilidad
+    const membership_type = "standard";
     const max_sessions_per_day = null;
-    const discount_percentage = 0;
     const priority_level = 0;
     const grace_period_days = 0;
     const phone = null;
@@ -1887,13 +2286,13 @@ async function createMembership(
       priority_level,
       auto_renew,
       grace_period_days,
-      true,
+      is_active,
       phone,
       id_card,
       acquisition_date,
       total_hours,
     ]);
-    return result.rows[0].id;
+    return result.lastID;
   } catch (error) {
     throw error;
   }
@@ -1908,12 +2307,12 @@ async function updateMembership(
   auto_renew,
   is_active,
   total_hours,
+  discount_percentage = 0,
 ) {
   try {
     const benefits = "";
     const membership_type = "standard";
     const max_sessions_per_day = null;
-    const discount_percentage = 0;
     const priority_level = 0;
     const grace_period_days = 0;
     const phone = null;
@@ -2004,11 +2403,11 @@ async function assignMembership(
     const endDate = new Date();
     // Usar la fecha actual del sistema local para calcular el fin
     endDate.setDate(endDate.getDate() + membership.duration_days);
-    
+
     // Formatear endDate a YYYY-MM-DD local
     const year = endDate.getFullYear();
-    const month = String(endDate.getMonth() + 1).padStart(2, '0');
-    const day = String(endDate.getDate()).padStart(2, '0');
+    const month = String(endDate.getMonth() + 1).padStart(2, "0");
+    const day = String(endDate.getDate()).padStart(2, "0");
     const endDateStr = `${year}-${month}-${day}`;
 
     let userId = null;
@@ -2047,7 +2446,7 @@ async function assignMembership(
       userId,
       getLocalTimestamp(),
     ]);
-    return result.rows[0].id;
+    return result.lastID;
   } catch (error) {
     throw error;
   }
@@ -2289,21 +2688,37 @@ async function getPackageFeatures() {
   }
 }
 
-async function createPackageFeature(name, description, category, requires_quantity = false) {
+async function createPackageFeature(
+  name,
+  description,
+  category,
+  requires_quantity = false,
+) {
   try {
     const sql = `
       INSERT INTO package_features (name, description, category, requires_quantity, is_active)
       VALUES (?, ?, ?, ?, true)
       RETURNING id
     `;
-    const result = await runAsync(sql, [name, description, category, requires_quantity]);
+    const result = await runAsync(sql, [
+      name,
+      description,
+      category,
+      requires_quantity,
+    ]);
     return result.lastID;
   } catch (error) {
     throw error;
   }
 }
 
-async function updatePackageFeature(id, name, description, category, requires_quantity = false) {
+async function updatePackageFeature(
+  id,
+  name,
+  description,
+  category,
+  requires_quantity = false,
+) {
   try {
     const sql = `
       UPDATE package_features 
@@ -2356,8 +2771,8 @@ async function setPackageFeatures(packageId, features) {
 
     // Agregar nuevas características
     for (const item of features) {
-      const featureId = typeof item === 'object' ? item.id : item;
-      const quantity = typeof item === 'object' ? (item.quantity || 1) : 1;
+      const featureId = typeof item === "object" ? item.id : item;
+      const quantity = typeof item === "object" ? item.quantity || 1 : 1;
 
       await runAsync(
         "INSERT INTO package_included_features (package_id, feature_id, quantity) VALUES (?, ?, ?)",
@@ -2446,13 +2861,19 @@ async function getCashBoxes() {
 
 // ============ FASE 2 - REPORTES ============
 
-async function getSalesByProduct(startDate, endDate, categoryFilter = null) {
+async function getSalesByProduct(
+  startDate,
+  endDate,
+  categoryFilter = null,
+  saleType = null,
+) {
   try {
     let sql = `
       SELECT 
         si.product_id,
         si.product_name,
         ps.category,
+        ps.type as product_type,
         SUM(si.quantity) as quantity_sold,
         SUM(si.subtotal) as revenue,
         COUNT(DISTINCT si.sale_id) as transactions,
@@ -2460,28 +2881,54 @@ async function getSalesByProduct(startDate, endDate, categoryFilter = null) {
       FROM sale_items si
       JOIN sales s ON si.sale_id = s.id
       LEFT JOIN products_services ps ON si.product_id = ps.id
-      WHERE DATE(s.timestamp) >= ? AND DATE(s.timestamp) <= ?
+      WHERE DATE(s.timestamp) >= $1 AND DATE(s.timestamp) <= $2
     `;
 
     const params = [startDate, endDate];
+    let paramIdx = 2;
 
     if (categoryFilter && categoryFilter !== "all") {
-      sql += ` AND ps.category = ?`;
+      paramIdx++;
+      sql += ` AND ps.category = $${paramIdx}`;
       params.push(categoryFilter);
     }
 
+    if (saleType && saleType !== "all") {
+      if (saleType === "membership") {
+        sql += ` AND (ps.type = 'membership' OR LOWER(si.product_name) LIKE '%membres%')`;
+      } else if (saleType === "package") {
+        sql += ` AND (ps.type IN ('package', 'time') OR LOWER(si.product_name) LIKE '%paquete%')`;
+      } else if (saleType === "product") {
+        sql += ` AND (ps.type NOT IN ('package', 'time', 'membership') AND LOWER(si.product_name) NOT LIKE '%paquete%' AND LOWER(si.product_name) NOT LIKE '%membres%')`;
+      }
+    }
+
     sql += `
-      GROUP BY si.product_id, si.product_name, ps.category
+      GROUP BY si.product_id, si.product_name, ps.category, ps.type
       ORDER BY quantity_sold DESC
     `;
 
     const products = await allAsync(sql, params);
 
-    // Calcular totales y porcentajes
-    const totalRevenue = products.reduce((sum, p) => sum + p.revenue, 0);
-    const totalQuantity = products.reduce((sum, p) => sum + p.quantity_sold, 0);
+    // Normalizar a nmeros para evitar concatenacin de strings de PostgreSQL
+    const normalizedProducts = products.map((p) => ({
+      ...p,
+      revenue: Number(p.revenue) || 0,
+      quantity_sold: Number(p.quantity_sold) || 0,
+      average_price: Number(p.average_price) || 0,
+    }));
 
-    const productsWithPercentage = products.map((p) => ({
+    // Calcular totales y porcentajes
+    const totalRevenue = normalizedProducts.reduce(
+      (sum, p) => sum + p.revenue,
+      0,
+    );
+    const totalQuantity = normalizedProducts.reduce(
+      (sum, p) => sum + p.quantity_sold,
+      0,
+    );
+
+    const productsWithPercentage = normalizedProducts.map((p) => ({
       ...p,
       revenue_percentage:
         totalRevenue > 0 ? (p.revenue / totalRevenue) * 100 : 0,
@@ -2951,7 +3398,7 @@ async function getSalesByHour(startDate, endDate) {
   try {
     const salesByHour = await allAsync(
       `SELECT 
-        CAST(strftime('%H', timestamp) AS INTEGER) as hour,
+        EXTRACT(HOUR FROM timestamp)::INTEGER as hour,
         COUNT(*) as transaction_count,
         SUM(total) as total_amount
       FROM sales
@@ -3005,7 +3452,8 @@ async function getLowStockProducts(threshold = null) {
         price,
         (stock * price) as stock_value
       FROM products_services
-      WHERE type = 'product' AND stock <= min_stock
+      WHERE type = 'product' AND stock IS NOT NULL AND stock <= min_stock
+      AND (stock > 0 OR type NOT IN ('food', 'drink', 'snack', 'rental'))
     `;
 
     if (threshold) {
@@ -3020,8 +3468,13 @@ async function getLowStockProducts(threshold = null) {
 
     const summary = {
       totalProducts: products.length,
-      criticalStock: products.filter((p) => p.stock === 0).length,
-      totalValue: products.reduce((sum, p) => sum + p.stock_value, 0),
+      criticalStock: products.filter(
+        (p) =>
+          p.stock !== null &&
+          p.stock === 0 &&
+          !["food", "drink", "snack", "rental"].includes(p.type),
+      ).length,
+      totalValue: products.reduce((sum, p) => sum + (p.stock_value || 0), 0),
     };
 
     return {
@@ -3274,8 +3727,14 @@ async function getFrequentClients(startDate, endDate, minVisits = 5) {
       clients,
       summary: {
         totalClients: clients.length,
-        totalVisits: clients.reduce((sum, c) => sum + c.visit_count, 0),
-        totalRevenue: clients.reduce((sum, c) => sum + c.total_spent, 0),
+        totalVisits: clients.reduce(
+          (sum, c) => sum + (Number(c.visit_count) || 0),
+          0,
+        ),
+        totalRevenue: clients.reduce(
+          (sum, c) => sum + (Number(c.total_spent) || 0),
+          0,
+        ),
       },
     };
   } catch (error) {
@@ -3286,36 +3745,50 @@ async function getFrequentClients(startDate, endDate, minVisits = 5) {
 // Clientes Inactivos
 async function getInactiveClients(days = 30) {
   try {
+    const daysNum = parseInt(days) || 30;
     const cutoffDate = new Date();
-    cutoffDate.setDate(cutoffDate.getDate() - days);
+    cutoffDate.setDate(cutoffDate.getDate() - daysNum);
     const cutoffDateStr = cutoffDate.toISOString().split("T")[0];
 
-    const clients = await allAsync(
-      `SELECT 
+    // Usar una subconsulta para mayor estabilidad en PostgreSQL
+    const sql = `
+      SELECT 
         c.id,
         c.name,
         c.email,
         c.phone,
-        MAX(s.timestamp) as last_visit,
-        COUNT(s.id) as total_visits,
-        SUM(s.total) as total_spent
+        (SELECT MAX(timestamp) FROM sales WHERE client_id = c.id) as last_visit,
+        (SELECT COUNT(id) FROM sales WHERE client_id = c.id) as total_visits,
+        (SELECT COALESCE(SUM(total), 0) FROM sales WHERE client_id = c.id) as total_spent
       FROM clients c
-      LEFT JOIN sales s ON c.id = s.client_id
-      GROUP BY c.id, c.name, c.phone, c.email, c.created_at
-      HAVING MAX(s.timestamp) < ? OR MAX(s.timestamp) IS NULL
-      ORDER BY MAX(s.timestamp) ASC`,
-      [cutoffDateStr],
-    );
+      WHERE (SELECT MAX(timestamp) FROM sales WHERE client_id = c.id) < CAST($1 AS TIMESTAMP)
+         OR (SELECT MAX(timestamp) FROM sales WHERE client_id = c.id) IS NULL
+      ORDER BY last_visit ASC NULLS FIRST
+    `;
+
+    const clients = await allAsync(sql, [cutoffDateStr]);
 
     const clientsWithDays = clients.map((c) => {
-      const daysSinceLastVisit = c.last_visit
-        ? Math.floor(
-            (new Date() - new Date(c.last_visit)) / (1000 * 60 * 60 * 24),
-          )
-        : null;
+      let daysSinceLastVisit = null;
+      try {
+        if (c.last_visit) {
+          const lastVisitDate = new Date(c.last_visit);
+          if (!isNaN(lastVisitDate.getTime())) {
+            daysSinceLastVisit = Math.floor(
+              (new Date().getTime() - lastVisitDate.getTime()) /
+                (1000 * 60 * 60 * 24),
+            );
+          }
+        }
+      } catch (e) {
+        // Silencioso
+      }
+
       return {
         ...c,
         days_inactive: daysSinceLastVisit,
+        total_spent: Number(c.total_spent) || 0,
+        total_visits: Number(c.total_visits) || 0,
       };
     });
 
@@ -3390,7 +3863,7 @@ async function getSalesComparison(
         COALESCE(SUM(total), 0) as total_revenue,
         COALESCE(AVG(total), 0) as avg_ticket
       FROM sales 
-      WHERE timestamp BETWEEN ? AND ?`,
+      WHERE timestamp BETWEEN ? AND ? AND status != 'cancelled'`,
       [period1Start, period1End],
     );
 
@@ -3400,28 +3873,39 @@ async function getSalesComparison(
         COALESCE(SUM(total), 0) as total_revenue,
         COALESCE(AVG(total), 0) as avg_ticket
       FROM sales 
-      WHERE timestamp BETWEEN ? AND ?`,
+      WHERE timestamp BETWEEN ? AND ? AND status != 'cancelled'`,
       [period2Start, period2End],
     );
 
-    const calculateGrowth = (current, previous) => {
-      if (!previous || previous === 0) return "0.00";
+    const calculateGrowth = (currentStr, previousStr) => {
+      const current = Number(currentStr) || 0;
+      const previous = Number(previousStr) || 0;
+      if (previous === 0) return "0.00";
       return (((current - previous) / previous) * 100).toFixed(2);
     };
 
     return {
       period1: {
         ...period1,
+        total_sales: Number(period1?.total_sales || 0),
+        total_revenue: Number(period1?.total_revenue || 0),
+        avg_ticket: Number(period1?.avg_ticket || 0),
         label: `${period1Start} - ${period1End}`,
       },
       period2: {
         ...period2,
+        total_sales: Number(period2?.total_sales || 0),
+        total_revenue: Number(period2?.total_revenue || 0),
+        avg_ticket: Number(period2?.avg_ticket || 0),
         label: `${period2Start} - ${period2End}`,
       },
       growth: {
-        sales: calculateGrowth(period2.total_sales, period1.total_sales),
-        revenue: calculateGrowth(period2.total_revenue, period1.total_revenue),
-        avgTicket: calculateGrowth(period2.avg_ticket, period1.avg_ticket),
+        sales: calculateGrowth(period2?.total_sales, period1?.total_sales),
+        revenue: calculateGrowth(
+          period2?.total_revenue,
+          period1?.total_revenue,
+        ),
+        avgTicket: calculateGrowth(period2?.avg_ticket, period1?.avg_ticket),
       },
     };
   } catch (error) {
@@ -3683,13 +4167,13 @@ async function getHourlyOccupancy(startDate, endDate) {
     // Obtener todas las sesiones en el rango de fechas
     const sql = `
       SELECT 
-        strftime('%H', start_time) as hour,
+        EXTRACT(HOUR FROM start_time) as hour,
         COUNT(*) as session_count,
         AVG(elapsed_minutes) as avg_duration
       FROM active_sessions
-      WHERE DATE(start_time) >= ? AND DATE(start_time) <= ?
+      WHERE start_time::DATE >= ? AND start_time::DATE <= ?
         AND status = 'completed'
-      GROUP BY strftime('%H', start_time)
+      GROUP BY EXTRACT(HOUR FROM start_time)
       ORDER BY hour
     `;
 
@@ -3762,7 +4246,7 @@ async function getActiveMemberships(statusFilter = "all") {
         cm.acquisition_date,
         cm.total_hours,
         crd.uid as nfc_uid,
-        CAST((julianday(cm.end_date) - julianday('now')) AS INTEGER) as days_remaining
+        CAST((cm.end_date - CURRENT_DATE) AS INTEGER) as days_remaining
       FROM client_memberships cm
       INNER JOIN clients c ON cm.client_id = c.id
       INNER JOIN memberships m ON cm.membership_id = m.id
@@ -3834,7 +4318,7 @@ async function getExpiringMemberships(daysThreshold = 30) {
         cm.end_date,
         cm.status,
         cm.payment_amount,
-        CAST((julianday(cm.end_date) - julianday('now')) AS INTEGER) as days_remaining
+        CAST((cm.end_date - CURRENT_DATE) AS INTEGER) as days_remaining
       FROM client_memberships cm
       INNER JOIN clients c ON cm.client_id = c.id
       INNER JOIN memberships m ON cm.membership_id = m.id
@@ -3978,6 +4462,7 @@ async function getDiscountsReport(
       WHERE s.timestamp BETWEEN ? AND ?
         AND s.discount > 0
         AND s.subtotal > 0
+        AND s.status != 'cancelled'
     `;
 
     const params = [startDate, endDate];
@@ -4004,7 +4489,7 @@ async function getDiscountsReport(
         COALESCE(SUM(total), 0) as total_sales,
         COUNT(*) as total_sales_count
       FROM sales 
-      WHERE timestamp BETWEEN ? AND ?`,
+      WHERE timestamp BETWEEN ? AND ? AND status != 'cancelled'`,
       [startDate, endDate],
     );
 
@@ -4058,9 +4543,9 @@ async function getDailyCashSummary(date) {
     const startDate = `${date} 00:00:00`;
     const endDate = `${date} 23:59:59`;
 
-    // Ventas del día por método de pago
+    // Ventas del día por método de pago (excluir canceladas)
     const salesByMethod = await allAsync(
-      `SELECT 
+      `SELECT
         payment_method,
         COUNT(*) as count,
         COALESCE(SUM(total), 0) as total,
@@ -4068,19 +4553,21 @@ async function getDailyCashSummary(date) {
         COALESCE(SUM(discount), 0) as discount
       FROM sales
       WHERE timestamp BETWEEN ? AND ?
+        AND status != 'cancelled'
       GROUP BY payment_method`,
       [startDate, endDate],
     );
 
-    // Total de ventas
+    // Total de ventas (excluir canceladas)
     const totalSales = await getAsync(
-      `SELECT 
+      `SELECT
         COUNT(*) as count,
         COALESCE(SUM(total), 0) as total,
         COALESCE(SUM(subtotal), 0) as subtotal,
         COALESCE(SUM(discount), 0) as discount
       FROM sales
-      WHERE timestamp BETWEEN ? AND ?`,
+      WHERE timestamp BETWEEN ? AND ?
+        AND status != 'cancelled'`,
       [startDate, endDate],
     );
 
@@ -4142,6 +4629,40 @@ async function getDailyCashSummary(date) {
         totalExpenses
       : cashSales + totalAdditionalIncome - totalExpenses;
 
+    // Detalle de ventas para el ticket
+    const sales = await allAsync(
+      `SELECT 
+        s.id,
+        s.total,
+        s.payment_method,
+        s.timestamp,
+        COALESCE(c.name, 'Cliente General') as client_name,
+        (
+          SELECT STRING_AGG(si.product_name || ' x' || si.quantity, ', ' ORDER BY si.id)
+          FROM sale_items si
+          WHERE si.sale_id = s.id
+        ) as products,
+        CASE 
+          WHEN EXISTS (
+            SELECT 1 FROM sale_items si2 WHERE si2.sale_id = s.id AND (
+              si2.product_type = 'membership' OR LOWER(si2.product_name) LIKE '%membres%'
+            )
+          ) THEN 'membership'
+          WHEN EXISTS (
+            SELECT 1 FROM sale_items si2 WHERE si2.sale_id = s.id AND (
+              si2.product_type IN ('package', 'time') OR LOWER(si2.product_name) LIKE '%paquete%'
+            )
+          ) THEN 'package'
+          ELSE 'product'
+        END as sale_type
+      FROM sales s
+      LEFT JOIN clients c ON s.client_id = c.id
+      WHERE s.timestamp BETWEEN $1 AND $2
+        AND s.status != 'cancelled'
+      ORDER BY s.timestamp ASC`,
+      [startDate, endDate],
+    );
+
     return {
       date,
       cashBox: openCashBox,
@@ -4151,6 +4672,7 @@ async function getDailyCashSummary(date) {
         subtotal: totalSales.subtotal,
         discount: totalSales.discount,
         byMethod: salesByMethod,
+        items: sales,
       },
       expenses: {
         total: totalExpenses,
@@ -4658,9 +5180,12 @@ async function fixNegativeCashMovements() {
 
 async function createWaiterOrder(orderData) {
   try {
-    console.log("📥 [WaiterAPI] Datos Recibidos:", JSON.stringify(orderData, null, 2));
+    console.log(
+      "📥 [WaiterAPI] Datos Recibidos:",
+      JSON.stringify(orderData, null, 2),
+    );
     const { table_or_client_name, subtotal, total, items } = orderData;
-    
+
     const subtotalVal = parseFloat(subtotal) || 0;
     const totalVal = parseFloat(total) || 0;
 
@@ -4670,10 +5195,12 @@ async function createWaiterOrder(orderData) {
 
     // 1. BUSCAR SI YA EXISTE UN PEDIDO PENDIENTE CON ESE NOMBRE
     const existingOrderSql = `SELECT id, subtotal, total FROM waiter_orders WHERE table_or_client_name = $1 AND status = 'pending' LIMIT 1`;
-    const existingOrder = await getAsync(existingOrderSql, [table_or_client_name]);
+    const existingOrder = await getAsync(existingOrderSql, [
+      table_or_client_name,
+    ]);
 
     let orderId;
-    
+
     if (existingOrder) {
       // --- ESCENARIO A: ACTUALIZAR PEDIDO EXISTENTE ---
       orderId = existingOrder.id;
@@ -4684,7 +5211,7 @@ async function createWaiterOrder(orderData) {
 
       await runAsync(
         "UPDATE waiter_orders SET subtotal = $1, total = $2, created_at = CURRENT_TIMESTAMP WHERE id = $3",
-        [newSubtotal, newTotal, orderId]
+        [newSubtotal, newTotal, orderId],
       );
     } else {
       // --- ESCENARIO B: CREAR PEDIDO NUEVO ---
@@ -4693,7 +5220,11 @@ async function createWaiterOrder(orderData) {
         VALUES ($1, $2, $3, 'pending', CURRENT_TIMESTAMP)
         RETURNING id
       `;
-      const result = await runAsync(orderSql, [table_or_client_name, subtotalVal, totalVal]);
+      const result = await runAsync(orderSql, [
+        table_or_client_name,
+        subtotalVal,
+        totalVal,
+      ]);
       orderId = result.lastID;
     }
 
@@ -4703,16 +5234,21 @@ async function createWaiterOrder(orderData) {
     for (const item of items) {
       // Verificar si el producto ya existe en ESTE pedido
       const checkItemSql = `SELECT id, quantity, subtotal FROM waiter_order_items WHERE order_id = $1 AND product_id = $2`;
-      const existingItem = await getAsync(checkItemSql, [orderId, item.product_id || 0]);
+      const existingItem = await getAsync(checkItemSql, [
+        orderId,
+        item.product_id || 0,
+      ]);
 
       if (existingItem && item.product_id) {
         // Si ya existe el mismo producto, sumamos la cantidad
-        const newQty = parseInt(existingItem.quantity) + (parseInt(item.quantity) || 1);
-        const newSub = parseFloat(existingItem.subtotal) + (parseFloat(item.subtotal) || 0);
-        
+        const newQty =
+          parseInt(existingItem.quantity) + (parseInt(item.quantity) || 1);
+        const newSub =
+          parseFloat(existingItem.subtotal) + (parseFloat(item.subtotal) || 0);
+
         await runAsync(
           "UPDATE waiter_order_items SET quantity = $1, subtotal = $2 WHERE id = $3",
-          [newQty, newSub, existingItem.id]
+          [newQty, newSub, existingItem.id],
         );
       } else {
         // Si es nuevo, lo insertamos
@@ -4726,7 +5262,7 @@ async function createWaiterOrder(orderData) {
           item.product_name,
           parseInt(item.quantity) || 1,
           parseFloat(item.unit_price) || 0,
-          parseFloat(item.subtotal) || 0
+          parseFloat(item.subtotal) || 0,
         ]);
       }
     }
@@ -4769,14 +5305,14 @@ async function getPendingWaiterOrders() {
 async function updateWaiterOrderStatus(arg1, arg2) {
   try {
     let orderId, status;
-    if (typeof arg1 === 'object' && arg1 !== null) {
+    if (typeof arg1 === "object" && arg1 !== null) {
       orderId = arg1.orderId;
       status = arg1.status;
     } else {
       orderId = arg1;
       status = arg2;
     }
-    
+
     const sql = "UPDATE waiter_orders SET status = $1 WHERE id = $2";
     await runAsync(sql, [status, orderId]);
     return true;
@@ -4804,6 +5340,7 @@ module.exports = {
   getClientById,
   startSession,
   getActiveSessions,
+  deleteSession,
   endSession,
   getProductsServices,
   createProductService,
@@ -4812,6 +5349,7 @@ module.exports = {
   deleteProductService,
   getSales,
   getDailyStats,
+  cancelSale,
   selectSystemLogo,
   getExecutiveDashboard,
   getSalesByPeriod,
@@ -4860,6 +5398,8 @@ module.exports = {
   getAllSettings,
   createSession,
   startTimerSession,
+  pauseSession,
+  resumeSession,
   updateSessionPaidStatus,
   checkDatabaseConnection,
   openCashBox,
@@ -4918,16 +5458,20 @@ module.exports = {
   setPackageIsStandardEntry,
 };
 
-async function openCashDrawerWithAudit(userId, printerName, reason = "Apertura manual") {
+async function openCashDrawerWithAudit(
+  userId,
+  printerName,
+  reason = "Apertura manual",
+) {
   try {
     const printerModule = require("./printer.cjs");
     const success = await printerModule.openCashDrawer(printerName);
     if (success) {
       // Usar 1 como fallback si el userId es nulo/inválido
-      const finalUserId = userId || 1; 
+      const finalUserId = userId || 1;
       await runAsync(
         "INSERT INTO user_audit_log (user_id, action, details) VALUES ($1, $2, $3)",
-        [finalUserId, "MANUAL_DRAWER_OPEN", reason]
+        [finalUserId, "MANUAL_DRAWER_OPEN", reason],
       );
     }
     return success;
@@ -4949,3 +5493,9 @@ Object.assign(module.exports, quotationsApi);
 Object.assign(module.exports, reservationsApi);
 Object.assign(module.exports, suppliesApi);
 Object.assign(module.exports, equipmentApi);
+
+// Import and assign nfc-api
+const nfcApi = require("./nfc-api.cjs");
+Object.assign(module.exports, nfcApi);
+module.exports.apiRegisterDiscountMembershipUse =
+  nfcApi.registerDiscountMembershipUse;

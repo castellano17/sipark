@@ -3,6 +3,7 @@ import { Search, Utensils, Minus, Plus, ShoppingCart, Trash2, Send } from "lucid
 import { Button } from "./ui/button";
 import { Card } from "./ui/card";
 import { Input } from "./ui/input";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "./ui/dialog";
 import { useDatabase } from "../hooks/useDatabase";
 import { useNotification } from "../hooks/useNotification";
 import { useCurrency } from "../hooks/useCurrency";
@@ -33,6 +34,9 @@ export function WaiterPOS() {
   const [activeOrders, setActiveOrders] = useState<any[]>([]);
   const [isMobileCartOpen, setIsMobileCartOpen] = useState(false);
   const [isSending, setIsSending] = useState(false);
+
+  const [showPrintModal, setShowPrintModal] = useState(false);
+  const [lastOrderDetails, setLastOrderDetails] = useState<{orderId: any, tableName: string, items: WaiterSaleItem[], total: number} | null>(null);
 
   useEffect(() => {
     loadProducts();
@@ -102,12 +106,12 @@ export function WaiterPOS() {
       return [
         ...prev,
         {
-          id: crypto.randomUUID(),
+          id: Date.now().toString(36) + Math.random().toString(36).substring(2),
           product_id: product.id,
           product_name: product.name,
           quantity: 1,
-          unit_price: product.price,
-          subtotal: product.price
+          unit_price: Number(product.price),
+          subtotal: Number(product.price)
         }
       ];
     });
@@ -117,13 +121,13 @@ export function WaiterPOS() {
     setCartItems(prev => prev.map(item => {
       if (item.id === itemId) {
         const newQuantity = Math.max(0, item.quantity + delta);
-        return { ...item, quantity: newQuantity, subtotal: newQuantity * item.unit_price };
+        return { ...item, quantity: newQuantity, subtotal: newQuantity * Number(item.unit_price) };
       }
       return item;
     }).filter(item => item.quantity > 0));
   };
 
-  const cartTotal = cartItems.reduce((sum, item) => sum + item.subtotal, 0);
+  const cartTotal = cartItems.reduce((sum, item) => sum + Number(item.subtotal), 0);
 
   const handleSendOrder = async () => {
     if (!tableName.trim()) {
@@ -147,43 +151,74 @@ export function WaiterPOS() {
       const orderId = await (window as any).api.createWaiterOrder(orderData);
       
       success("Pedido enviado correctamente.", 2500);
+      setLastOrderDetails({
+        orderId,
+        tableName: tableName.trim(),
+        items: [...cartItems],
+        total: cartTotal
+      });
+      setShowPrintModal(true);
+
       setCartItems([]);
       setTableName("");
       setIsMobileCartOpen(false);
       loadActiveOrders();
-
-      // Imprimir Comanda
-      try {
-        const ticketPrinter = await (window as any).api.getSetting("ticket_printer");
-        if (ticketPrinter) {
-          const comandaHtml = `
-            <div style="font-family: monospace; width: 100%; font-size: 14px; text-align: center;">
-              <h2>COMANDA</h2>
-              <h1 style="font-size: 24px; margin: 5px 0;">MESA: ${tableName.trim()}</h1>
-              <p>Fecha: ${new Date().toLocaleString()}</p>
-              <p>Orden #: ${orderId}</p>
-              <hr style="border-top: 1px dashed black;" />
-              <table style="width: 100%; text-align: left; font-size: 16px; margin-top: 10px;">
-                ${cartItems.map(item => `
-                  <tr>
-                    <td style="font-weight: bold; padding: 5px 0;">${item.quantity}x</td>
-                    <td style="padding: 5px 0;">${item.product_name}</td>
-                  </tr>
-                `).join('')}
-              </table>
-              <hr style="border-top: 1px dashed black; margin-top: 10px;" />
-            </div>
-          `;
-          await (window as any).api.printHtmlSilent(comandaHtml);
-        }
-      } catch (printErr) {
-        console.warn("Fallo al imprimir la comanda", printErr);
-      }
     } catch (err) {
       error("Error al enviar el pedido");
       console.error(err);
     } finally {
       setIsSending(false);
+    }
+  };
+
+  const handlePrintComanda = async () => {
+    if (!lastOrderDetails) return;
+    try {
+      const ticketPrinter = await (window as any).api.getSetting("ticket_printer");
+      if (ticketPrinter) {
+        const INIT_SEQ = "\x1B\x40\x1C\x2E\x1B\x74\x10";
+        const CUT_SEQ = "\x1D\x56\x00";
+        
+        const currentUserStr = localStorage.getItem("currentUser");
+        const currentUser = currentUserStr ? JSON.parse(currentUserStr) : null;
+        const waiterName = currentUser ? `${currentUser.first_name} ${currentUser.last_name}`.trim() : "Desconocido";
+        
+        let itemsText = lastOrderDetails.items.map(item => {
+          const qty = `${item.quantity}x`.padEnd(4);
+          const name = item.product_name.substring(0, 15).padEnd(15);
+          const price = `C$${Number(item.unit_price).toFixed(2)}`.padStart(8);
+          const subt = `C$${Number(item.subtotal).toFixed(2)}`.padStart(9);
+          return `${qty} ${name} ${price} ${subt}`;
+        }).join('\n');
+        
+        const comandaText = INIT_SEQ + `
+======================================
+               COMANDA
+======================================
+MESA/CLIENTE: ${lastOrderDetails.tableName}
+MESERO: ${waiterName}
+Fecha: ${new Date().toLocaleString()}
+Orden #: ${lastOrderDetails.orderId}
+--------------------------------------
+CANT  PRODUCTO        PRECIO  SUBTOTAL
+--------------------------------------
+${itemsText}
+--------------------------------------
+TOTAL A PAGAR:        C$${lastOrderDetails.total.toFixed(2).padStart(8)}
+======================================
+
+` + CUT_SEQ;
+        await (window as any).api.printTicket(ticketPrinter, comandaText);
+        success("Comanda enviada a la impresora.");
+      } else {
+        warning("No hay impresora de tickets configurada.");
+      }
+    } catch (printErr) {
+      console.warn("Fallo al imprimir la comanda", printErr);
+      error("Error al imprimir la comanda.");
+    } finally {
+      setShowPrintModal(false);
+      setLastOrderDetails(null);
     }
   };
 
@@ -377,6 +412,62 @@ export function WaiterPOS() {
           </div>
         </div>
       </div>
+
+      {/* Modal para Imprimir Comanda */}
+      <Dialog open={showPrintModal} onOpenChange={(open) => {
+        if (!open) {
+          setShowPrintModal(false);
+          setLastOrderDetails(null);
+        }
+      }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Imprimir Comanda</DialogTitle>
+            <DialogDescription>
+              ¿Desea enviar este pedido a la impresora de cocina?
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <div className="bg-slate-50 p-4 rounded-lg flex items-center justify-between border border-slate-100">
+              <div className="flex items-center gap-3">
+                <div className="bg-blue-100 text-blue-600 p-2 rounded-full">
+                  <Utensils className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="font-semibold text-slate-800">
+                    {lastOrderDetails?.tableName}
+                  </div>
+                  <div className="text-xs text-slate-500">
+                    {lastOrderDetails?.items.length} productos
+                  </div>
+                </div>
+              </div>
+              <div className="font-bold text-blue-600">
+                {formatCurrency(lastOrderDetails?.total)}
+              </div>
+            </div>
+          </div>
+          <DialogFooter className="flex gap-2 sm:gap-0">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setShowPrintModal(false);
+                setLastOrderDetails(null);
+              }}
+            >
+              No
+            </Button>
+            <Button
+              type="button"
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+              onClick={handlePrintComanda}
+            >
+              Sí, imprimir
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

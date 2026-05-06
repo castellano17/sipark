@@ -536,12 +536,18 @@ export function usePrinter() {
           } else if (t.type === "refund") {
             op = "Reembolso";
             amountStr = `+${currencySymbol}${Number(t.amount).toFixed(2)}`;
+          } else if (t.type === "discount") {
+            op = "Descuento";
+            amountStr = `-${currencySymbol}${Number(t.amount).toFixed(2)}`;
           } else {
             op = t.type;
             amountStr = `${currencySymbol}${Number(t.amount).toFixed(2)}`;
           }
           text += `${tDate} | ${op}\n`;
           text += `  Monto: ${amountStr}  Saldo: ${currencySymbol}${Number(t.new_balance).toFixed(2)}\n`;
+          if (t.notes) {
+            text += `  Detalle: ${t.notes}\n`;
+          }
         });
       }
 

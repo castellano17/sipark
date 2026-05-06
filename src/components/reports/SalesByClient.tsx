@@ -64,45 +64,39 @@ export default function SalesByClient({ onBack }: SalesByClientProps) {
 
   const handleExportExcel = () => {
     if (!reportData) return;
-
-    const data = reportData.clients.map((c: any) => ({
-      Cliente: c.name,
-      Email: c.email || "N/A",
-      Teléfono: c.phone || "N/A",
-      "Total Compras": c.total_purchases,
-      "Total Gastado": c.total_spent,
-      "Ticket Promedio": c.avg_ticket,
-      "% del Total": c.percentage + "%",
-      "Última Compra": c.last_purchase,
-    }));
-
-    exportToExcel(data, "ventas-por-cliente");
+    exportToExcel({
+      title: "Ventas por Cliente",
+      filename: "ventas-por-cliente",
+      subtitle: `Período: ${startDate} - ${endDate}`,
+      columns: [
+        { header: "Cliente", key: "name" },
+        { header: "Email", key: "email" },
+        { header: "Teléfono", key: "phone" },
+        { header: "Total Compras", key: "total_purchases", format: "number" },
+        { header: "Total Gastado", key: "total_spent", format: "currency" },
+        { header: "Ticket Promedio", key: "avg_ticket", format: "currency" },
+        { header: "% del Total", key: "percentage" },
+        { header: "Última Compra", key: "last_purchase", format: "date" },
+      ],
+      data: reportData.clients,
+    });
   };
 
   const handleExportPDF = () => {
     if (!reportData) return;
-
-    const columns = [
-      "Cliente",
-      "Compras",
-      "Total Gastado",
-      "Ticket Prom.",
-      "% Total",
-    ];
-    const data = reportData.clients.map((c: any) => [
-      c.name,
-      c.total_purchases,
-      formatCurrency(c.total_spent),
-      formatCurrency(c.avg_ticket),
-      c.percentage + "%",
-    ]);
-
-    exportToPDF(
-      "Ventas por Cliente",
-      columns,
-      data,
-      `Período: ${startDate} - ${endDate}`,
-    );
+    exportToPDF({
+      title: "Ventas por Cliente",
+      filename: "ventas-por-cliente",
+      subtitle: `Período: ${startDate} - ${endDate}`,
+      columns: [
+        { header: "Cliente", key: "name" },
+        { header: "Compras", key: "total_purchases", format: "number" },
+        { header: "Total Gastado", key: "total_spent", format: "currency" },
+        { header: "Ticket Promedio", key: "avg_ticket", format: "currency" },
+        { header: "% del Total", key: "percentage" },
+      ],
+      data: reportData.clients,
+    });
   };
 
   if (loading && !reportData) {
@@ -241,9 +235,8 @@ export default function SalesByClient({ onBack }: SalesByClientProps) {
           <Card className="p-6 mb-6">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-semibold text-lg">Detalle de Clientes</h3>
-              <Button
-                        className="h-8 w-8 p-0" variant="outline" size="sm" onClick={handleExportExcel}>
-                <FileSpreadsheet className="w-4 h-4 mr-2" />
+              <Button variant="outline" size="sm" onClick={handleExportExcel} className="flex items-center gap-1.5 whitespace-nowrap">
+                <FileSpreadsheet className="w-4 h-4" />
                 Excel
               </Button>
             </div>

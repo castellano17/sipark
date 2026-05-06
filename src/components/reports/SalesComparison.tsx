@@ -102,35 +102,36 @@ export default function SalesComparison({ onBack }: SalesComparisonProps) {
       },
     ];
 
-    exportToExcel(data, "comparativo-ventas");
+    exportToExcel({
+      title: "Comparativo de Ventas",
+      filename: "comparativo-ventas",
+      columns: [
+        { header: "Métrica", key: "Métrica" },
+        { header: "Período 1", key: "Período 1" },
+        { header: "Período 2", key: "Período 2" },
+        { header: "Crecimiento", key: "Crecimiento" }
+      ],
+      data: data
+    });
   };
 
   const handleExportPDF = () => {
     if (!reportData) return;
-
-    const columns = ["Métrica", "Período 1", "Período 2", "Crecimiento"];
-    const data = [
-      [
-        "Total Ventas",
-        reportData.period1.total_sales,
-        reportData.period2.total_sales,
-        reportData.growth.sales + "%",
+    exportToPDF({
+      title: "Comparativo de Ventas",
+      filename: "comparativo-ventas",
+      columns: [
+        { header: "Métrica", key: "metrica" },
+        { header: "Período 1", key: "periodo1", format: "currency" },
+        { header: "Período 2", key: "periodo2", format: "currency" },
+        { header: "Crecimiento", key: "crecimiento" },
       ],
-      [
-        "Ingresos",
-        formatCurrency(reportData.period1.total_revenue),
-        formatCurrency(reportData.period2.total_revenue),
-        reportData.growth.revenue + "%",
+      data: [
+        { metrica: "Total Ventas", periodo1: reportData.period1.total_sales, periodo2: reportData.period2.total_sales, crecimiento: reportData.growth.sales + "%" },
+        { metrica: "Ingresos", periodo1: reportData.period1.total_revenue, periodo2: reportData.period2.total_revenue, crecimiento: reportData.growth.revenue + "%" },
+        { metrica: "Ticket Promedio", periodo1: reportData.period1.avg_ticket, periodo2: reportData.period2.avg_ticket, crecimiento: reportData.growth.avgTicket + "%" },
       ],
-      [
-        "Ticket Promedio",
-        formatCurrency(reportData.period1.avg_ticket),
-        formatCurrency(reportData.period2.avg_ticket),
-        reportData.growth.avgTicket + "%",
-      ],
-    ];
-
-    exportToPDF("Comparativo de Ventas", columns, data);
+    });
   };
 
   if (loading && !reportData) {
@@ -288,8 +289,8 @@ export default function SalesComparison({ onBack }: SalesComparisonProps) {
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-semibold text-lg">Detalle Comparativo</h3>
               <Button
-                        className="h-8 w-8 p-0" variant="outline" size="sm" onClick={handleExportExcel}>
-                <FileSpreadsheet className="w-4 h-4 mr-2" />
+                className="flex items-center gap-1.5 whitespace-nowrap" variant="outline" size="sm" onClick={handleExportExcel}>
+                <FileSpreadsheet className="w-4 h-4" />
                 Excel
               </Button>
             </div>

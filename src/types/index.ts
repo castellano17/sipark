@@ -58,6 +58,9 @@ export interface ActiveSession {
   package_name?: string;
   duration_minutes?: number;
   is_paid?: boolean;
+  children_count?: number;
+  is_paused?: boolean;
+  pause_start_time?: string;
 }
 
 export interface ProductService {
@@ -77,6 +80,7 @@ export interface ProductService {
   barcode?: string;
   stock?: number;
   min_stock?: number;
+  requires_stock?: boolean | number;
   duration_minutes?: number;
   created_at: string;
 }
@@ -128,6 +132,7 @@ export interface CurrentSale {
   total: number;
   payment_method?: "cash" | "card" | "transfer";
   notes?: string;
+  nfc_membership_id?: number;
 }
 
 export interface ProductCategory {
@@ -143,6 +148,7 @@ export interface ProductCategory {
     | "event"
     | "rental"
     | "membership";
+  requires_stock?: boolean | number;
   color: string;
 }
 

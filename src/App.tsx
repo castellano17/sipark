@@ -40,6 +40,52 @@ function App() {
     setCurrentUser(null);
   };
 
+  // Auto-logout por inactividad
+  useEffect(() => {
+    if (!currentUser || isCustomerDisplay) return;
+
+    let timeoutId: NodeJS.Timeout;
+
+    const logoutUser = () => {
+      handleLogout();
+    };
+
+    const resetTimer = () => {
+      if (timeoutId) clearTimeout(timeoutId);
+      // 5 minutos = 300,000 ms
+      timeoutId = setTimeout(logoutUser, 300000);
+    };
+
+    // Inicializar el timer
+    resetTimer();
+
+    // Eventos que indican actividad del usuario
+    const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart'];
+    
+    // Función optimizada para no llamar resetTimer en cada pixel de mousemove
+    let throttleTimeout: NodeJS.Timeout | null = null;
+    const handleActivity = () => {
+      if (!throttleTimeout) {
+        throttleTimeout = setTimeout(() => {
+          resetTimer();
+          throttleTimeout = null;
+        }, 1000); // Throttling a 1 segundo para mejorar rendimiento
+      }
+    };
+
+    events.forEach(event => {
+      window.addEventListener(event, handleActivity, { passive: true });
+    });
+
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+      if (throttleTimeout) clearTimeout(throttleTimeout);
+      events.forEach(event => {
+        window.removeEventListener(event, handleActivity);
+      });
+    };
+  }, [currentUser, isCustomerDisplay]);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-slate-950">

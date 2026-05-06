@@ -7,7 +7,7 @@ import {
 import { Button } from "./ui/button";
 import { useNotification } from "@/hooks/useNotification";
 
-type CampaignType = "hours" | "discount_pct" | "discount_fixed";
+type CampaignType = "hours" | "minutes" | "discount_pct" | "discount_fixed";
 
 interface Campaign {
   id: number;
@@ -29,12 +29,14 @@ interface Campaign {
 
 const TYPE_LABELS: Record<CampaignType, string> = {
   hours: "Horas de Juego Gratis",
+  minutes: "Minutos de Juego Gratis",
   discount_pct: "Descuento Porcentual (%)",
   discount_fixed: "Descuento Fijo (C$)",
 };
 
 const TYPE_COLORS: Record<CampaignType, string> = {
   hours: "bg-blue-100 text-blue-700",
+  minutes: "bg-cyan-100 text-cyan-700",
   discount_pct: "bg-purple-100 text-purple-700",
   discount_fixed: "bg-green-100 text-green-700",
 };
@@ -50,6 +52,7 @@ const getBenefitLabel = (type: CampaignType, value: any) => {
   const numValue = parseFloat(value) || 0;
   switch (type) {
     case "hours": return `${numValue} hora${numValue !== 1 ? "s" : ""} gratis`;
+    case "minutes": return `${numValue} minuto${numValue !== 1 ? "s" : ""} gratis`;
     case "discount_pct": return `${numValue}% de descuento`;
     case "discount_fixed": return `C$${numValue.toFixed(2)} de descuento`;
     default: return `${numValue}`;
@@ -296,11 +299,30 @@ export default function Promotions() {
 
           const pDescription = removeAccents(v.campaign_description || "");
 
+          const wordWrapText = (text: string, maxWidth: number) => {
+            const words = text.split(" ");
+            const lines: string[] = [];
+            let currentLine = "";
+            for (const word of words) {
+              if ((currentLine + word).length > maxWidth) {
+                if (currentLine.trim()) lines.push(currentLine.trim());
+                currentLine = word + " ";
+              } else {
+                currentLine += word + " ";
+              }
+            }
+            if (currentLine.trim()) lines.push(currentLine.trim());
+            return lines;
+          };
+
           let t = INIT + CENTER;
           if (logoEscPos) t += logoEscPos;
           t += line + "\n";
-          if (showBusinessName) t += BOLD_ON + DOUBLE + pBusinessName + "\n" + NORMAL + BOLD_OFF;
-          if (showAddress && pBusinessAddress) t += pBusinessAddress + "\n";
+          if (showBusinessName) t += BOLD_ON + DOUBLE + pBusinessName + "\n" + NORMAL + BOLD_OFF + "\n";
+          if (showAddress && pBusinessAddress) {
+            const addressLines = wordWrapText(pBusinessAddress, 40); // 40 cols for 80mm
+            addressLines.forEach(l => t += l + "\n");
+          }
           if (showPhone && pBusinessPhone) t += `Tel: ${pBusinessPhone}\n`;
           if (pHeaderMessage) t += pHeaderMessage + "\n";
           t += line + "\n";
@@ -667,7 +689,7 @@ export default function Promotions() {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">
-                      {form.type === "hours" ? "Horas" : form.type === "discount_pct" ? "% Descuento" : "Monto C$"} *
+                      {form.type === "hours" ? "Horas" : form.type === "minutes" ? "Minutos" : form.type === "discount_pct" ? "% Descuento" : "Monto C$"} *
                     </label>
                     <input type="number" min="0.01" step="0.01" value={form.benefitValue}
                       onChange={e => setForm(f => ({ ...f, benefitValue: e.target.value }))}

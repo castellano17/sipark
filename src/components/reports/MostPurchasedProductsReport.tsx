@@ -134,6 +134,26 @@ export function MostPurchasedProductsReport({
           <ArrowLeft className="w-4 h-4 mr-2" />
           Volver
         </Button>
+        <div className="flex gap-2 ml-auto">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => handleExport("excel")}
+            className="flex items-center gap-1.5 whitespace-nowrap"
+          >
+            <FileDown className="w-4 h-4" />
+            Excel
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => handleExport("pdf")}
+            className="flex items-center gap-1.5 whitespace-nowrap"
+          >
+            <FileDown className="w-4 h-4" />
+            PDF
+          </Button>
+        </div>
       </div>
 
       <div className="mb-6">

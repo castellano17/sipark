@@ -32,6 +32,43 @@ interface SalesByPeriodProps {
   onBack: () => void;
 }
 
+// Helper: badge de tipo de venta
+function SaleTypeBadge({ type }: { type: string }) {
+  if (type === 'membership') {
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-purple-100 text-purple-700">
+        🪪 Membresía
+      </span>
+    );
+  }
+  if (type === 'package') {
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-100 text-blue-700">
+        📦 Paquete
+      </span>
+    );
+  }
+  if (type === 'promo') {
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-orange-100 text-orange-700">
+        🎟️ Promo
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-green-100 text-green-700">
+      🛒 Producto
+    </span>
+  );
+}
+
+const getTypeName = (type: string) => {
+  if (type === 'promo') return 'Promo';
+  if (type === 'membership') return 'Membresía';
+  if (type === 'package') return 'Paquete';
+  return 'Producto';
+};
+
 export function SalesByPeriod({ onBack }: SalesByPeriodProps) {
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState<any>(null);
@@ -41,28 +78,53 @@ export function SalesByPeriod({ onBack }: SalesByPeriodProps) {
 
   // Filtros
   const [startDate, setStartDate] = useState(() => {
-    const date = new Date();
-    date.setDate(1); // Primer día del mes
-    return date.toISOString().split("T")[0];
+    return new Date().toISOString().split("T")[0];
   });
   const [endDate, setEndDate] = useState(() => {
     return new Date().toISOString().split("T")[0];
   });
   const [paymentMethod, setPaymentMethod] = useState("all");
+  const [saleType, setSaleType] = useState("all");
 
   useEffect(() => {
     loadReport();
   }, []);
 
-  const loadReport = async () => {
+  const loadReport = async (overrides?: { start?: string; end?: string; payment?: string; type?: string }) => {
     try {
       setLoading(true);
+      const typeFilter = overrides?.type ?? saleType;
+
+      // Fetch all data for the period to handle filtering and summary locally
       const result = await window.api.getSalesByPeriod(
-        startDate,
-        endDate,
-        paymentMethod,
+        overrides?.start ?? startDate,
+        overrides?.end ?? endDate,
+        overrides?.payment ?? paymentMethod,
+        "all"
       );
-      setData(result);
+
+      // Apply the 'Tipo de Venta' filter in the frontend
+      let filteredSales = result.sales;
+      if (typeFilter && typeFilter !== "all") {
+        filteredSales = result.sales.filter((s: any) => s.sale_type === typeFilter);
+      }
+
+      // Recalculate summary totals based on filtered results
+      const total_sales = filteredSales.length;
+      const total_revenue = filteredSales.reduce((sum: number, s: any) => sum + (Number(s.total) || 0), 0);
+      const total_discount = filteredSales.reduce((sum: number, s: any) => sum + (Number(s.discount) || 0), 0);
+      const average_ticket = total_sales > 0 ? total_revenue / total_sales : 0;
+
+      setData({
+        ...result,
+        sales: filteredSales,
+        summary: {
+          total_sales,
+          total_revenue,
+          total_discount,
+          average_ticket
+        }
+      });
     } catch (err) {
       error("Error cargando reporte");
     } finally {
@@ -75,27 +137,38 @@ export function SalesByPeriod({ onBack }: SalesByPeriodProps) {
     return date.toLocaleDateString("es-ES", { day: "2-digit", month: "short" });
   };
 
+  // Format date as DD/MM/YYYY for reports
+  const formatDateDMY = (isoDate: string) => {
+    const [y, m, d] = isoDate.split("-");
+    return `${d}/${m}/${y}`;
+  };
+
   const handleExportExcel = () => {
     if (!data) return;
 
     exportToExcel({
       title: "Reporte de Ventas por Período",
-      subtitle: `Del ${startDate} al ${endDate}`,
+      subtitle: `Del ${formatDateDMY(startDate)} al ${formatDateDMY(endDate)}`,
       filename: `ventas-${startDate}-${endDate}`,
       columns: [
         { header: "ID", key: "id", width: 10 },
         { header: "Fecha", key: "timestamp", format: "datetime", width: 20 },
         { header: "Cliente", key: "client_name", width: 25 },
+        { header: "Productos", key: "products", width: 40 },
+        { header: "Categoría", key: "sale_type", width: 15 },
         { header: "Método", key: "payment_method", width: 15 },
         { header: "Subtotal", key: "subtotal", format: "currency", width: 15 },
         { header: "Descuento", key: "discount", format: "currency", width: 15 },
         { header: "Total", key: "total", format: "currency", width: 15 },
       ],
-      data: data.sales,
+      data: data.sales.map((s: any) => ({
+        ...s,
+        sale_type: getTypeName(s.sale_type),
+        payment_method: s.payment_method === 'cash' ? 'Efectivo' : s.payment_method === 'card' ? 'Tarjeta' : s.payment_method === 'transfer' ? 'Transferencia' : s.payment_method
+      })),
       summary: [
         { label: "Total Ventas", value: data.summary.total_revenue },
         { label: "Total Transacciones", value: data.summary.total_sales },
-        { label: "Ticket Promedio", value: data.summary.average_ticket },
         { label: "Total Descuentos", value: data.summary.total_discount },
       ],
     });
@@ -106,20 +179,27 @@ export function SalesByPeriod({ onBack }: SalesByPeriodProps) {
 
     exportToPDF({
       title: "Reporte de Ventas por Período",
-      subtitle: `Del ${startDate} al ${endDate}`,
+      subtitle: `Del ${formatDateDMY(startDate)} al ${formatDateDMY(endDate)}`,
       filename: `ventas-${startDate}-${endDate}`,
       columns: [
-        { header: "ID", key: "id" },
-        { header: "Fecha", key: "timestamp", format: "datetime" },
-        { header: "Cliente", key: "client_name" },
-        { header: "Método", key: "payment_method" },
-        { header: "Total", key: "total", format: "currency" },
+        { header: "ID", key: "id", width: 5 },
+        { header: "Fecha", key: "timestamp", format: "datetime", width: 16 },
+        { header: "Cliente", key: "client_name", width: 18 },
+        { header: "Productos", key: "products", width: 28 },
+        { header: "Categoría", key: "sale_type", width: 14 },
+        { header: "Método", key: "payment_method", width: 12 },
+        { header: "Total", key: "total", format: "currency", width: 12 },
       ],
-      data: data.sales,
+      data: data.sales.map((s: any) => ({
+        ...s,
+        products: s.products || '—',
+        sale_type: getTypeName(s.sale_type),
+        payment_method: s.payment_method === 'cash' ? 'Efectivo' : s.payment_method === 'card' ? 'Tarjeta' : s.payment_method === 'transfer' ? 'Transferencia' : s.payment_method
+      })),
       summary: [
         { label: "Total Ventas", value: data.summary.total_revenue },
         { label: "Total Transacciones", value: data.summary.total_sales },
-        { label: "Ticket Promedio", value: data.summary.average_ticket },
+        { label: "Total Descuentos", value: data.summary.total_discount },
       ],
     });
   };
@@ -129,22 +209,26 @@ export function SalesByPeriod({ onBack }: SalesByPeriodProps) {
 
     printReport({
       title: "Reporte de Ventas por Período",
-      subtitle: `Del ${startDate} al ${endDate}`,
+      subtitle: `Del ${formatDateDMY(startDate)} al ${formatDateDMY(endDate)}`,
       filename: `ventas-${startDate}-${endDate}`,
       columns: [
-        { header: "ID", key: "id" },
-        { header: "Fecha", key: "timestamp", format: "datetime" },
-        { header: "Cliente", key: "client_name" },
-        { header: "Método", key: "payment_method" },
-        { header: "Subtotal", key: "subtotal", format: "currency" },
-        { header: "Descuento", key: "discount", format: "currency" },
-        { header: "Total", key: "total", format: "currency" },
+        { header: "ID", key: "id", width: 6 },
+        { header: "Fecha", key: "timestamp", format: "datetime", width: 18 },
+        { header: "Cliente", key: "client_name", width: 20 },
+        { header: "Productos", key: "products", width: 35 },
+        { header: "Categoría", key: "sale_type", width: 14 },
+        { header: "Método", key: "payment_method", width: 12 },
+        { header: "Total", key: "total", format: "currency", width: 15 },
       ],
-      data: data.sales,
+      data: data.sales.map((s: any) => ({
+        ...s,
+        products: s.products || '—',
+        sale_type: getTypeName(s.sale_type),
+        payment_method: s.payment_method === 'cash' ? 'Efectivo' : s.payment_method === 'card' ? 'Tarjeta' : s.payment_method === 'transfer' ? 'Transferencia' : s.payment_method
+      })),
       summary: [
         { label: "Total Ventas", value: data.summary.total_revenue },
         { label: "Total Transacciones", value: data.summary.total_sales },
-        { label: "Ticket Promedio", value: data.summary.average_ticket },
         { label: "Total Descuentos", value: data.summary.total_discount },
       ],
     });
@@ -183,7 +267,7 @@ export function SalesByPeriod({ onBack }: SalesByPeriodProps) {
       {/* Filtros */}
       <Card className="p-6 mb-6">
         <h3 className="font-semibold mb-4">Filtros</h3>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
           <div>
             <label className="text-sm font-medium mb-2 block">
               Fecha Inicio
@@ -209,7 +293,7 @@ export function SalesByPeriod({ onBack }: SalesByPeriodProps) {
             <select
               value={paymentMethod}
               onChange={(e) => setPaymentMethod(e.target.value)}
-              className="w-full px-3 py-2 border rounded-md"
+              className="w-full px-3 py-2 border rounded-md text-sm"
             >
               <option value="all">Todos</option>
               <option value="cash">Efectivo</option>
@@ -217,18 +301,39 @@ export function SalesByPeriod({ onBack }: SalesByPeriodProps) {
               <option value="transfer">Transferencia</option>
             </select>
           </div>
+          <div>
+            <label className="text-sm font-medium mb-2 block">
+              Tipo de Venta
+            </label>
+            <select
+              value={saleType}
+              onChange={(e) => setSaleType(e.target.value)}
+              className="w-full px-3 py-2 border rounded-md text-sm"
+            >
+              <option value="all">Todos los tipos</option>
+              <option value="product">🛒 Producto</option>
+              <option value="package">📦 Paquete</option>
+              <option value="membership">🪪 Membresía</option>
+              <option value="promo">🎟️ Promo</option>
+            </select>
+          </div>
           <div className="flex items-end gap-2">
-            <Button onClick={loadReport} disabled={loading} className="flex-1">
+            <Button
+              onClick={() => loadReport({ start: startDate, end: endDate, payment: paymentMethod, type: saleType })}
+              disabled={loading}
+              className="flex-1"
+            >
               {loading ? "Cargando..." : "Aplicar"}
             </Button>
             <Button
               variant="outline"
               onClick={() => {
-                setStartDate(
-                  new Date(new Date().setDate(1)).toISOString().split("T")[0],
-                );
-                setEndDate(new Date().toISOString().split("T")[0]);
+                const today = new Date().toISOString().split("T")[0];
+                setStartDate(today);
+                setEndDate(today);
                 setPaymentMethod("all");
+                setSaleType("all");
+                loadReport({ start: today, end: today, payment: "all", type: "all" });
               }}
             >
               Limpiar
@@ -298,68 +403,6 @@ export function SalesByPeriod({ onBack }: SalesByPeriodProps) {
             </Card>
           </div>
 
-          {/* Gráficos */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
-            {/* Gráfico de Ventas por Día */}
-            <Card className="p-6">
-              <h3 className="font-semibold text-lg mb-4">Ventas por Día</h3>
-              <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={data.dailyBreakdown}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis
-                    dataKey="date"
-                    tickFormatter={formatDate}
-                    style={{ fontSize: "12px" }}
-                  />
-                  <YAxis style={{ fontSize: "12px" }} />
-                  <Tooltip
-                    formatter={(value: number) => formatCurrency(value)}
-                    labelFormatter={(label) => formatDate(label)}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="total"
-                    stroke="#10b981"
-                    strokeWidth={2}
-                    dot={{ fill: "#10b981", r: 4 }}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            </Card>
-
-            {/* Gráfico por Método de Pago */}
-            <Card className="p-6">
-              <h3 className="font-semibold text-lg mb-4">Por Método de Pago</h3>
-              <ResponsiveContainer width="100%" height={300}>
-                <PieChart>
-                  <Pie
-                    data={data.paymentMethodBreakdown}
-                    dataKey="total"
-                    nameKey="payment_method"
-                    cx="50%"
-                    cy="50%"
-                    outerRadius={100}
-                    label={(entry) =>
-                      `${entry.payment_method}: ${formatCurrency(entry.total)}`
-                    }
-                  >
-                    {data.paymentMethodBreakdown.map(
-                      (entry: any, index: number) => (
-                        <Cell
-                          key={`cell-${index}`}
-                          fill={COLORS[index % COLORS.length]}
-                        />
-                      ),
-                    )}
-                  </Pie>
-                  <Tooltip
-                    formatter={(value: number) => formatCurrency(value)}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-            </Card>
-          </div>
-
           {/* Tabla de Ventas */}
           <Card className="p-6">
             <div className="flex items-center justify-between mb-4">
@@ -372,7 +415,7 @@ export function SalesByPeriod({ onBack }: SalesByPeriodProps) {
                   className="flex items-center gap-2"
                 >
                   <FileDown className="w-4 h-4" />
-                  <span className="hidden sm:inline">Exportar Excel</span>
+                  Exportar Excel
                 </Button>
                 <Button
                   variant="outline"
@@ -381,7 +424,7 @@ export function SalesByPeriod({ onBack }: SalesByPeriodProps) {
                   className="flex items-center gap-2"
                 >
                   <FileDown className="w-4 h-4" />
-                  <span className="hidden sm:inline">Exportar PDF</span>
+                  Exportar PDF
                 </Button>
                 <Button
                   variant="outline"
@@ -390,7 +433,7 @@ export function SalesByPeriod({ onBack }: SalesByPeriodProps) {
                   className="flex items-center gap-2"
                 >
                   <Printer className="w-4 h-4" />
-                  <span className="hidden sm:inline">Imprimir</span>
+                  Imprimir
                 </Button>
               </div>
             </div>
@@ -406,6 +449,12 @@ export function SalesByPeriod({ onBack }: SalesByPeriodProps) {
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-semibold">
                       Cliente
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold">
+                      Productos
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold">
+                      Tipo
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-semibold">
                       Método
@@ -429,8 +478,17 @@ export function SalesByPeriod({ onBack }: SalesByPeriodProps) {
                         {new Date(sale.timestamp).toLocaleString("es-ES")}
                       </td>
                       <td className="px-4 py-3 text-sm">{sale.client_name}</td>
-                      <td className="px-4 py-3 text-sm capitalize">
-                        {sale.payment_method}
+                      <td className="px-4 py-3 text-sm text-gray-700">
+                        {sale.products || <span className="text-gray-400">—</span>}
+                      </td>
+                      <td className="px-4 py-3">
+                        <SaleTypeBadge type={sale.sale_type || 'product'} />
+                      </td>
+                      <td className="px-4 py-3 text-sm">
+                        {sale.payment_method === 'cash' ? 'Efectivo'
+                          : sale.payment_method === 'card' ? 'Tarjeta'
+                          : sale.payment_method === 'transfer' ? 'Transferencia'
+                          : sale.payment_method}
                       </td>
                       <td className="px-4 py-3 text-sm text-right">
                         {formatCurrency(sale.subtotal)}

@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
-import { Truck, Plus, Edit, Trash2, Phone, Mail, MapPin,
-  FileDown,
-  FileText,
-  Printer,
+import { 
+  Truck, Plus, Edit, Trash2, Phone, Mail, MapPin,
+  FileDown, FileText, Printer,
+  ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight 
 } from "lucide-react";
 import { Card } from "./ui/card";
 import { Button } from "./ui/button";
@@ -30,6 +30,10 @@ export function Suppliers() {
   const { canCreate, canEdit, canDelete } = usePermissions();
   const { exportToExcel, exportToPDF, printReport } = useReportExport();
   const [searchTerm, setSearchTerm] = useState("");
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(6);
 
   const [formData, setFormData] = useState({
     name: "",
@@ -135,6 +139,17 @@ export function Suppliers() {
     (s.contact_name && s.contact_name.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
+  // Pagination logic
+  const totalPages = Math.ceil(filteredSuppliers.length / itemsPerPage);
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentItems = filteredSuppliers.slice(indexOfFirstItem, indexOfLastItem);
+
+  // Reset to first page when search changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
+
   const reportConfig = {
     title: "Directorio de Proveedores",
     subtitle: `Búsqueda: ${searchTerm || "Todos"}`,
@@ -213,7 +228,7 @@ export function Suppliers() {
           />
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredSuppliers.map((supplier) => (
+          {currentItems.map((supplier) => (
             <Card
               key={supplier.id}
               className="p-6 hover:shadow-lg transition-shadow"
@@ -280,6 +295,106 @@ export function Suppliers() {
             </Card>
           ))}
         </div>
+
+        {/* Modern Pagination UI */}
+        {filteredSuppliers.length > itemsPerPage && (
+          <div className="mt-8 px-6 py-4 bg-white rounded-xl shadow-sm border flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="text-sm text-gray-500">
+              Mostrando <span className="font-semibold text-gray-900">{indexOfFirstItem + 1}</span> a{" "}
+              <span className="font-semibold text-gray-900">
+                {Math.min(indexOfLastItem, filteredSuppliers.length)}
+              </span>{" "}
+              de <span className="font-semibold text-gray-900">{filteredSuppliers.length}</span> proveedores
+            </div>
+            
+            <div className="flex items-center gap-2">
+              <div className="flex items-center mr-4">
+                <span className="text-xs text-gray-500 mr-2">Filas por página:</span>
+                <select 
+                  className="text-xs border rounded px-2 py-1 bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 min-w-[60px]"
+                  value={itemsPerPage}
+                  onChange={(e) => {
+                    setItemsPerPage(Number(e.target.value));
+                    setCurrentPage(1);
+                  }}
+                >
+                  {[3, 6, 9, 12, 24].map(val => (
+                    <option key={val} value={val}>{val}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(1)}
+                  disabled={currentPage === 1}
+                  className="h-8 w-8 p-0"
+                  title="Primera página"
+                >
+                  <ChevronsLeft className="w-4 h-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  disabled={currentPage === 1}
+                  className="h-8 w-8 p-0"
+                  title="Anterior"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </Button>
+                
+                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                  let pageNum;
+                  if (totalPages <= 5) {
+                    pageNum = i + 1;
+                  } else if (currentPage <= 3) {
+                    pageNum = i + 1;
+                  } else if (currentPage >= totalPages - 2) {
+                    pageNum = totalPages - 4 + i;
+                  } else {
+                    pageNum = currentPage - 2 + i;
+                  }
+                  
+                  return (
+                    <Button
+                      key={pageNum}
+                      variant={currentPage === pageNum ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setCurrentPage(pageNum)}
+                      className={`h-8 w-8 p-0 ${currentPage === pageNum ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600'}`}
+                    >
+                      {pageNum}
+                    </Button>
+                  );
+                })}
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                  disabled={currentPage === totalPages}
+                  className="h-8 w-8 p-0"
+                  title="Siguiente"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(totalPages)}
+                  disabled={currentPage === totalPages}
+                  className="h-8 w-8 p-0"
+                  title="Última página"
+                >
+                  <ChevronsRight className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {suppliers.length === 0 && (
           <div className="text-center py-12">

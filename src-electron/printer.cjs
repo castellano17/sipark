@@ -422,12 +422,30 @@ function generateTicketContent(config, saleData) {
   // Nombre del negocio
   if (config.showBusinessName) {
     lines.push(center(config.businessName.toUpperCase()));
-    lines.push("");
+    lines.push(" ");
+    lines.push(" ");
   }
 
   // Información de contacto
+  const wordWrapLines = (text, maxWidth) => {
+    const words = text.split(" ");
+    const wrappedLines = [];
+    let currentLine = "";
+    for (const word of words) {
+      if ((currentLine + word).length > maxWidth) {
+        if (currentLine.trim()) wrappedLines.push(currentLine.trim());
+        currentLine = word + " ";
+      } else {
+        currentLine += word + " ";
+      }
+    }
+    if (currentLine.trim()) wrappedLines.push(currentLine.trim());
+    return wrappedLines;
+  };
+
   if (config.showAddress) {
-    lines.push(center(config.businessAddress));
+    const addressLines = wordWrapLines(config.businessAddress, width);
+    addressLines.forEach(l => lines.push(center(l)));
   }
   if (config.showPhone) {
     lines.push(center(`Tel: ${config.businessPhone}`));

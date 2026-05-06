@@ -49,8 +49,7 @@ export function InventoryAdjustmentsReport({
     try {
       const result = await (window as any).api.getInventoryProducts();
       setProducts(result || []);
-    } catch (err) {
-    }
+    } catch (err) {}
   };
 
   const loadReport = async () => {
@@ -84,12 +83,24 @@ export function InventoryAdjustmentsReport({
       return;
     }
 
+    const columns = [
+      { header: "Fecha", key: "Fecha" },
+      { header: "Producto", key: "Producto" },
+      { header: "Código", key: "Código" },
+      { header: "Tipo de Ajuste", key: "Tipo de Ajuste" },
+      { header: "Cantidad", key: "Cantidad", format: "number" as const },
+      { header: "Stock Anterior", key: "Stock Anterior", format: "number" as const },
+      { header: "Stock Nuevo", key: "Stock Nuevo", format: "number" as const },
+      { header: "Razón", key: "Razón" },
+      { header: "Notas", key: "Notas" },
+      { header: "Usuario", key: "Usuario" },
+    ];
+
     const exportData = data.changes.map((change: any) => ({
       Fecha: new Date(change.created_at).toLocaleString("es-ES"),
       Producto: change.product_name,
       Código: change.barcode || "-",
-      "Tipo de Ajuste":
-        change.adjustment_type === "increase" ? "Aumento" : "Disminución",
+      "Tipo de Ajuste": change.adjustment_type === "increase" ? "Aumento" : "Disminución",
       Cantidad: change.quantity,
       "Stock Anterior": change.previous_stock,
       "Stock Nuevo": change.new_stock,
@@ -98,10 +109,17 @@ export function InventoryAdjustmentsReport({
       Usuario: change.created_by || "-",
     }));
 
+    const options = {
+      title: "Reporte de Ajustes de Inventario",
+      filename: "ajustes-inventario",
+      columns,
+      data: exportData,
+    };
+
     if (format === "excel") {
-      exportToExcel(exportData, "ajustes-inventario");
+      exportToExcel(options);
     } else {
-      exportToPDF(exportData, "Reporte de Ajustes de Inventario");
+      exportToPDF(options);
     }
   };
 
@@ -211,6 +229,26 @@ export function InventoryAdjustmentsReport({
 
       {data && (
         <>
+          <div className="flex gap-2 mb-4">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleExport("excel")}
+              className="flex items-center gap-1.5 whitespace-nowrap"
+            >
+              <FileDown className="w-4 h-4" />
+              Excel
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleExport("pdf")}
+              className="flex items-center gap-1.5 whitespace-nowrap"
+            >
+              <FileDown className="w-4 h-4" />
+              PDF
+            </Button>
+          </div>
           {/* Stats Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
             <Card className="p-6 bg-gradient-to-br from-blue-50 to-blue-100">

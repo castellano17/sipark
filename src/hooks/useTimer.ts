@@ -16,6 +16,7 @@ export function useTimer(
   onExpire?: () => void,
   isPaused: boolean = false,
   isPending: boolean = false,
+  pauseStartTime?: string,
 ): UseTimerReturn {
   const [elapsed, setElapsed] = useState(0);
   const [status, setStatus] = useState<TimerStatus>("active");
@@ -44,8 +45,27 @@ export function useTimer(
       return;
     }
 
-    // Si está pausada, no actualizar
+    // Si está pausada, calcular el tiempo transcurrido hasta el momento de la pausa y salir
     if (isPaused) {
+      const start = new Date(startTimeRef.current);
+      const pauseStart = pauseStartTime ? new Date(pauseStartTime) : new Date();
+      
+      if (!isNaN(start.getTime()) && !isNaN(pauseStart.getTime())) {
+        const elapsedMs = pauseStart.getTime() - start.getTime();
+        const elapsedSeconds = Math.max(0, Math.floor(elapsedMs / 1000));
+        setElapsed(elapsedSeconds);
+        
+        const durationSeconds = durationMinutes * 60;
+        const remainingSeconds = durationSeconds - elapsedSeconds;
+        
+        if (remainingSeconds <= 0) {
+          setStatus("expired");
+        } else if (remainingSeconds <= 600) {
+          setStatus("warning");
+        } else {
+          setStatus("active");
+        }
+      }
       return;
     }
 
@@ -72,12 +92,7 @@ export function useTimer(
       const remainingSeconds = durationSeconds - elapsedSeconds;
 
       if (remainingSeconds <= 0) {
-        setHasExpired(prev => {
-          if (!prev) {
-            onExpireRef.current?.();
-          }
-          return true;
-        });
+        setHasExpired(true);
         setStatus("expired");
       } else if (remainingSeconds <= 600) {
         setStatus("warning");
@@ -87,7 +102,14 @@ export function useTimer(
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [durationMinutes, isPaused, isPending]);
+  }, [durationMinutes, isPaused, isPending, pauseStartTime, startTime]);
+
+  // Efecto separado para disparar onExpire de forma segura
+  useEffect(() => {
+    if (hasExpired && !isPending && !isPaused) {
+      onExpireRef.current?.();
+    }
+  }, [hasExpired, isPending, isPaused]);
 
   const durationSeconds = durationMinutes * 60;
   const remaining = isPending ? durationSeconds : Math.max(0, durationSeconds - elapsed);

@@ -46,7 +46,17 @@ async function deleteEquipmentCategory(id) {
 async function getEquipment() {
   try {
     const sql = `
-      SELECT e.*, c.name as category_name
+      SELECT e.*, c.name as category_name,
+        COALESCE((
+          SELECT SUM(ea.quantity)
+          FROM equipment_adjustments ea
+          WHERE ea.equipment_id = e.id AND ea.adjustment_type = 'damaged'
+        ), 0) as units_in_maintenance,
+        COALESCE((
+          SELECT SUM(ea.quantity)
+          FROM equipment_adjustments ea
+          WHERE ea.equipment_id = e.id AND ea.adjustment_type IN ('loss')
+        ), 0) as units_lost
       FROM equipment e
       LEFT JOIN equipment_categories c ON e.category_id = c.id
       ORDER BY e.name ASC

@@ -8,6 +8,10 @@ import {
   Package,
   FileDown,
   Printer,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
 } from "lucide-react";
 import { Card } from "./ui/card";
 import { Button } from "./ui/button";
@@ -64,6 +68,10 @@ export function Purchases() {
   const { formatCurrency } = useCurrency();
   const { exportToExcel, exportToPDF, printReport } = useReportExport();
   const [searchTerm, setSearchTerm] = useState("");
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
 
   // Helper para obtener fecha local en formato YYYY-MM-DD
   const getLocalDateString = () => {
@@ -132,8 +140,12 @@ export function Purchases() {
 
   const loadProducts = async () => {
     try {
-      const data = await window.api.getInventoryProducts();
-      setProducts(data);
+      const data = await window.api.getProductsServices();
+      // En compras permitimos todo lo que sea físico (no tiempo/paquete)
+      const filtered = data.filter((p: any) => 
+        p.type !== "time" && p.type !== "package" || p.requires_stock == 1
+      );
+      setProducts(filtered);
     } catch (err) {
       error("Error cargando productos");
     }
@@ -141,9 +153,12 @@ export function Purchases() {
 
   // Filtrar productos por búsqueda
   const filteredProducts = products.filter(
-    (p) =>
-      p.name.toLowerCase().includes(productSearch.toLowerCase()) ||
-      (p.barcode && p.barcode.includes(productSearch)),
+    (p) => {
+      const search = productSearch.toLowerCase().trim();
+      if (!search) return true;
+      return p.name.toLowerCase().includes(search) || 
+             (p.barcode && String(p.barcode).toLowerCase().includes(search));
+    }
   );
 
   // Filtrar proveedores por búsqueda
@@ -269,6 +284,17 @@ export function Purchases() {
     p.supplier_name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  // Pagination logic
+  const totalPages = Math.ceil(filteredPurchases.length / itemsPerPage);
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentItems = filteredPurchases.slice(indexOfFirstItem, indexOfLastItem);
+
+  // Reset to first page when search changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
+
   const reportConfig = {
     title: "Registro de Compras",
     subtitle: `Búsqueda: ${searchTerm || "Todas"}`,
@@ -336,89 +362,189 @@ export function Purchases() {
         </div>
       </div>
 
-        <div className="mb-4">
-          <Input
-            placeholder="Buscar por factura o proveedor..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full"
-          />
-        </div>
-        <Card>
-          <table className="w-full">
-            <thead className="bg-gray-50 border-b">
-              <tr>
-                <th className="px-4 py-3 text-left text-xs font-semibold">
-                  Factura
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold">
-                  Proveedor
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold">
-                  Fecha
-                </th>
-                <th className="px-4 py-3 text-center text-xs font-semibold">
-                  Items
-                </th>
-                <th className="px-4 py-3 text-right text-xs font-semibold">
-                  Total
-                </th>
-                <th className="w-40 px-4 py-3 text-center text-xs font-semibold">
-                  Acciones
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y">
-              {filteredPurchases.map((purchase) => (
-                <tr key={purchase.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-2">
-                      <FileText className="w-4 h-4 text-gray-400" />
-                      <span className="font-medium">
-                        {purchase.invoice_number}
-                      </span>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-2">
-                      <Truck className="w-4 h-4 text-gray-400" />
-                      {purchase.supplier_name}
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 text-sm">
-                    {formatDate(purchase.invoice_date)}
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                    <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">
-                      {purchase.total_items}
+      <div className="mb-4">
+        <Input
+          placeholder="Buscar por factura o proveedor..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="w-full"
+        />
+      </div>
+      <Card>
+        <table className="w-full">
+          <thead className="bg-gray-50 border-b">
+            <tr>
+              <th className="px-4 py-3 text-left text-xs font-semibold">
+                Factura
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-semibold">
+                Proveedor
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-semibold">
+                Fecha
+              </th>
+              <th className="px-4 py-3 text-center text-xs font-semibold">
+                Items
+              </th>
+              <th className="px-4 py-3 text-right text-xs font-semibold">
+                Total
+              </th>
+              <th className="w-40 px-4 py-3 text-center text-xs font-semibold">
+                Acciones
+              </th>
+            </tr>
+          </thead>
+          <tbody className="divide-y">
+            {currentItems.map((purchase) => (
+              <tr key={purchase.id} className="hover:bg-gray-50">
+                <td className="px-4 py-3">
+                  <div className="flex items-center gap-2">
+                    <FileText className="w-4 h-4 text-gray-400" />
+                    <span className="font-medium">
+                      {purchase.invoice_number}
                     </span>
-                  </td>
-                  <td className="px-4 py-3 text-right font-semibold">
-                    {formatCurrency(purchase.total_amount)}
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => setSelectedPurchaseId(purchase.id)}
-                      className="gap-2"
-                    >
-                      <Eye className="w-4 h-4" />
-                      Ver
-                    </Button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                  </div>
+                </td>
+                <td className="px-4 py-3">
+                  <div className="flex items-center gap-2">
+                    <Truck className="w-4 h-4 text-gray-400" />
+                    {purchase.supplier_name}
+                  </div>
+                </td>
+                <td className="px-4 py-3 text-sm">
+                  {formatDate(purchase.invoice_date)}
+                </td>
+                <td className="px-4 py-3 text-center">
+                  <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">
+                    {purchase.total_items}
+                  </span>
+                </td>
+                <td className="px-4 py-3 text-right font-semibold">
+                  {formatCurrency(purchase.total_amount)}
+                </td>
+                <td className="px-4 py-3 text-center">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setSelectedPurchaseId(purchase.id)}
+                    className="gap-2"
+                  >
+                    <Eye className="w-4 h-4" />
+                    Ver
+                  </Button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
 
-          {purchases.length === 0 && (
-            <div className="text-center py-12">
-              <ShoppingCart className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-              <p className="text-gray-500">No hay compras registradas</p>
+        {/* Modern Pagination UI */}
+        {filteredPurchases.length > 0 && (
+          <div className="px-6 py-4 bg-white border-t flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="text-sm text-gray-500">
+              Mostrando <span className="font-semibold text-gray-900">{indexOfFirstItem + 1}</span> a{" "}
+              <span className="font-semibold text-gray-900">
+                {Math.min(indexOfLastItem, filteredPurchases.length)}
+              </span>{" "}
+              de <span className="font-semibold text-gray-900">{filteredPurchases.length}</span> compras
             </div>
-          )}
-        </Card>
+
+            <div className="flex items-center gap-2">
+              <div className="flex items-center mr-4">
+                <span className="text-xs text-gray-500 mr-2">Filas por página:</span>
+                <select
+                  className="text-xs border rounded px-2 py-1 bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 min-w-[60px]"
+                  value={itemsPerPage}
+                  onChange={(e) => {
+                    setItemsPerPage(Number(e.target.value));
+                    setCurrentPage(1);
+                  }}
+                >
+                  {[5, 10, 20, 50].map(val => (
+                    <option key={val} value={val}>{val}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(1)}
+                  disabled={currentPage === 1}
+                  className="h-8 w-8 p-0"
+                  title="Primera página"
+                >
+                  <ChevronsLeft className="w-4 h-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  disabled={currentPage === 1}
+                  className="h-8 w-8 p-0"
+                  title="Anterior"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </Button>
+
+                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                  let pageNum;
+                  if (totalPages <= 5) {
+                    pageNum = i + 1;
+                  } else if (currentPage <= 3) {
+                    pageNum = i + 1;
+                  } else if (currentPage >= totalPages - 2) {
+                    pageNum = totalPages - 4 + i;
+                  } else {
+                    pageNum = currentPage - 2 + i;
+                  }
+
+                  return (
+                    <Button
+                      key={pageNum}
+                      variant={currentPage === pageNum ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setCurrentPage(pageNum)}
+                      className={`h-8 w-8 p-0 ${currentPage === pageNum ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600'}`}
+                    >
+                      {pageNum}
+                    </Button>
+                  );
+                })}
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                  disabled={currentPage === totalPages}
+                  className="h-8 w-8 p-0"
+                  title="Siguiente"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(totalPages)}
+                  disabled={currentPage === totalPages}
+                  className="h-8 w-8 p-0"
+                  title="Última página"
+                >
+                  <ChevronsRight className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {purchases.length === 0 && (
+          <div className="text-center py-12">
+            <ShoppingCart className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+            <p className="text-gray-500">No hay compras registradas</p>
+          </div>
+        )}
+      </Card>
 
       {/* Modal Nueva Compra */}
       {showModal && (

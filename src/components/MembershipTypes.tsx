@@ -39,6 +39,7 @@ export function MembershipTypes() {
   const [loading, setLoading] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [showForm, setShowForm] = useState(false);
+  const [membershipMode, setMembershipMode] = useState<"ventas" | "descuentos">("ventas");
   const [formData, setFormData] = useState<MembershipType>({
     name: "",
     description: "",
@@ -59,6 +60,9 @@ export function MembershipTypes() {
 
   useEffect(() => {
     loadMemberships();
+    (window as any).api.getSetting("membership_mode").then((val: string) => {
+      if (val === "descuentos") setMembershipMode("descuentos");
+    }).catch(() => {});
   }, []);
 
   const loadMemberships = async () => {
@@ -92,6 +96,7 @@ export function MembershipTypes() {
           formData.auto_renew,
           formData.is_active,
           formData.total_hours,
+          formData.discount_percentage,
         );
         success("Membresía actualizada correctamente");
       } else {
@@ -103,6 +108,7 @@ export function MembershipTypes() {
           formData.auto_renew,
           formData.is_active,
           formData.total_hours,
+          formData.discount_percentage,
         );
         success("Membresía creada correctamente");
       }
@@ -207,18 +213,20 @@ export function MembershipTypes() {
                 />
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  N° de Entradas en horas
-                </label>
-                <Input
-                  value={formData.total_hours}
-                  onChange={(e) =>
-                    setFormData({ ...formData, total_hours: e.target.value })
-                  }
-                  placeholder="Ej: 10 horas"
-                />
-              </div>
+              {membershipMode === "ventas" && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    N° de Entradas en horas
+                  </label>
+                  <Input
+                    value={formData.total_hours}
+                    onChange={(e) =>
+                      setFormData({ ...formData, total_hours: e.target.value })
+                    }
+                    placeholder="Ej: 10 horas"
+                  />
+                </div>
+              )}
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -255,9 +263,10 @@ export function MembershipTypes() {
                 />
               </div>
 
+              {membershipMode === "descuentos" && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Descuento (%)
+                  Descuento (%) *
                 </label>
                 <Input
                   type="number"
@@ -271,8 +280,11 @@ export function MembershipTypes() {
                       discount_percentage: parseFloat(e.target.value) || 0,
                     })
                   }
+                  required={membershipMode === "descuentos"}
                 />
+                <p className="text-xs text-gray-500 mt-1">Porcentaje que se descuenta del precio base al usar la membresía.</p>
               </div>
+              )}
 
 
             </div>

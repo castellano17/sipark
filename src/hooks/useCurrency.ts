@@ -56,22 +56,35 @@ export function useCurrency() {
     }
   };
 
-  const formatCurrency = (amount: number | string): string => {
+  const formatCurrency = (amount: number | string | null | undefined): string => {
     // Convertir a número si es string (PostgreSQL devuelve DECIMAL como string)
-    const numAmount = typeof amount === "string" ? parseFloat(amount) : amount;
+    // O manejar null/undefined como 0
+    let numAmount = 0;
+    
+    if (typeof amount === "string") {
+      numAmount = parseFloat(amount);
+    } else if (typeof amount === "number") {
+      numAmount = amount;
+    }
 
-    if (isNaN(numAmount)) {
+    if (isNaN(numAmount) || numAmount === null) {
       return `${currency.symbol}0.00`;
     }
 
     return `${currency.symbol}${numAmount.toFixed(2)}`;
   };
 
-  const formatCurrencyWithCode = (amount: number | string): string => {
-    // Convertir a número si es string (PostgreSQL devuelve DECIMAL como string)
-    const numAmount = typeof amount === "string" ? parseFloat(amount) : amount;
+  const formatCurrencyWithCode = (amount: number | string | null | undefined): string => {
+    // Convertir a número si es string
+    let numAmount = 0;
+    
+    if (typeof amount === "string") {
+      numAmount = parseFloat(amount);
+    } else if (typeof amount === "number") {
+      numAmount = amount;
+    }
 
-    if (isNaN(numAmount)) {
+    if (isNaN(numAmount) || numAmount === null) {
       return `${currency.symbol}0.00 ${currency.code}`;
     }
 

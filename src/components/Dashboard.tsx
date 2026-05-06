@@ -68,22 +68,28 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
   useEffect(() => {
     loadDashboardData();
+    // Escuchar eventos de venta creada o eliminada para refrescar
+    window.addEventListener("sale-created", loadDashboardData);
+    window.addEventListener("sale-cancelled", loadDashboardData);
+    return () => {
+      window.removeEventListener("sale-created", loadDashboardData);
+      window.removeEventListener("sale-cancelled", loadDashboardData);
+    };
   }, []);
 
   const loadDashboardData = async () => {
     try {
       const sessions = await getActiveSessions();
 
-      // Obtener ventas del día desde la caja activa
+      // Obtener ventas de la caja activa (igual que Gestión de Caja)
       let totalSales = 0;
-      const activeCashBox = await getActiveCashBox();
       let currentDaySalesCount = 0;
-
+      const activeCashBox = await getActiveCashBox();
       if (activeCashBox) {
         const sales = await getCashBoxSales(activeCashBox.id);
         currentDaySalesCount = sales.length;
         totalSales = sales.reduce(
-          (sum: number, sale: any) => sum + (sale.total || 0),
+          (sum: number, sale: any) => sum + (parseFloat(sale.total) || 0),
           0,
         );
       }
@@ -92,22 +98,30 @@ export const Dashboard: React.FC<DashboardProps> = ({
       let newClientsCount = 0;
       try {
         const clients = await window.api.getClients();
-        const todayStr = new Date().toISOString().split('T')[0];
+        const todayStr = new Date().toISOString().split("T")[0];
         newClientsCount = clients.filter((c: any) => {
           if (!c.created_at) return false;
-          const createdAtStr = typeof c.created_at === 'string' 
-            ? c.created_at 
-            : new Date(c.created_at).toISOString();
+          const createdAtStr =
+            typeof c.created_at === "string"
+              ? c.created_at
+              : new Date(c.created_at).toISOString();
           return createdAtStr.startsWith(todayStr);
         }).length;
-      } catch (err) {
-      }
+      } catch (err) {}
+
+      const activeSessionsOnly = sessions.filter(
+        (s: any) => s.status === "active",
+      );
 
       setStats({
         totalSales: totalSales,
-        inProgress: sessions.length || 0,
-        childrenInProgress: sessions.reduce((sum: number, s: any) => sum + (s.children_count || 0), 0),
-        ticketAverage: currentDaySalesCount > 0 ? totalSales / currentDaySalesCount : 0,
+        inProgress: activeSessionsOnly.length,
+        childrenInProgress: activeSessionsOnly.reduce(
+          (sum: number, s: any) => sum + (Number(s.children_count) || 1),
+          0,
+        ),
+        ticketAverage:
+          currentDaySalesCount > 0 ? totalSales / currentDaySalesCount : 0,
         newClients: newClientsCount,
         salesCount: currentDaySalesCount,
       });
@@ -120,8 +134,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
       // Cargar reservaciones de la semana
       loadWeekReservations();
-    } catch (error) {
-    }
+    } catch (error) {}
   };
 
   const loadActiveMemberships = async () => {
@@ -181,24 +194,27 @@ export const Dashboard: React.FC<DashboardProps> = ({
     }
   };
 
-  const loadWeekReservations = async () => {
+  const loadWeekReservations = async (
+    targetDate = currentDate,
+    targetSelectedDate = selectedDate,
+  ) => {
     try {
-      // Obtener el primer y último día del mes actual
+      // Obtener el primer y último día del mes
       const firstDay = new Date(
-        currentDate.getFullYear(),
-        currentDate.getMonth(),
+        targetDate.getFullYear(),
+        targetDate.getMonth(),
         1,
       );
       const lastDay = new Date(
-        currentDate.getFullYear(),
-        currentDate.getMonth() + 1,
+        targetDate.getFullYear(),
+        targetDate.getMonth() + 1,
         0,
       );
 
       const formatDate = (d: Date) => {
         const y = d.getFullYear();
-        const m = String(d.getMonth() + 1).padStart(2, '0');
-        const day = String(d.getDate()).padStart(2, '0');
+        const m = String(d.getMonth() + 1).padStart(2, "0");
+        const day = String(d.getDate()).padStart(2, "0");
         return `${y}-${m}-${day}`;
       };
 
@@ -209,13 +225,14 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
       if (result.success) {
         const reservations = result.data.map((res: any) => {
-          const dateStr = typeof res.event_date === 'string' && res.event_date.includes('T')
-            ? res.event_date.split('T')[0]
-            : res.event_date;
-            
+          const dateStr =
+            typeof res.event_date === "string" && res.event_date.includes("T")
+              ? res.event_date.split("T")[0]
+              : res.event_date;
+
           let year, month, day;
-          if (dateStr && typeof dateStr === 'string' && dateStr.includes('-')) {
-            const parts = dateStr.split('-');
+          if (dateStr && typeof dateStr === "string" && dateStr.includes("-")) {
+            const parts = dateStr.split("-");
             year = parseInt(parts[0], 10);
             month = parseInt(parts[1], 10) - 1; // Meses en JS son 0-indexed
             day = parseInt(parts[2], 10);
@@ -226,13 +243,14 @@ export const Dashboard: React.FC<DashboardProps> = ({
             day = d.getDate();
           }
 
-          let hours = 0, minutes = 0;
+          let hours = 0,
+            minutes = 0;
           if (res.event_time) {
-            const tParts = res.event_time.split(':');
+            const tParts = res.event_time.split(":");
             hours = parseInt(tParts[0], 10) || 0;
             minutes = parseInt(tParts[1], 10) || 0;
           }
-            
+
           return {
             id: res.id,
             date: new Date(year, month, day, hours, minutes),
@@ -248,10 +266,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
           };
         });
         setAllReservations(reservations);
-        filterReservationsByDate(selectedDate, reservations);
+        filterReservationsByDate(targetSelectedDate, reservations);
       }
-    } catch (error) {
-    }
+    } catch (error) {}
   };
 
   const filterReservationsByDate = (
@@ -285,6 +302,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
       1,
     );
     setCurrentDate(newDate);
+    setSelectedDate(newDate);
+    loadWeekReservations(newDate, newDate);
   };
 
   const getDaysInMonth = (date: Date) => {
@@ -320,7 +339,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
       {/* Header con Welcome */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 md:gap-4">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-slate-900">Dashboard Principal</h1>
+          <h1 className="text-2xl md:text-3xl font-bold text-slate-900">
+            Dashboard Principal
+          </h1>
           <p className="text-slate-600 mt-1">
             {new Date().toLocaleDateString("es-ES", {
               weekday: "long",
@@ -350,7 +371,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
                     Bienvenido,{" "}
                     {currentUser?.full_name || currentUser?.username}
                   </h2>
-                  <h3 className="text-2xl md:text-3xl font-bold mb-2 md:mb-4">Abrir Venta</h3>
+                  <h3 className="text-2xl md:text-3xl font-bold mb-2 md:mb-4">
+                    Abrir Venta
+                  </h3>
                   <p className="text-blue-100 mb-6 max-w-md">
                     Gestiona tus ventas, productos y servicios de manera rápida
                     y eficiente
@@ -396,8 +419,12 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 <div className="flex items-center justify-between mb-2">
                   <Clock className="w-8 h-8 opacity-80" />
                   <div className="flex flex-col items-end">
-                    <span className="text-2xl font-bold">{stats.childrenInProgress}</span>
-                    <span className="text-[10px] uppercase opacity-80">Niños</span>
+                    <span className="text-2xl font-bold">
+                      {stats.childrenInProgress}
+                    </span>
+                    <span className="text-[10px] uppercase opacity-80">
+                      Niños
+                    </span>
                   </div>
                 </div>
                 <p className="text-3xl font-bold">{stats.inProgress}</p>
@@ -417,7 +444,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
               </CardContent>
             </Card>
 
-            <Card 
+            <Card
               className="shadow-md border-none bg-gradient-to-br from-orange-500 to-orange-600 text-white cursor-pointer hover:scale-105 transition-transform"
               onClick={() => onNavigate("/clientes")}
             >
@@ -639,13 +666,17 @@ export const Dashboard: React.FC<DashboardProps> = ({
                       <span className="text-2xl font-bold text-blue-600">
                         {stats.childrenInProgress}
                       </span>
-                      <p className="text-[10px] text-blue-500 font-bold uppercase">Niños Total</p>
+                      <p className="text-[10px] text-blue-500 font-bold uppercase">
+                        Niños Total
+                      </p>
                     </div>
                   </div>
                   <div className="flex items-center justify-between text-xs text-blue-700 mt-2">
                     <span>Sesiones: {stats.inProgress}</span>
                     <span className="font-semibold">
-                      {stats.childrenInProgress > 0 ? "Sala Ocupada" : "Sala Vacía"}
+                      {stats.childrenInProgress > 0
+                        ? "Sala Ocupada"
+                        : "Sala Vacía"}
                     </span>
                   </div>
                 </div>
@@ -701,14 +732,26 @@ export const Dashboard: React.FC<DashboardProps> = ({
               </div>
             </CardHeader>
             <CardContent className="px-2 pb-4 sm:px-6 sm:pb-6">
-              <div className="gap-1 text-center text-xs mb-2 w-full" style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))' }}>
+              <div
+                className="gap-1 text-center text-xs mb-2 w-full"
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(7, minmax(0, 1fr))",
+                }}
+              >
                 {["D", "L", "M", "M", "J", "V", "S"].map((day, i) => (
                   <div key={i} className="font-semibold text-slate-600 py-1">
                     {day}
                   </div>
                 ))}
               </div>
-              <div className="gap-1 text-center text-xs sm:text-sm w-full" style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))' }}>
+              <div
+                className="gap-1 text-center text-xs sm:text-sm w-full"
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(7, minmax(0, 1fr))",
+                }}
+              >
                 {Array.from({ length: startingDayOfWeek }).map((_, i) => (
                   <div key={`empty-${i}`} className="py-2"></div>
                 ))}
@@ -732,7 +775,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   );
 
                   return (
-                    <div key={day} className="flex justify-center flex-col items-center py-0.5">
+                    <div
+                      key={day}
+                      className="flex justify-center flex-col items-center py-0.5"
+                    >
                       <div
                         onClick={() => handleDateSelect(day)}
                         className={`w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center rounded-lg cursor-pointer transition-all relative ${
@@ -823,7 +869,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
           {/* Colores de las Brazaletes */}
           <Card className="shadow-md border-none">
             <CardHeader>
-              <CardTitle className="text-lg">Colores de las Brazaletes</CardTitle>
+              <CardTitle className="text-lg">
+                Colores de las Brazaletes
+              </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg border border-slate-100">
@@ -831,7 +879,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   <BraceletIcon className="w-6 h-6 text-white" />
                 </div>
                 <div>
-                  <p className="text-sm font-bold text-slate-900">Membresía y Reservación</p>
+                  <p className="text-sm font-bold text-slate-900">
+                    Membresía y Reservación
+                  </p>
                   <p className="text-xs text-slate-500">Brazalete Rojo</p>
                 </div>
               </div>
@@ -841,7 +891,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   <BraceletIcon className="w-6 h-6 text-white" />
                 </div>
                 <div>
-                  <p className="text-sm font-bold text-slate-900">Niño/niña individual</p>
+                  <p className="text-sm font-bold text-slate-900">
+                    Niño/niña individual
+                  </p>
                   <p className="text-xs text-slate-500">Brazalete Celeste</p>
                 </div>
               </div>
@@ -851,7 +903,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   <BraceletIcon className="w-6 h-6 text-white" />
                 </div>
                 <div>
-                  <p className="text-sm font-bold text-slate-900">Niño/niña individual</p>
+                  <p className="text-sm font-bold text-slate-900">
+                    Niño/niña individual
+                  </p>
                   <p className="text-xs text-slate-500">Brazalete Rosado</p>
                 </div>
               </div>
@@ -861,7 +915,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   <BraceletIcon className="w-6 h-6 text-white" />
                 </div>
                 <div>
-                  <p className="text-sm font-bold text-slate-900">Promociones</p>
+                  <p className="text-sm font-bold text-slate-900">
+                    Promociones
+                  </p>
                   <p className="text-xs text-slate-500">Brazalete Dorado</p>
                 </div>
               </div>

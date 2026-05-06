@@ -48,8 +48,7 @@ export function SalesAuditReport({ onBack }: SalesAuditReportProps) {
     try {
       const result = await (window as any).api.getUsers();
       setUsers(result || []);
-    } catch (err) {
-    }
+    } catch (err) {}
   };
 
   const loadReport = async () => {
@@ -75,21 +74,53 @@ export function SalesAuditReport({ onBack }: SalesAuditReportProps) {
       return;
     }
 
+    // Definir columnas para exportación
+    const columns = [
+      { header: "Fecha/Hora", key: "created_at", width: 20 },
+      { header: "ID Venta", key: "sale_id", width: 10 },
+      { header: "Cliente", key: "client_name", width: 25 },
+      { header: "Total", key: "sale_total", format: "currency", width: 12 },
+      { header: "Acción", key: "action", width: 12 },
+      { header: "Razón", key: "reason", width: 20 },
+      { header: "Usuario", key: "user_fullname", width: 20 },
+    ];
+
+    // Preparar datos planos
     const exportData = data.audits.map((audit: any) => ({
-      Fecha: new Date(audit.created_at).toLocaleString("es-ES"),
-      "ID Venta": audit.sale_id,
-      Cliente: audit.client_name,
-      "Total Venta": audit.sale_total,
-      Acción: audit.action,
-      Razón: audit.reason || "-",
-      Detalles: audit.details || "-",
-      Usuario: `${audit.first_name} ${audit.last_name}`,
+      created_at: new Date(audit.created_at).toLocaleString("es-ES"),
+      sale_id: audit.sale_id,
+      client_name: audit.client_name,
+      sale_total: audit.sale_total,
+      action:
+        audit.action === "cancelled"
+          ? "Cancelada"
+          : audit.action === "modified"
+            ? "Modificada"
+            : audit.action === "refunded"
+              ? "Reembolsada"
+              : audit.action,
+      reason: audit.reason || "-",
+      user_fullname: `${audit.first_name} ${audit.last_name}`,
     }));
 
+    const exportOptions = {
+      title: "Auditoría de Ventas (Canceladas/Modificadas)",
+      subtitle: `Del ${startDate} al ${endDate}`,
+      filename: `auditoria-ventas-${startDate}-${endDate}`,
+      columns,
+      data: exportData,
+      summary: [
+        { label: "Total Auditorías", value: data.stats?.total_audits || 0 },
+        { label: "Canceladas", value: data.stats?.cancelled_count || 0 },
+        { label: "Modificadas", value: data.stats?.modified_count || 0 },
+        { label: "Reembolsadas", value: data.stats?.refunded_count || 0 },
+      ],
+    };
+
     if (format === "excel") {
-      exportToExcel(exportData, "auditoria-ventas");
+      exportToExcel(exportOptions);
     } else {
-      exportToPDF(exportData, "Reporte de Auditoría de Ventas");
+      exportToPDF(exportOptions);
     }
   };
 

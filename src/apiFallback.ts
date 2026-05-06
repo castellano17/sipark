@@ -88,7 +88,8 @@ export const apiFallback = {
       durationMinutes,
     }),
   getActiveSessions: () => invokeHttp("api:getActiveSessions"),
-  endSession: (sessionId, finalPrice) =>
+  deleteSession: (sessionId: number) => invokeHttp("api:deleteSession", sessionId),
+  endSession: (sessionId: number, finalPrice: number) =>
     invokeHttp("api:endSession", { sessionId, finalPrice }),
   updateSessionPaidStatus: (sessionId, isPaid) =>
     invokeHttp("api:updateSessionPaidStatus", { sessionId, isPaid }),
@@ -449,7 +450,7 @@ export const apiFallback = {
 
   // Memberships
   getMemberships: () => invokeHttp("api:getMemberships"),
-  createMembership: (name, description, price, durationDays, autoRenew, isActive, totalHours) =>
+  createMembership: (name, description, price, durationDays, autoRenew, isActive, totalHours, discountPercentage) =>
     invokeHttp("api:createMembership", {
       name,
       description,
@@ -457,9 +458,10 @@ export const apiFallback = {
       durationDays,
       autoRenew,
       isActive,
-      totalHours
+      totalHours,
+      discountPercentage
     }),
-  updateMembership: (id, name, description, price, durationDays, autoRenew, isActive, totalHours) =>
+  updateMembership: (id, name, description, price, durationDays, autoRenew, isActive, totalHours, discountPercentage) =>
     invokeHttp("api:updateMembership", {
       id,
       name,
@@ -468,7 +470,8 @@ export const apiFallback = {
       durationDays,
       autoRenew,
       isActive,
-      totalHours
+      totalHours,
+      discountPercentage
     }),
   deleteMembership: (id) => invokeHttp("api:deleteMembership", { id }),
 

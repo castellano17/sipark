@@ -12,12 +12,22 @@ export const StatusBar: React.FC<StatusBarProps> = ({
   currentUser,
 }) => {
   const [currentTime, setCurrentTime] = useState(new Date());
-  const [tvActive, setTvActive] = useState(true);
+  const [tvActive, setTvActive] = useState(() => {
+    const saved = localStorage.getItem('tvActive');
+    return saved !== null ? saved === 'true' : true;
+  });
   const [showDeviceStatus, setShowDeviceStatus] = useState(() => {
     // Cargar preferencia del localStorage
     const saved = localStorage.getItem('showDeviceStatus');
     return saved !== null ? saved === 'true' : true;
   });
+
+  useEffect(() => {
+    // Sincronizar el estado inicial de la ventana de TV/Publicidad
+    if (!tvActive) {
+      (window as any).api.toggleAdsWindow(true); // true = ocultar/desactivar
+    }
+  }, []);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -183,6 +193,9 @@ export const StatusBar: React.FC<StatusBarProps> = ({
         onClick={() => {
           setTvActive(prev => {
             const nv = !prev;
+            localStorage.setItem('tvActive', String(nv));
+            // Guardar también en la base de datos para persistencia real
+            (window as any).api.setSetting("customer_display_enabled", String(nv));
             (window as any).api.toggleAdsWindow(!nv);
             return nv;
           });

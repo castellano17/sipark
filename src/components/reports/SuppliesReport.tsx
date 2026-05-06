@@ -38,15 +38,23 @@ export function SuppliesReport({ onBack }: SuppliesReportProps) {
   };
 
   const filteredData = data.filter((item: any) => {
-    if (categoryFilter !== "all" && item.category_id?.toString() !== categoryFilter) return false;
+    if (
+      categoryFilter !== "all" &&
+      item.category_id?.toString() !== categoryFilter
+    )
+      return false;
     if (lowStockOnly && item.stock >= item.min_stock) return false;
     return true;
   });
 
   const getSummary = () => {
     const totalItems = filteredData.length;
-    const lowStockCount = filteredData.filter((i: any) => i.stock < i.min_stock && i.stock > 0).length;
-    const outOfStockCount = filteredData.filter((i: any) => i.stock <= 0).length;
+    const lowStockCount = filteredData.filter(
+      (i: any) => i.stock < i.min_stock && i.stock > 0,
+    ).length;
+    const outOfStockCount = filteredData.filter(
+      (i: any) => i.stock <= 0,
+    ).length;
     return { totalItems, lowStockCount, outOfStockCount };
   };
 
@@ -64,11 +72,14 @@ export function SuppliesReport({ onBack }: SuppliesReportProps) {
         { header: "U. Medida", key: "unit_of_measure", width: 15 },
         { header: "Stock Mín.", key: "min_stock", width: 15 },
       ],
-      data: filteredData.map(d => ({ ...d, category_name: d.category_name || "Sin Categoría" })),
+      data: filteredData.map((d) => ({
+        ...d,
+        category_name: d.category_name || "Sin Categoría",
+      })),
       summary: [
-        { label: "Total Registros", value: summaryData.totalItems },
-        { label: "Insumos Stock Bajo", value: summaryData.lowStockCount },
-        { label: "Insumos Agotados", value: summaryData.outOfStockCount },
+        { label: "Total Tipos de Insumo", value: String(summaryData.totalItems) },
+        { label: "Insumos Stock Bajo", value: String(summaryData.lowStockCount) },
+        { label: "Insumos Agotados", value: String(summaryData.outOfStockCount) },
       ],
     };
   };
@@ -99,7 +110,9 @@ export function SuppliesReport({ onBack }: SuppliesReportProps) {
             ← Volver
           </Button>
           <div>
-            <h1 className="text-3xl font-bold text-emerald-900">📋 Reporte de Insumos</h1>
+            <h1 className="text-3xl font-bold text-emerald-900">
+              📋 Reporte de Insumos
+            </h1>
             <p className="text-sm text-gray-600">
               Estado actual de consumibles internos y materiales
             </p>
@@ -134,7 +147,9 @@ export function SuppliesReport({ onBack }: SuppliesReportProps) {
                 onChange={(e) => setLowStockOnly(e.target.checked)}
                 className="w-4 h-4"
               />
-              <span className="text-sm font-medium">Solo stock crítico/bajo</span>
+              <span className="text-sm font-medium">
+                Solo stock crítico/bajo
+              </span>
             </label>
           </div>
           <div className="flex items-end gap-2 md:col-span-2">
@@ -159,7 +174,9 @@ export function SuppliesReport({ onBack }: SuppliesReportProps) {
             <div className="p-2 bg-emerald-500 rounded-lg">
               <Layers className="w-5 h-5 text-white" />
             </div>
-            <p className="text-sm font-medium text-emerald-700">Total Insumos Filtrados</p>
+            <p className="text-sm font-medium text-emerald-700">
+              Total Insumos Filtrados
+            </p>
           </div>
           <p className="text-3xl font-bold text-emerald-900">{totalItems}</p>
         </Card>
@@ -179,7 +196,9 @@ export function SuppliesReport({ onBack }: SuppliesReportProps) {
             <div className="p-2 bg-red-500 rounded-lg">
               <AlertTriangle className="w-5 h-5 text-white" />
             </div>
-            <p className="text-sm font-medium text-red-700">Agotados (Stock &lt;= 0)</p>
+            <p className="text-sm font-medium text-red-700">
+              Agotados (Stock &lt;= 0)
+            </p>
           </div>
           <p className="text-3xl font-bold text-red-900">{outOfStockCount}</p>
         </Card>
@@ -190,16 +209,26 @@ export function SuppliesReport({ onBack }: SuppliesReportProps) {
         <div className="flex items-center justify-between mb-4">
           <h3 className="font-semibold text-lg">Detalle de Insumos</h3>
           <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={handleExportExcel}>
-              <FileDown className="w-4 h-4 mr-2" />
-              Exportar Excel
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleExportExcel}
+              className="flex items-center gap-1.5 whitespace-nowrap"
+            >
+              <FileDown className="w-4 h-4" />
+              Excel
             </Button>
-            <Button variant="outline" size="sm" onClick={handleExportPDF}>
-              <FileDown className="w-4 h-4 mr-2" />
-              Exportar PDF
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleExportPDF}
+              className="flex items-center gap-1.5 whitespace-nowrap"
+            >
+              <FileDown className="w-4 h-4" />
+              PDF
             </Button>
-            <Button variant="outline" size="sm" onClick={handlePrint}>
-              <Printer className="w-4 h-4 mr-2" />
+            <Button variant="outline" size="sm" onClick={handlePrint} className="flex items-center gap-1.5 whitespace-nowrap">
+              <Printer className="w-4 h-4" />
               Imprimir
             </Button>
           </div>
@@ -208,12 +237,24 @@ export function SuppliesReport({ onBack }: SuppliesReportProps) {
           <table className="w-full">
             <thead className="bg-gray-50 sticky top-0">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-semibold">ID</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold">Insumo</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold">Categoría</th>
-                <th className="px-4 py-3 text-right text-xs font-semibold">Stock</th>
-                <th className="px-4 py-3 text-center text-xs font-semibold">U. Medida</th>
-                <th className="px-4 py-3 text-right text-xs font-semibold">Mínimo</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold">
+                  ID
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-semibold">
+                  Insumo
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-semibold">
+                  Categoría
+                </th>
+                <th className="px-4 py-3 text-right text-xs font-semibold">
+                  Stock
+                </th>
+                <th className="px-4 py-3 text-center text-xs font-semibold">
+                  U. Medida
+                </th>
+                <th className="px-4 py-3 text-right text-xs font-semibold">
+                  Mínimo
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y">
@@ -230,7 +271,9 @@ export function SuppliesReport({ onBack }: SuppliesReportProps) {
                 >
                   <td className="px-4 py-3 text-sm">#{item.id}</td>
                   <td className="px-4 py-3 text-sm font-medium">{item.name}</td>
-                  <td className="px-4 py-3 text-sm">{item.category_name || "-"}</td>
+                  <td className="px-4 py-3 text-sm">
+                    {item.category_name || "-"}
+                  </td>
                   <td className="px-4 py-3 text-sm text-right font-bold">
                     <span
                       className={`px-2 py-1 rounded ${
@@ -244,13 +287,20 @@ export function SuppliesReport({ onBack }: SuppliesReportProps) {
                       {item.stock}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-sm text-center uppercase text-gray-500">{item.unit_of_measure}</td>
-                  <td className="px-4 py-3 text-sm text-right text-gray-400">{item.min_stock}</td>
+                  <td className="px-4 py-3 text-sm text-center uppercase text-gray-500">
+                    {item.unit_of_measure}
+                  </td>
+                  <td className="px-4 py-3 text-sm text-right text-gray-400">
+                    {item.min_stock}
+                  </td>
                 </tr>
               ))}
               {filteredData.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-4 py-12 text-center text-gray-500">
+                  <td
+                    colSpan={6}
+                    className="px-4 py-12 text-center text-gray-500"
+                  >
                     No se encontraron insumos con los filtros actuales.
                   </td>
                 </tr>

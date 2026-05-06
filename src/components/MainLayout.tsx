@@ -100,11 +100,9 @@ export default function MainLayout({ currentUser, onLogout }: MainLayoutProps) {
     return () => clearInterval(interval);
   }, []);
 
-  // Verificar dispositivos USB cada 3 segundos (más frecuente para detección en tiempo real)
+  // Verificar dispositivos USB solo una vez al iniciar la app
   useEffect(() => {
     checkDeviceStatus();
-    const interval = setInterval(checkDeviceStatus, 3000);
-    return () => clearInterval(interval);
   }, []);
 
   const checkDeviceStatus = async () => {
@@ -124,20 +122,9 @@ export default function MainLayout({ currentUser, onLogout }: MainLayoutProps) {
     try {
       const dbStatus = await window.api.checkDatabaseConnection();
       const activeCashBox = await (window as any).api.getActiveCashBox();
-      
-      // Usar la nueva API de detección de dispositivos que verifica conexión física
-      let printerStatus: "connected" | "disconnected" | "error" = "disconnected";
-      try {
-        const devices = await (window as any).api.getConnectedDevices();
-        printerStatus = devices.printerConnected ? "connected" : "disconnected";
-      } catch {
-        printerStatus = "disconnected";
-      }
-      
       setSystemStatus((prev) => ({
         ...prev,
         database: dbStatus.connected ? "connected" : "error",
-        printer: printerStatus,
         cashBox: activeCashBox ? "open" : "closed",
         currentTime: new Date(),
         isOnline: navigator.onLine,
@@ -160,11 +147,13 @@ export default function MainLayout({ currentUser, onLogout }: MainLayoutProps) {
       if (session) {
         // Obtener el precio del paquete desde la base de datos
         let packagePrice = 0;
+        let isStandardEntry = false;
         if (session.package_id) {
           try {
             const products = await window.api.getProductsServices();
             const packageProduct = products.find((p: any) => p.id === session.package_id);
             packagePrice = packageProduct?.price || 0;
+            isStandardEntry = !!packageProduct?.is_standard_entry;
           } catch (err) {
             console.error("Error obteniendo precio del paquete:", err);
           }
@@ -181,6 +170,8 @@ export default function MainLayout({ currentUser, onLogout }: MainLayoutProps) {
           isPaid: session.is_paid, // Pasar el estado de pago
           startTime: session.start_time,
           durationMinutes: session.duration_minutes,
+          childrenCount: session.children_count || 1,
+          isStandardEntry: isStandardEntry,
         });
 
         // Navegar al POS
@@ -199,6 +190,8 @@ export default function MainLayout({ currentUser, onLogout }: MainLayoutProps) {
     packageName: string;
     packagePrice: number;
     durationMinutes?: number;
+    childrenCount?: number;
+    isStandardEntry?: boolean;
   }) => {
     setCheckoutData({
       sessionId: data.sessionId ?? 0,
@@ -208,7 +201,34 @@ export default function MainLayout({ currentUser, onLogout }: MainLayoutProps) {
       packageName: data.packageName,
       packagePrice: data.packagePrice,
       durationMinutes: data.durationMinutes || 60,
+      childrenCount: data.childrenCount || 1,
+      isStandardEntry: data.isStandardEntry || false,
       isCheckIn: true,
+    });
+    setCurrentPath("/pos");
+  };
+
+  const handleReservationToPOS = (data: {
+    clientName: string;
+    concept: string;
+    amount: number;
+    reservationId: number;
+  }) => {
+    // Preparar un checkout genérico con el monto de la reservación
+    setCheckoutData({
+      sessionId: 0,
+      clientId: null,
+      clientName: data.clientName,
+      packageId: -1,
+      packageName: data.concept,
+      packagePrice: data.amount,
+      durationMinutes: 0,
+      childrenCount: 1,
+      isStandardEntry: false,
+      isCheckIn: true,
+      // Marcar como cobro de reservación para que el POS lo identifique
+      reservationId: data.reservationId,
+      isReservationPayment: true,
     });
     setCurrentPath("/pos");
   };
@@ -308,9 +328,9 @@ export default function MainLayout({ currentUser, onLogout }: MainLayoutProps) {
       case "/clientes":
         return <Clients />;
       case "/reservaciones":
-        return <Reservaciones />;
+        return <Reservaciones onSendToPOS={handleReservationToPOS} />;
       case "/cotizaciones":
-        return <Cotizaciones />;
+        return <Cotizaciones onSendToPOS={handleReservationToPOS} />;
       case "/inventario":
         return <Inventory />;
       case "/inventario/productos":

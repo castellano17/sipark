@@ -10,19 +10,41 @@ import {
   Printer,
   Phone,
   Mail,
+  CheckCircle,
+  CreditCard,
+  FileText,
 } from "lucide-react";
 import { useSnackbar } from "notistack";
 
+const formatTimeTo12h = (timeStr: string) => {
+  if (!timeStr) return "N/A";
+  try {
+    const parts = timeStr.split(':');
+    if (parts.length < 2) return timeStr;
+    let hours = parseInt(parts[0]);
+    const minutes = parts[1].substring(0, 2);
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    hours = hours % 12;
+    hours = hours === 0 ? 12 : hours;
+    return `${String(hours).padStart(2, '0')}:${minutes} ${ampm}`;
+  } catch (e) {
+    return timeStr;
+  }
+};
+
 interface Reservation {
   id: number;
+  client_id: number;
   client_name: string;
   client_phone: string;
   client_email: string;
+  client_id_card?: string;
   event_date: string;
   event_time: string;
   package_name: string;
   total_amount: number;
   deposit_amount: number;
+  discount?: number;
   status: string;
   payment_status: string;
   notes: string;
@@ -42,7 +64,16 @@ interface Client {
   email: string;
 }
 
-export const Reservaciones: React.FC = () => {
+interface ReservacionesProps {
+  onSendToPOS?: (data: {
+    clientName: string;
+    concept: string;
+    amount: number;
+    reservationId: number;
+  }) => void;
+}
+
+export const Reservaciones: React.FC<ReservacionesProps> = ({ onSendToPOS }) => {
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [packages, setPackages] = useState<PackageItem[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
@@ -71,12 +102,15 @@ export const Reservaciones: React.FC = () => {
     client_name: "",
     client_phone: "",
     client_email: "",
+    client_id_card: "",
     event_date: "",
-    event_time: "",
+    event_time: "12:00",
     package_id: 0,
     package_name: "",
     total_amount: 0,
     deposit_amount: 0,
+    discount: 0,
+    num_children: 1,
     notes: "",
   });
 
@@ -91,14 +125,18 @@ export const Reservaciones: React.FC = () => {
       loadAndShowReservation(parseInt(reservationId));
       sessionStorage.removeItem("selectedReservationId");
     }
+
+    const handleUpdate = () => loadReservations();
+    window.addEventListener('reservations-updated', handleUpdate);
+    return () => window.removeEventListener('reservations-updated', handleUpdate);
   }, []);
 
   useEffect(() => {
     if (clientSearch.length >= 1) {
       const filtered = clients.filter(
         (client) =>
-          client.name.toLowerCase().includes(clientSearch.toLowerCase()) ||
-          client.phone.includes(clientSearch),
+          (client.name?.toLowerCase().includes(clientSearch.toLowerCase()) ||
+          (client.phone && client.phone.includes(clientSearch))),
       );
       setFilteredClients(filtered);
       setShowClientDropdown(true);
@@ -125,7 +163,14 @@ export const Reservaciones: React.FC = () => {
     try {
       const result = await window.api.getAllReservations();
       if (result.success) {
-        setReservations(result.data || []);
+        const data = result.data || [];
+        setReservations(data);
+        
+        // Si hay una reservación seleccionada, actualizar sus datos también
+        if (selectedReservation) {
+          const updated = data.find((r: Reservation) => r.id === selectedReservation.id);
+          if (updated) setSelectedReservation(updated);
+        }
       }
     } catch (error) {
     }
@@ -168,8 +213,8 @@ export const Reservaciones: React.FC = () => {
     setFormData({
       ...formData,
       client_id: client.id,
-      client_name: client.name,
-      client_phone: client.phone,
+      client_name: client.name || "",
+      client_phone: client.phone || "",
       client_email: client.email || "",
     });
     setClientSearch(client.name);
@@ -204,8 +249,18 @@ export const Reservaciones: React.FC = () => {
       setShowModal(false);
       resetForm();
       loadReservations();
+
+      // Redirigir a POS si hay adelanto
+      if (formData.deposit_amount > 0 && onSendToPOS && result.id) {
+        onSendToPOS({
+          clientName: formData.client_name,
+          concept: `Adelanto Reservación — ${formData.package_name} (${formData.event_date})`,
+          amount: formData.deposit_amount,
+          reservationId: result.id,
+        });
+      }
     } else {
-      enqueueSnackbar("Error al crear reservación", { variant: "error" });
+      enqueueSnackbar(`Error: ${result.error || "Error al crear reservación"}`, { variant: "error" });
     }
   };
 
@@ -215,12 +270,14 @@ export const Reservaciones: React.FC = () => {
       client_name: "",
       client_phone: "",
       client_email: "",
+      client_id_card: "",
       event_date: "",
-      event_time: "",
+      event_time: "12:00",
       package_id: 0,
       package_name: "",
       total_amount: 0,
       deposit_amount: 0,
+      discount: 0,
       notes: "",
     });
     setClientSearch("");
@@ -251,13 +308,58 @@ export const Reservaciones: React.FC = () => {
     }
   };
 
+  const handleConfirmReservation = async (reservation: Reservation) => {
+    const pending = reservation.total_amount - reservation.deposit_amount;
+    
+    if (pending > 0) {
+      // Si hay saldo pendiente, forzar el flujo de pago para confirmar
+      handleOpenPaymentModal(reservation);
+      enqueueSnackbar("Debe registrar un pago para confirmar la reservación", {
+        variant: "info",
+      });
+      return;
+    }
+
+    try {
+      const result = await window.api.updateReservationStatus(reservation.id, "confirmed");
+      if (result.success) {
+        enqueueSnackbar("Reservación confirmada exitosamente", {
+          variant: "success",
+        });
+        loadReservations();
+      } else {
+        enqueueSnackbar("Error al confirmar reservación", { variant: "error" });
+      }
+    } catch (error) {
+      enqueueSnackbar("Error al confirmar reservación", { variant: "error" });
+    }
+  };
+
   const handlePrintReservation = async (reservation: Reservation) => {
     try {
-      enqueueSnackbar("Generando PDF...", { variant: "info" });
-      await window.api.generateReservationPDF(reservation);
-      enqueueSnackbar("PDF generado exitosamente", { variant: "success" });
-    } catch (error) {
+      const currentUser = JSON.parse(localStorage.getItem("currentUser") || "{}");
+      await (window as any).api.generateReservationPDF({
+        ...reservation,
+        printedBy: currentUser.username || "Sistema",
+      });
+      enqueueSnackbar("Comprobante de reservación generado", { variant: "success" });
+    } catch (err) {
       enqueueSnackbar("Error al generar PDF", { variant: "error" });
+    }
+  };
+
+  const handlePrintInvoice = async (reservation: Reservation) => {
+    try {
+      const currentUser = JSON.parse(localStorage.getItem("currentUser") || "{}");
+      await (window as any).api.generateReservationInvoicePDF({
+        ...reservation,
+        printedBy: currentUser.username || "Sistema",
+      });
+      enqueueSnackbar("Factura formal generada", { variant: "success" });
+      // Recargar para ver si el número de factura cambió (opcional si se muestra en UI)
+      loadReservations();
+    } catch (err) {
+      enqueueSnackbar("Error al generar factura formal", { variant: "error" });
     }
   };
 
@@ -270,6 +372,22 @@ export const Reservaciones: React.FC = () => {
 
   const handleRegisterPayment = async () => {
     if (!selectedReservation) return;
+
+    if (onSendToPOS) {
+      const remaining = selectedReservation.total_amount - selectedReservation.deposit_amount;
+      const isTotal = paymentAmount >= remaining;
+      const prefix = isTotal ? "Pago Total" : "Adelanto";
+      
+      onSendToPOS({
+        clientName: selectedReservation.client_name,
+        concept: `${prefix} Reservación — ${selectedReservation.package_name} (${selectedReservation.event_date})`,
+        amount: paymentAmount,
+        reservationId: selectedReservation.id,
+      });
+      setShowPaymentModal(false);
+      setSelectedReservation(null);
+      return;
+    }
 
     try {
       const cashBox = await window.api.getActiveCashBox();
@@ -310,6 +428,16 @@ export const Reservaciones: React.FC = () => {
   };
 
   const handleOpenCompleteModal = (reservation: Reservation) => {
+    if (onSendToPOS) {
+      const pending = reservation.total_amount - reservation.deposit_amount;
+      onSendToPOS({
+        clientName: reservation.client_name,
+        concept: `Saldo Final — ${reservation.package_name} (${reservation.event_date})`,
+        amount: pending,
+        reservationId: reservation.id,
+      });
+      return;
+    }
     setSelectedReservation(reservation);
     const remaining = reservation.total_amount - reservation.deposit_amount;
     setPaymentAmount(remaining);
@@ -439,9 +567,11 @@ export const Reservaciones: React.FC = () => {
                   <th className="text-left p-3">Cliente</th>
                   <th className="text-left p-3">Fecha</th>
                   <th className="text-left p-3">Hora</th>
-                  <th className="text-left p-3">Paquete</th>
-                  <th className="text-right p-3">Total</th>
-                  <th className="w-40 text-center p-3">Estado</th>
+                  <th className="p-3 text-left">Paquete</th>
+                  <th className="p-3 text-right">Total</th>
+                  <th className="p-3 text-right">Abonado</th>
+                  <th className="p-3 text-right">Saldo</th>
+                  <th className="p-3 text-center">Estado</th>
                   <th className="text-center p-3">Acciones</th>
                 </tr>
               </thead>
@@ -464,16 +594,47 @@ export const Reservaciones: React.FC = () => {
                     </td>
                     <td className="p-3">
                       {(() => {
-                        const dateStr = typeof reservation.event_date === "string" && reservation.event_date.includes("T")
-                          ? reservation.event_date.split("T")[0]
-                          : reservation.event_date;
-                        return new Date(`${dateStr}T00:00:00`).toLocaleDateString();
+                        const d = reservation.event_date;
+                        if (!d) return "N/A";
+                        try {
+                          const str = String(d).trim();
+                          if (!str) return "N/A";
+                          
+                          // Manejar formato ISO o YYYY-MM-DD
+                          let s = str.split('T')[0];
+                          
+                          // Si tiene guiones pero no es YYYY-MM-DD (ej: DD-MM-YYYY)
+                          if (s.includes('-') && s.split('-')[0].length !== 4) {
+                             const parts = s.split('-');
+                             if (parts.length === 3) s = `${parts[2]}-${parts[1]}-${parts[0]}`;
+                          }
+                          
+                          // Si tiene slashes (ej: DD/MM/YYYY)
+                          if (s.includes('/')) {
+                            const parts = s.split('/');
+                            if (parts.length === 3) {
+                              if (parts[0].length === 4) s = `${parts[0]}-${parts[1]}-${parts[2]}`; // YYYY/MM/DD
+                              else s = `${parts[2]}-${parts[1]}-${parts[0]}`; // DD/MM/YYYY
+                            }
+                          }
+
+                          const date = new Date(s.includes('-') ? `${s}T00:00:00` : str);
+                          return isNaN(date.getTime()) ? "F. Inválida" : date.toLocaleDateString();
+                        } catch {
+                          return "Error Fecha";
+                        }
                       })()}
                     </td>
-                    <td className="p-3">{reservation.event_time}</td>
+                    <td className="p-3">{formatTimeTo12h(reservation.event_time)}</td>
                     <td className="p-3">{reservation.package_name}</td>
                     <td className="p-3 text-right font-medium">
                       ${Number(reservation.total_amount).toFixed(2)}
+                    </td>
+                    <td className="p-3 text-right text-green-600">
+                      ${Number(reservation.deposit_amount).toFixed(2)}
+                    </td>
+                    <td className="p-3 text-right font-bold text-red-600">
+                      ${(Number(reservation.total_amount) - Number(reservation.deposit_amount)).toFixed(2)}
                     </td>
                     <td className="p-3 text-center">
                       <span
@@ -498,17 +659,65 @@ export const Reservaciones: React.FC = () => {
                         >
                           <Printer className="w-4 h-4" />
                         </Button>
-                        {reservation.status === "pending" && (
+                        {(reservation.status === "pending" || reservation.status === "confirmed") && 
+                          (Number(reservation.total_amount) - Number(reservation.deposit_amount)) > 0.01 && (
                           <Button
                             size="sm"
                             variant="outline"
-                            className="text-red-600"
-                            onClick={() =>
-                              handleCancelReservation(reservation.id)
-                            }
+                            className="text-green-600"
+                            onClick={() => handleOpenPaymentModal(reservation)}
+                            title="Registrar Pago"
                           >
-                            <X className="w-4 h-4" />
+                            <CreditCard className="w-4 h-4" />
                           </Button>
+                        )}
+                        {reservation.status === "pending" && (
+                          <>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="text-green-600"
+                              onClick={() => handleConfirmReservation(reservation)}
+                              title="Confirmar/Aprobar"
+                            >
+                              <CheckCircle className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="text-red-600"
+                              onClick={() =>
+                                handleCancelReservation(reservation.id)
+                              }
+                              title="Cancelar"
+                            >
+                              <X className="w-4 h-4" />
+                            </Button>
+                          </>
+                        )}
+                        {reservation.status === "confirmed" && (
+                          <>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="text-purple-600"
+                              onClick={() => handleOpenCompleteModal(reservation)}
+                              title="Completar Evento"
+                            >
+                              <CheckCircle className="w-4 h-4" />
+                            </Button>
+                            {reservation.total_amount - reservation.deposit_amount <= 0 && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="text-blue-600"
+                                onClick={() => handlePrintInvoice(reservation)}
+                                title="Imprimir Factura Formal"
+                              >
+                                <FileText className="w-4 h-4" />
+                              </Button>
+                            )}
+                          </>
                         )}
                       </div>
                     </td>
@@ -607,18 +816,33 @@ export const Reservaciones: React.FC = () => {
                   </div>
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium mb-1">
-                    Email
-                  </label>
-                  <input
-                    type="email"
-                    value={formData.client_email}
-                    onChange={(e) =>
-                      setFormData({ ...formData, client_email: e.target.value })
-                    }
-                    className="w-full p-2 border rounded"
-                  />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-1">
+                      Email
+                    </label>
+                    <input
+                      type="email"
+                      value={formData.client_email}
+                      onChange={(e) =>
+                        setFormData({ ...formData, client_email: e.target.value })
+                      }
+                      className="w-full p-2 border rounded"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">
+                      Identificación (Cédula/RUC)
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.client_id_card}
+                      onChange={(e) =>
+                        setFormData({ ...formData, client_id_card: e.target.value })
+                      }
+                      className="w-full p-2 border rounded"
+                    />
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -639,14 +863,49 @@ export const Reservaciones: React.FC = () => {
                     <label className="block text-sm font-medium mb-1">
                       Hora del Evento *
                     </label>
-                    <input
-                      type="time"
-                      value={formData.event_time}
-                      onChange={(e) =>
-                        setFormData({ ...formData, event_time: e.target.value })
-                      }
-                      className="w-full p-2 border rounded"
-                    />
+                    <div className="flex gap-2">
+                      <select 
+                        className="p-2 border rounded w-full"
+                        value={formData.event_time.split(':')[0] ? (parseInt(formData.event_time.split(':')[0]) % 12 || 12).toString().padStart(2, '0') : "12"}
+                        onChange={(e) => {
+                          const h = parseInt(e.target.value);
+                          const currentMin = formData.event_time.split(':')[1]?.substring(0,2) || "00";
+                          const currentIsPM = formData.event_time.includes('PM') || (parseInt(formData.event_time.split(':')[0]) >= 12);
+                          const finalH = currentIsPM ? (h === 12 ? 12 : h + 12) : (h === 12 ? 0 : h);
+                          setFormData({ ...formData, event_time: `${finalH.toString().padStart(2, '0')}:${currentMin}` });
+                        }}
+                      >
+                        {Array.from({length: 12}, (_, i) => i + 1).map(h => (
+                          <option key={h} value={h.toString().padStart(2, '0')}>{h.toString().padStart(2, '0')}</option>
+                        ))}
+                      </select>
+                      <select 
+                        className="p-2 border rounded w-full"
+                        value={formData.event_time.split(':')[1]?.substring(0,2) || "00"}
+                        onChange={(e) => {
+                          const h = formData.event_time.split(':')[0] || "12";
+                          setFormData({ ...formData, event_time: `${h}:${e.target.value}` });
+                        }}
+                      >
+                        {["00", "15", "30", "45"].map(m => (
+                          <option key={m} value={m}>{m}</option>
+                        ))}
+                      </select>
+                      <select 
+                        className="p-2 border rounded w-full font-bold bg-blue-50"
+                        value={formData.event_time.includes('PM') || (parseInt(formData.event_time.split(':')[0]) >= 12) ? "PM" : "AM"}
+                        onChange={(e) => {
+                          const isPM = e.target.value === "PM";
+                          let h = parseInt(formData.event_time.split(':')[0] || "12") % 12;
+                          const finalH = isPM ? h + 12 : h;
+                          const m = formData.event_time.split(':')[1] || "00";
+                          setFormData({ ...formData, event_time: `${finalH.toString().padStart(2, '0')}:${m}` });
+                        }}
+                      >
+                        <option value="AM">AM</option>
+                        <option value="PM">PM</option>
+                      </select>
+                    </div>
                   </div>
                 </div>
 
@@ -728,6 +987,41 @@ export const Reservaciones: React.FC = () => {
                       className="w-full p-2 border rounded"
                     />
                   </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">
+                      Descuento
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={formData.discount}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          discount: Number(e.target.value),
+                          total_amount: formData.total_amount - (Number(e.target.value) - (formData.discount || 0))
+                        })
+                      }
+                      className="w-full p-2 border rounded text-red-600"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-1">
+                    Número de Niños
+                  </label>
+                  <input
+                    type="number"
+                    value={formData.num_children}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        num_children: parseInt(e.target.value),
+                      })
+                    }
+                    className="w-full p-2 border rounded"
+                  />
                 </div>
 
                 <div>
@@ -826,20 +1120,44 @@ export const Reservaciones: React.FC = () => {
                   <div>
                     <p className="text-sm text-slate-500 mb-1">Fecha</p>
                     <p className="font-medium text-slate-900">
-                      {new Date(
-                        selectedReservation.event_date,
-                      ).toLocaleDateString("es-ES", {
-                        weekday: "long",
-                        year: "numeric",
-                        month: "long",
-                        day: "numeric",
-                      })}
+                      {(() => {
+                        const d = selectedReservation.event_date;
+                        if (!d) return "N/A";
+                        try {
+                          const str = String(d).trim();
+                          let s = str.split('T')[0];
+                          
+                          if (s.includes('-') && s.split('-')[0].length !== 4) {
+                             const parts = s.split('-');
+                             if (parts.length === 3) s = `${parts[2]}-${parts[1]}-${parts[0]}`;
+                          }
+                          
+                          if (s.includes('/')) {
+                            const parts = s.split('/');
+                            if (parts.length === 3) {
+                              if (parts[0].length === 4) s = `${parts[0]}-${parts[1]}-${parts[2]}`;
+                              else s = `${parts[2]}-${parts[1]}-${parts[0]}`;
+                            }
+                          }
+
+                          const date = new Date(s.includes('-') ? `${s}T00:00:00` : str);
+                          if (isNaN(date.getTime())) return "Fecha Inválida";
+                          return date.toLocaleDateString("es-ES", {
+                            weekday: "long",
+                            year: "numeric",
+                            month: "long",
+                            day: "numeric",
+                          });
+                        } catch {
+                          return "Error de Fecha";
+                        }
+                      })()}
                     </p>
                   </div>
                   <div>
                     <p className="text-sm text-slate-500 mb-1">Hora</p>
                     <p className="font-medium text-slate-900">
-                      {selectedReservation.event_time}
+                      {formatTimeTo12h(selectedReservation.event_time)}
                     </p>
                   </div>
                 </div>
@@ -929,6 +1247,16 @@ export const Reservaciones: React.FC = () => {
                       Registrar Pago
                     </Button>
                   )}
+                {selectedReservation.status === "pending" && (
+                    <Button
+                      onClick={() =>
+                        handleConfirmReservation(selectedReservation)
+                      }
+                      className="bg-green-600 hover:bg-green-700 px-6"
+                    >
+                      Confirmar Reservación
+                    </Button>
+                  )}
                 {selectedReservation.status === "confirmed" && (
                     <Button
                       onClick={() =>
@@ -937,6 +1265,17 @@ export const Reservaciones: React.FC = () => {
                       className="bg-purple-600 hover:bg-purple-700 px-6"
                     >
                       Completar Evento
+                    </Button>
+                  )}
+                {selectedReservation.total_amount - selectedReservation.deposit_amount <= 0 && (
+                    <Button
+                      onClick={() =>
+                        handlePrintInvoice(selectedReservation)
+                      }
+                      className="bg-blue-600 hover:bg-blue-700 px-6"
+                    >
+                      <FileText className="w-4 h-4 mr-2" />
+                      Generar Factura
                     </Button>
                   )}
               </div>
@@ -1096,13 +1435,19 @@ export const Reservaciones: React.FC = () => {
               </div>
               <div>
                 <p className="text-sm text-gray-600 mb-2">Saldo Pendiente</p>
-                <p className="text-2xl font-bold text-red-600">
-                  $
-                  {(
-                    selectedReservation.total_amount -
-                    selectedReservation.deposit_amount
-                  ).toFixed(2)}
-                </p>
+                {selectedReservation.total_amount - selectedReservation.deposit_amount <= 0 ? (
+                  <p className="text-2xl font-bold text-green-600">
+                    TOTALMENTE PAGADO
+                  </p>
+                ) : (
+                  <p className="text-2xl font-bold text-red-600">
+                    $
+                    {(
+                      selectedReservation.total_amount -
+                      selectedReservation.deposit_amount
+                    ).toFixed(2)}
+                  </p>
+                )}
               </div>
               {selectedReservation.total_amount -
                 selectedReservation.deposit_amount >

@@ -10,22 +10,24 @@ async function createReservation(data) {
 
     const result = await runAsync(
       `INSERT INTO reservations (
-        client_id, client_name, client_phone, client_email,
+        client_id, client_name, client_phone, client_email, client_id_card,
         event_date, event_time, package_id, package_name,
-        num_children, total_amount, deposit_amount, status, notes, created_by
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        num_children, total_amount, discount, deposit_amount, status, notes, created_by
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
-        data.client_id,
+        data.client_id || null,
         data.client_name,
         data.client_phone,
         data.client_email || null,
+        data.client_id_card || null,
         data.event_date,
         data.event_time,
         data.package_id,
         data.package_name,
         data.num_children || 0,
         data.total_amount,
-        data.deposit_amount || 0,
+        data.discount || 0,
+        0, // El adelanto se registrará a través del POS para evitar duplicaciones
         data.status || "pending",
         data.notes || null,
         data.created_by || null,
@@ -34,6 +36,7 @@ async function createReservation(data) {
 
     return { success: true, id: result.lastID };
   } catch (error) {
+    console.error("ERROR DB RESERVACIÓN:", error);
     return { success: false, error: error.message };
   }
 }
@@ -118,7 +121,7 @@ async function cancelReservation(id) {
 // Registrar pago de reservación
 async function registerReservationPayment(reservationId, paymentData) {
   try {
-    const { amount, paymentMethod, cashBoxId, userId } = paymentData;
+    const { amount, paymentMethod, cashBoxId, userId, saleId: existingSaleId } = paymentData;
 
     // Obtener la reservación
     const reservation = await getAsync(
@@ -135,54 +138,67 @@ async function registerReservationPayment(reservationId, paymentData) {
       return { success: false, error: "El monto debe ser mayor a 0" };
     }
 
-    // Validar que no exceda el saldo pendiente
-    const remaining = reservation.total_amount - reservation.deposit_amount;
-    if (amount > remaining) {
+    // Validar que no exceda el saldo pendiente (Asegurar números)
+    const total = Number(reservation.total_amount || 0);
+    const deposit = Number(reservation.deposit_amount || 0);
+    const amountNum = Number(amount);
+    
+    const remaining = total - deposit;
+    
+    // Añadimos una pequeña tolerancia de 0.01 para errores de decimales
+    if (amountNum > (remaining + 0.01)) {
       return {
         success: false,
-        error: "El monto excede el saldo pendiente",
+        error: `El monto ($${amountNum}) excede el saldo pendiente ($${remaining.toFixed(2)})`,
       };
     }
 
-    // Crear la venta (client_id puede ser NULL si es 0)
-    const clientId = reservation.client_id > 0 ? reservation.client_id : null;
+    let saleId = existingSaleId;
 
-    const saleResult = await runAsync(
-      `INSERT INTO sales (
-        client_id, client_name, total, subtotal, discount,
-        payment_method, cash_box_id, timestamp
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
-      [
-        clientId,
-        reservation.client_name,
-        amount,
-        amount,
-        0,
-        paymentMethod,
-        cashBoxId,
-      ],
-    );
+    // Solo crear venta si NO viene del POS (POS ya la crea por su cuenta)
+    if (!existingSaleId) {
+      const clientId = reservation.client_id > 0 ? reservation.client_id : null;
 
-    const saleId = saleResult.lastID;
+      const saleResult = await runAsync(
+        `INSERT INTO sales (
+          client_id, client_name, total, subtotal, discount,
+          payment_method, cash_box_id, timestamp
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+        [
+          clientId,
+          reservation.client_name,
+          amount,
+          amount,
+          0,
+          paymentMethod,
+          cashBoxId,
+        ],
+      );
 
-    // Crear el item de venta
-    await runAsync(
-      `INSERT INTO sale_items (
-        sale_id, product_id, product_name, quantity, unit_price, subtotal
-      ) VALUES (?, ?, ?, ?, ?, ?)`,
-      [
-        saleId,
-        reservation.package_id,
-        `Reservación: ${reservation.package_name}`,
-        1,
-        amount,
-        amount,
-      ],
-    );
+      saleId = saleResult.lastID;
 
-    // Actualizar la reservación
-    const newDepositAmount = reservation.deposit_amount + amount;
-    const isPaid = newDepositAmount >= reservation.total_amount;
+      await runAsync(
+        `INSERT INTO sale_items (
+          sale_id, product_id, product_name, quantity, unit_price, subtotal
+        ) VALUES (?, ?, ?, ?, ?, ?)`,
+        [
+          saleId,
+          reservation.package_id,
+          `Reservación: ${reservation.package_name}`,
+          1,
+          amount,
+          amount,
+        ],
+      );
+    }
+
+    // Actualizar la reservación - Asegurar que sean números para evitar errores de concatenación
+    const currentDeposit = Number(reservation.deposit_amount || 0);
+    const totalAmount = Number(reservation.total_amount || 0);
+    const amountPaid = Number(amount);
+    
+    const newDepositAmount = currentDeposit + amountPaid;
+    const isPaid = newDepositAmount >= (totalAmount - 0.01);
     const paymentStatus = isPaid
       ? "paid"
       : newDepositAmount > 0
@@ -199,7 +215,7 @@ async function registerReservationPayment(reservationId, paymentData) {
       [
         newDepositAmount,
         paymentStatus,
-        isPaid || newDepositAmount > 0 ? "confirmed" : "pending",
+        isPaid ? "confirmed" : reservation.status,
         saleId,
         reservationId,
       ],

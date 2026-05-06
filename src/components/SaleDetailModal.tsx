@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import JsBarcode from "jsbarcode";
-import { X, Printer, User, Calendar, CreditCard, Package } from "lucide-react";
+import { X, Printer, User, Calendar, CreditCard, Package, Trash2 } from "lucide-react";
+import Swal from "sweetalert2";
 import { Dialog } from "./ui/dialog";
 import { Button } from "./ui/button";
 import { Card } from "./ui/card";
@@ -24,8 +25,17 @@ interface SaleDetail {
   discount: number;
   total: number;
   payment_method: string;
+  status: string;
   timestamp: string;
   items: SaleItem[];
+  sale_type?: string;
+}
+
+function SaleTypeBadge({ type }: { type?: string }) {
+  if (type === 'promo') return <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-orange-100 text-orange-700">🎟️ Promo</span>;
+  if (type === 'membership') return <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-purple-100 text-purple-700">🪪 Membresía</span>;
+  if (type === 'package') return <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-100 text-blue-700">📦 Paquete</span>;
+  return <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-green-100 text-green-700">🛒 Producto</span>;
 }
 
 interface SaleDetailModalProps {
@@ -99,6 +109,44 @@ export function SaleDetailModal({ saleId, onClose }: SaleDetailModalProps) {
     }
   };
 
+  const handleCancelSale = async () => {
+    if (!sale) return;
+
+    const result = await Swal.fire({
+      title: "¿Anular esta venta?",
+      text: "El monto se restará de la caja y los productos volverán al inventario. Esta acción no se puede deshacer.",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#ef4444",
+      cancelButtonColor: "#64748b",
+      confirmButtonText: "Sí, anular venta",
+      cancelButtonText: "Cancelar",
+    });
+
+    if (result.isConfirmed) {
+      try {
+        setLoading(true);
+        const currentUser = JSON.parse(localStorage.getItem("currentUser") || "{}");
+        await window.api.cancelSale(sale.id, currentUser.id, "Anulación manual por error");
+        
+        await Swal.fire({
+          title: "¡Anulada!",
+          text: "La venta ha sido anulada y el stock actualizado.",
+          icon: "success",
+          timer: 2000,
+          showConfirmButton: false
+        });
+
+        window.dispatchEvent(new CustomEvent('sale-cancelled'));
+        onClose();
+      } catch (err: any) {
+        error(err.message || "Error al anular la venta");
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
+
   const formatDate = (timestamp: string) => {
     const date = new Date(timestamp);
     return date.toLocaleString("es-ES", {
@@ -123,20 +171,17 @@ export function SaleDetailModal({ saleId, onClose }: SaleDetailModalProps) {
                 <Package className="w-6 h-6 text-white" />
               </div>
               <div>
-                <h2 className="text-xl font-bold text-white">
-                  Detalle de Venta
-                </h2>
-                <p className="text-sm text-blue-100">Ticket #{saleId}</p>
+                <h2 className="text-xl font-bold text-white">Detalle de Venta</h2>
+                <div className="flex items-center gap-2">
+                  <p className="text-sm text-blue-100">Ticket #{saleId}</p>
+                  {sale?.status === 'cancelled' && (
+                    <span className="bg-red-500 text-white text-[10px] px-2 py-0.5 rounded-full font-bold animate-pulse">ANULADA</span>
+                  )}
+                  {sale && <SaleTypeBadge type={sale.sale_type} />}
+                </div>
               </div>
             </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={onClose}
-              className="text-white hover:bg-white/20"
-            >
-              <X className="w-5 h-5" />
-            </Button>
+            <Button variant="ghost" size="icon" onClick={onClose} className="text-white hover:bg-white/20"><X className="w-5 h-5" /></Button>
           </div>
 
           {/* Content */}
@@ -150,106 +195,52 @@ export function SaleDetailModal({ saleId, onClose }: SaleDetailModalProps) {
               </div>
             ) : sale ? (
               <div className="space-y-6">
-                {/* Info de la venta */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <Card className="p-4 bg-gray-50">
                     <div className="flex items-center gap-3">
-                      <div className="p-2 bg-blue-100 rounded-lg">
-                        <User className="w-5 h-5 text-blue-600" />
-                      </div>
-                      <div>
-                        <p className="text-xs text-gray-500">Cliente</p>
-                        <p className="font-semibold">
-                          {sale.client_name || "Venta Rápida"}
-                        </p>
-                      </div>
+                      <div className="p-2 bg-blue-100 rounded-lg"><User className="w-5 h-5 text-blue-600" /></div>
+                      <div><p className="text-xs text-gray-500">Cliente</p><p className="font-semibold">{sale.client_name || "Venta Rápida"}</p></div>
                     </div>
                   </Card>
-
                   <Card className="p-4 bg-gray-50">
                     <div className="flex items-center gap-3">
-                      <div className="p-2 bg-green-100 rounded-lg">
-                        <Calendar className="w-5 h-5 text-green-600" />
-                      </div>
-                      <div>
-                        <p className="text-xs text-gray-500">Fecha y Hora</p>
-                        <p className="font-semibold text-sm">
-                          {formatDate(sale.timestamp)}
-                        </p>
-                      </div>
+                      <div className="p-2 bg-green-100 rounded-lg"><Calendar className="w-5 h-5 text-green-600" /></div>
+                      <div><p className="text-xs text-gray-500">Fecha y Hora</p><p className="font-semibold text-sm">{formatDate(sale.timestamp)}</p></div>
                     </div>
                   </Card>
-
                   <Card className="p-4 bg-gray-50">
                     <div className="flex items-center gap-3">
-                      <div className="p-2 bg-purple-100 rounded-lg">
-                        <CreditCard className="w-5 h-5 text-purple-600" />
-                      </div>
-                      <div>
-                        <p className="text-xs text-gray-500">Método de Pago</p>
-                        <p className="font-semibold capitalize">
-                          {sale.payment_method === "cash"
-                            ? "Efectivo"
-                            : sale.payment_method === "card"
-                              ? "Tarjeta"
-                              : sale.payment_method}
-                        </p>
-                      </div>
+                      <div className="p-2 bg-purple-100 rounded-lg"><CreditCard className="w-5 h-5 text-purple-600" /></div>
+                      <div><p className="text-xs text-gray-500">Método de Pago</p><p className="font-semibold">{sale.payment_method === "cash" ? "Efectivo" : sale.payment_method === "card" ? "Tarjeta" : sale.payment_method === "transfer" ? "Transferencia" : sale.payment_method}</p></div>
                     </div>
                   </Card>
-
                   <Card className="p-4 bg-gray-50">
                     <div className="flex items-center gap-3">
-                      <div className="p-2 bg-orange-100 rounded-lg">
-                        <Package className="w-5 h-5 text-orange-600" />
-                      </div>
-                      <div>
-                        <p className="text-xs text-gray-500">Items</p>
-                        <p className="font-semibold">{sale.items.length}</p>
-                      </div>
+                      <div className="p-2 bg-orange-100 rounded-lg"><Package className="w-5 h-5 text-orange-600" /></div>
+                      <div><p className="text-xs text-gray-500">Items</p><p className="font-semibold">{sale.items.length}</p></div>
                     </div>
                   </Card>
                 </div>
 
-                {/* Items de la venta */}
                 <div>
-                  <h3 className="font-semibold text-lg mb-3 flex items-center gap-2">
-                    <Package className="w-5 h-5 text-gray-600" />
-                    Productos/Servicios
-                  </h3>
+                  <h3 className="font-semibold text-lg mb-3 flex items-center gap-2"><Package className="w-5 h-5 text-gray-600" />Productos/Servicios</h3>
                   <Card>
                     <table className="w-full">
                       <thead className="bg-gray-50 border-b">
                         <tr>
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">
-                            Producto
-                          </th>
-                          <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600">
-                            Cant.
-                          </th>
-                          <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600">
-                            Precio Unit.
-                          </th>
-                          <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600">
-                            Subtotal
-                          </th>
+                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">Producto</th>
+                          <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600">Cant.</th>
+                          <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600">Precio Unit.</th>
+                          <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600">Subtotal</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y">
                         {sale.items.map((item) => (
                           <tr key={item.id} className="hover:bg-gray-50">
-                            <td className="px-4 py-3 text-sm">
-                              {item.product_name}
-                            </td>
-                            <td className="px-4 py-3 text-center text-sm font-semibold">
-                              {item.quantity}
-                            </td>
-                            <td className="px-4 py-3 text-right text-sm">
-                              {formatCurrency(item.unit_price)}
-                            </td>
-                            <td className="px-4 py-3 text-right text-sm font-semibold">
-                              {formatCurrency(item.subtotal)}
-                            </td>
+                            <td className="px-4 py-3 text-sm">{item.product_name}</td>
+                            <td className="px-4 py-3 text-center text-sm font-semibold">{item.quantity}</td>
+                            <td className="px-4 py-3 text-right text-sm">{formatCurrency(item.unit_price)}</td>
+                            <td className="px-4 py-3 text-right text-sm font-semibold">{formatCurrency(item.subtotal)}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -257,59 +248,31 @@ export function SaleDetailModal({ saleId, onClose }: SaleDetailModalProps) {
                   </Card>
                 </div>
 
-                {/* Totales */}
                 <Card className="p-6 bg-gradient-to-br from-gray-50 to-gray-100">
                   <div className="space-y-3">
-                    <div className="flex justify-between items-center text-sm">
-                      <span className="text-gray-600">Subtotal:</span>
-                      <span className="font-semibold">
-                        {formatCurrency(sale.subtotal)}
-                      </span>
-                    </div>
-
+                    <div className="flex justify-between items-center text-sm"><span className="text-gray-600">Subtotal:</span><span className="font-semibold">{formatCurrency(sale.subtotal)}</span></div>
                     {sale.discount > 0 && (
-                      <div className="flex justify-between items-center text-sm">
-                        <span className="text-gray-600">Descuento:</span>
-                        <span className="font-semibold text-red-600">
-                          -{formatCurrency(sale.discount)}
-                        </span>
-                      </div>
+                      <div className="flex justify-between items-center text-sm"><span className="text-gray-600">Descuento:</span><span className="font-semibold text-red-600">-{formatCurrency(sale.discount)}</span></div>
                     )}
-
                     <div className="border-t pt-3">
-                      <div className="flex justify-between items-center">
-                        <span className="text-lg font-bold text-gray-900">
-                          Total:
-                        </span>
-                        <span className="text-2xl font-bold text-green-600">
-                          {formatCurrency(sale.total)}
-                        </span>
-                      </div>
+                      <div className="flex justify-between items-center"><span className="text-lg font-bold text-gray-900">Total:</span><span className="text-2xl font-bold text-green-600">{formatCurrency(sale.total)}</span></div>
                     </div>
                   </div>
                 </Card>
 
-                {/* Código de Barras */}
-                <div className="flex justify-center mt-6">
-                  <svg ref={barcodeRef}></svg>
-                </div>
+                <div className="flex justify-center mt-6"><svg ref={barcodeRef}></svg></div>
               </div>
             ) : (
-              <div className="text-center py-12">
-                <p className="text-gray-500">No se encontró la venta</p>
-              </div>
+              <div className="text-center py-12"><p className="text-gray-500">No se encontró la venta</p></div>
             )}
           </div>
 
-          {/* Footer */}
           <div className="flex items-center justify-end gap-3 p-6 border-t bg-gray-50">
-            <Button variant="outline" onClick={onClose}>
-              Cerrar
-            </Button>
-            <Button onClick={handlePrint} className="gap-2">
-              <Printer className="w-4 h-4" />
-              Reimprimir
-            </Button>
+             <Button variant="outline" onClick={onClose}>Cerrar</Button>
+             {sale?.status !== 'cancelled' && (
+               <Button variant="destructive" onClick={handleCancelSale} className="gap-2" disabled={loading}><Trash2 className="w-4 h-4" />Anular Venta</Button>
+             )}
+             <Button onClick={handlePrint} className="gap-2" disabled={sale?.status === 'cancelled'}><Printer className="w-4 h-4" />Reimprimir</Button>
           </div>
         </Card>
       </div>

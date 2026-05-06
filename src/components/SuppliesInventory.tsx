@@ -101,6 +101,14 @@ export function SuppliesInventory() {
     notes: "",
   });
 
+  const getAdjustmentTypeLabel = (type: string) => {
+    if (type === "in") return "Entrada / Compra";
+    if (type === "out") return "Salida / Consumo";
+    if (type === "loss") return "Baja / Pérdida";
+    if (type === "damaged") return "Averiado";
+    return type;
+  };
+
   const adjustmentTypes = [
     { value: "in", label: "Entrada (Compra/Hallazgo)", color: "text-green-600" },
     { value: "out", label: "Salida / Consumo Interno", color: "text-orange-600" },
@@ -601,8 +609,8 @@ export function SuppliesInventory() {
                         <td className="px-4 py-2 text-gray-500">
                           {new Date(log.created_at).toLocaleString()}
                         </td>
-                        <td className="px-4 py-2 font-medium capitalize">
-                          {log.adjustment_type}
+                        <td className="px-4 py-2 font-medium">
+                          {getAdjustmentTypeLabel(log.adjustment_type)}
                         </td>
                         <td className={`px-4 py-2 text-right font-bold ${log.adjustment_type === 'in' ? 'text-green-600' : 'text-red-500'}`}>
                           {log.adjustment_type === 'in' ? '+' : '-'}{log.quantity}

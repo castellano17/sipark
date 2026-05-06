@@ -2,7 +2,6 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
 import "./index.css";
-import "./lib/api-adapter"; // Inicializar adaptador de API
 
 import { apiFallback } from "./apiFallback";
 
