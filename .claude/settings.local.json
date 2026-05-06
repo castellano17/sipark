@@ -3,7 +3,11 @@
     "allow": [
       "Bash(xargs grep *)",
       "Bash(grep -rn \"exportToPDF\\\\\\(\\\\\"\\\\\\\\|exportToExcel\\\\\\(data\\\\|exportToExcel\\\\\\(export\" c:/Users/Esmir/Desktop/sipark/src/components/reports/*.tsx)",
-      "Bash(npx tsc *)"
+      "Bash(npx tsc *)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\Esmir\\\\Desktop\\\\sipark\" -Recurse -Directory)",
+      "Bash(Select-Object -ExpandProperty FullName)",
+      "Bash(grep -E \"\\\\.\\(js|ts|sql\\)$\")",
+      "Bash(npm run *)"
     ]
   }
 }

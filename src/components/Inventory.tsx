@@ -32,6 +32,7 @@ interface Product {
   category: string;
   barcode: string;
   stock: number | null;
+  requires_stock?: boolean;
 }
 
 interface Category {
@@ -254,12 +255,13 @@ export function Inventory() {
   const getStockStatus = (product: Product) => {
     const stock = product.stock;
     const type = product.type;
-    
-    // Si es producto de preparación y tiene stock 0 o nulo, es ilimitado
-    if ((stock === null || stock === 0) && ["food", "drink", "snack", "rental"].includes(type)) {
+
+    if (product.requires_stock === false || (product.requires_stock as any) === 0)
       return { color: "text-blue-600", bg: "bg-blue-50", label: "Ilimitado" };
-    }
-    
+
+    if ((stock === null || stock === 0) && ["food", "drink", "snack", "rental"].includes(type))
+      return { color: "text-blue-600", bg: "bg-blue-50", label: "Ilimitado" };
+
     if (stock === null || stock === undefined)
       return { color: "text-blue-600", bg: "bg-blue-50", label: "Ilimitado" };
 
@@ -549,7 +551,7 @@ export function Inventory() {
               <tbody className="divide-y">
                 {currentItems.map((product) => {
                   const status = getStockStatus(product);
-                  const isUnlimited = (product.stock === null || (product.stock === 0 && ["food", "drink", "snack", "rental"].includes(product.type)));
+                  const isUnlimited = product.requires_stock === false || (product.requires_stock as any) === 0 || product.stock === null || (product.stock === 0 && ["food", "drink", "snack", "rental"].includes(product.type));
                   const isEditingCategoryRow = editingCategory === product.id;
 
                   return (

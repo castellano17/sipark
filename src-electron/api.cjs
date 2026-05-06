@@ -321,7 +321,7 @@ async function endSession(sessionId, finalPrice) {
 
 async function getProductsServices() {
   try {
-    const sql = "SELECT * FROM products_services ORDER BY name";
+    const sql = "SELECT * FROM products_services WHERE is_active IS NOT FALSE ORDER BY name";
     return await allAsync(sql);
   } catch (error) {
     throw error;
@@ -407,37 +407,10 @@ async function updateProductCategory(productId, categoryName) {
 
 async function deleteProductService(id) {
   try {
-    const hasSessions = await getAsync(
-      "SELECT COUNT(*) as count FROM active_sessions WHERE package_id = ?",
+    await runAsync(
+      "UPDATE products_services SET is_active = FALSE WHERE id = ?",
       [id],
     );
-    const hasReservations = await getAsync(
-      "SELECT COUNT(*) as count FROM reservations WHERE package_id = ?",
-      [id],
-    );
-    const hasSales = await getAsync(
-      "SELECT COUNT(*) as count FROM sale_items WHERE product_id = ?",
-      [id],
-    );
-    const hasQuotations = await getAsync(
-      "SELECT COUNT(*) as count FROM quotation_items WHERE product_id = ?",
-      [id],
-    );
-
-    const totalRecords =
-      (hasSessions?.count || 0) +
-      (hasReservations?.count || 0) +
-      (hasSales?.count || 0) +
-      (hasQuotations?.count || 0);
-
-    if (totalRecords > 0) {
-      throw new Error(
-        `No se puede eliminar el producto/paquete porque está en uso en ${totalRecords} registro(s) (sesiones, reservaciones, ventas o cotizaciones)`,
-      );
-    }
-
-    const sql = "DELETE FROM products_services WHERE id = ?";
-    await runAsync(sql, [id]);
   } catch (error) {
     throw error;
   }
@@ -629,8 +602,10 @@ async function getExecutiveDashboard() {
     const lowStock = await allAsync(
       `SELECT id, name, stock, price
       FROM products_services
-      WHERE type IN ('food', 'drink', 'snack', 'rental') 
-      AND stock IS NOT NULL AND stock < 10
+      WHERE type IN ('food', 'drink', 'snack', 'rental')
+      AND is_active IS NOT FALSE
+      AND (requires_stock IS NULL OR requires_stock = TRUE)
+      AND stock IS NOT NULL AND stock > 0 AND stock < 10
       ORDER BY stock ASC
       LIMIT 5`,
     );
@@ -955,12 +930,12 @@ async function getCashBoxReport(cashBoxId) {
 
     // Resumen por método de pago
     const paymentSummary = await allAsync(
-      `SELECT 
+      `SELECT
         payment_method,
         COUNT(*) as count,
         COALESCE(SUM(total), 0) as total
       FROM sales
-      WHERE cash_box_id = $1
+      WHERE cash_box_id = $1 AND status != 'cancelled'
       GROUP BY payment_method`,
       [cashBoxId],
     );
@@ -1018,7 +993,7 @@ async function getStockReport(categoryFilter = null, lowStockOnly = false) {
         price,
         (stock * price) as stock_value
       FROM products_services
-      WHERE type IN ('food', 'drink', 'snack', 'rental')
+      WHERE type IN ('food', 'drink', 'snack', 'rental') AND is_active IS NOT FALSE
     `;
 
     const params = [];
@@ -1029,21 +1004,20 @@ async function getStockReport(categoryFilter = null, lowStockOnly = false) {
     }
 
     if (lowStockOnly) {
-      sql += ` AND stock < 10`;
+      sql += ` AND (requires_stock IS NULL OR requires_stock = TRUE) AND stock IS NOT NULL AND stock > 0 AND stock < 10`;
     }
 
     sql += ` ORDER BY name ASC`;
 
     const products = await allAsync(sql, params);
 
-    // Resumen
-    const totalValue = products.reduce((sum, p) => sum + p.stock * p.price, 0);
+    const totalValue = products.reduce((sum, p) => sum + (p.stock || 0) * p.price, 0);
     const totalProducts = products.length;
     const lowStockCount = products.filter(
-      (p) => p.stock !== null && p.stock < 10,
+      (p) => p.stock !== null && p.stock > 0 && p.stock < 10 && (p.requires_stock !== false),
     ).length;
     const outOfStockCount = products.filter(
-      (p) => p.stock !== null && p.stock === 0,
+      (p) => p.stock !== null && p.stock === 0 && p.requires_stock !== false,
     ).length;
 
     return {
@@ -1073,16 +1047,15 @@ async function getTopClientsReport(startDate, endDate, limit = 10) {
         MAX(s.timestamp) as last_purchase
       FROM clients c
       INNER JOIN sales s ON c.id = s.client_id
-      WHERE DATE(s.timestamp) >= ? AND DATE(s.timestamp) <= ?
+      WHERE DATE(s.timestamp) >= ? AND DATE(s.timestamp) <= ? AND s.status != 'cancelled'
       GROUP BY c.id, c.name, c.phone
       ORDER BY total_spent DESC
       LIMIT ?`,
       [startDate, endDate, limit],
     );
 
-    // Clientes más frecuentes
     const frequentClients = await allAsync(
-      `SELECT 
+      `SELECT
         c.id,
         c.name,
         c.phone,
@@ -1091,7 +1064,7 @@ async function getTopClientsReport(startDate, endDate, limit = 10) {
         COALESCE(AVG(s.total), 0) as average_ticket
       FROM clients c
       INNER JOIN sales s ON c.id = s.client_id
-      WHERE DATE(s.timestamp) >= ? AND DATE(s.timestamp) <= ?
+      WHERE DATE(s.timestamp) >= ? AND DATE(s.timestamp) <= ? AND s.status != 'cancelled'
       GROUP BY c.id, c.name, c.phone
       ORDER BY visit_count DESC
       LIMIT ?`,
@@ -1640,7 +1613,7 @@ async function getCashBoxSales(cashBoxId) {
         ) as product_items_count
       FROM sales s
       LEFT JOIN clients c ON s.client_id = c.id
-      WHERE s.cash_box_id = ?
+      WHERE s.cash_box_id = ? AND s.status != 'cancelled'
       ORDER BY s.timestamp ASC
     `;
     return await allAsync(sql, [cashBoxId]);
@@ -1857,8 +1830,8 @@ async function getSaleWithItems(saleId) {
 async function getInventoryProducts() {
   try {
     const sql = `
-      SELECT * FROM products_services 
-      WHERE type IN ('food', 'drink', 'snack', 'rental', 'event')
+      SELECT * FROM products_services
+      WHERE type IN ('food', 'drink', 'snack', 'rental', 'event') AND is_active IS NOT FALSE
       ORDER BY name ASC
     `;
     return await allAsync(sql);
@@ -1974,8 +1947,12 @@ async function getStockAdjustments(productId = null, limit = 50) {
 async function getLowStockProducts(threshold = 10) {
   try {
     const sql = `
-      SELECT * FROM products_services 
+      SELECT * FROM products_services
       WHERE type IN ('food', 'drink', 'snack', 'rental', 'event')
+      AND is_active IS NOT FALSE
+      AND (requires_stock IS NULL OR requires_stock = TRUE)
+      AND stock IS NOT NULL
+      AND stock > 0
       AND stock <= ?
       ORDER BY stock ASC
     `;
@@ -2464,6 +2441,18 @@ async function cancelClientMembership(id, canceledBy) {
   }
 }
 
+async function updateClientMembership(id, { phone, id_card, total_hours, notes }) {
+  try {
+    await runAsync(
+      `UPDATE client_memberships SET phone = ?, id_card = ?, total_hours = ?, notes = ? WHERE id = ?`,
+      [phone || null, id_card || null, total_hours || null, notes || null, id],
+    );
+    return true;
+  } catch (error) {
+    throw error;
+  }
+}
+
 // Registrar renovación de membresía
 async function recordMembershipRenewal(renewalData) {
   try {
@@ -2881,7 +2870,7 @@ async function getSalesByProduct(
       FROM sale_items si
       JOIN sales s ON si.sale_id = s.id
       LEFT JOIN products_services ps ON si.product_id = ps.id
-      WHERE DATE(s.timestamp) >= $1 AND DATE(s.timestamp) <= $2
+      WHERE DATE(s.timestamp) >= $1 AND DATE(s.timestamp) <= $2 AND s.status != 'cancelled'
     `;
 
     const params = [startDate, endDate];
@@ -2961,12 +2950,12 @@ async function getCashFlowReport(startDate, endDate) {
   try {
     // Ingresos por ventas
     const salesIncome = await allAsync(
-      `SELECT 
+      `SELECT
         DATE(timestamp) as date,
         SUM(total) as amount,
         'sale' as type
       FROM sales
-      WHERE DATE(timestamp) >= ? AND DATE(timestamp) <= ?
+      WHERE DATE(timestamp) >= ? AND DATE(timestamp) <= ? AND status != 'cancelled'
       GROUP BY DATE(timestamp)
       ORDER BY date ASC`,
       [startDate, endDate],
@@ -3356,13 +3345,13 @@ async function getSessionsByPeriod(startDate, endDate, packageFilter = null) {
 async function getSalesByPaymentMethod(startDate, endDate) {
   try {
     const salesByMethod = await allAsync(
-      `SELECT 
+      `SELECT
         payment_method,
         COUNT(*) as transaction_count,
         SUM(total) as total_amount,
         AVG(total) as average_ticket
       FROM sales
-      WHERE DATE(timestamp) >= ? AND DATE(timestamp) <= ?
+      WHERE DATE(timestamp) >= ? AND DATE(timestamp) <= ? AND status != 'cancelled'
       GROUP BY payment_method
       ORDER BY total_amount DESC`,
       [startDate, endDate],
@@ -3397,12 +3386,12 @@ async function getSalesByPaymentMethod(startDate, endDate) {
 async function getSalesByHour(startDate, endDate) {
   try {
     const salesByHour = await allAsync(
-      `SELECT 
+      `SELECT
         EXTRACT(HOUR FROM timestamp)::INTEGER as hour,
         COUNT(*) as transaction_count,
         SUM(total) as total_amount
       FROM sales
-      WHERE DATE(timestamp) >= ? AND DATE(timestamp) <= ?
+      WHERE DATE(timestamp) >= ? AND DATE(timestamp) <= ? AND status != 'cancelled'
       GROUP BY hour
       ORDER BY hour ASC`,
       [startDate, endDate],
@@ -3820,7 +3809,7 @@ async function getSalesByClient(startDate, endDate, limit = 20) {
         MAX(s.timestamp) as last_purchase
       FROM clients c
       INNER JOIN sales s ON c.id = s.client_id
-      WHERE s.timestamp BETWEEN ? AND ?
+      WHERE s.timestamp BETWEEN ? AND ? AND s.status != 'cancelled'
       GROUP BY c.id, c.name, c.phone, c.email
       ORDER BY total_spent DESC
       LIMIT ?`,
@@ -3828,7 +3817,7 @@ async function getSalesByClient(startDate, endDate, limit = 20) {
     );
 
     const totalSales = await getAsync(
-      `SELECT COALESCE(SUM(total), 0) as total FROM sales WHERE timestamp BETWEEN ? AND ?`,
+      `SELECT COALESCE(SUM(total), 0) as total FROM sales WHERE timestamp BETWEEN ? AND ? AND status != 'cancelled'`,
       [startDate, endDate],
     );
 
@@ -3918,7 +3907,7 @@ async function getIncomeVsExpenses(startDate, endDate) {
   try {
     // Ingresos por ventas
     const income = await getAsync(
-      `SELECT SUM(total) as total FROM sales WHERE timestamp BETWEEN ? AND ?`,
+      `SELECT SUM(total) as total FROM sales WHERE timestamp BETWEEN ? AND ? AND status != 'cancelled'`,
       [startDate, endDate],
     );
 
@@ -5435,6 +5424,7 @@ module.exports = {
   getClientMemberships,
   assignMembership,
   cancelClientMembership,
+  updateClientMembership,
   recordMembershipRenewal,
   getClientVisits,
   createClientVisit,

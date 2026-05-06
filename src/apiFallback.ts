@@ -1,3 +1,11 @@
+const openPdfInBrowser = (filepath: string) => {
+  if (!filepath) return;
+  const filename = (filepath as string).split(/[\\/]/).pop() || filepath;
+  const host = window.location.hostname;
+  const port = window.location.port ? ':' + window.location.port : '';
+  window.open(`http://${host}${port}/pdfs/${filename}`, '_blank');
+};
+
 const invokeHttp = async (channel: string, payload?: any, ...extraArgs: any[]) => {
   const host = window.location.hostname;
   const port = window.location.port ? ":" + window.location.port : '';
@@ -372,14 +380,27 @@ export const apiFallback = {
   getCashBoxSales: (cashBoxId) =>
     invokeHttp("api:getCashBoxSales", cashBoxId),
 
-  // PDF Generation
-  exportPDF: (options) => invokeHttp("api:exportPDF", options),
-  generateOpeningPDF: (cashBoxData) =>
-    invokeHttp("api:generateOpeningPDF", cashBoxData),
-  generateClosingPDF: (closeData) =>
-    invokeHttp("api:generateClosingPDF", closeData),
-  generateDailyCashSummaryPDF: (data) =>
-    invokeHttp("api:generateDailyCashSummaryPDF", data),
+  // PDF Generation — en modo web, el servidor genera el PDF y lo sirve via /pdfs/:filename
+  exportPDF: async (options) => {
+    const fp = await invokeHttp("api:exportPDF", options);
+    openPdfInBrowser(fp);
+    return fp;
+  },
+  generateOpeningPDF: async (cashBoxData) => {
+    const fp = await invokeHttp("api:generateOpeningPDF", cashBoxData);
+    openPdfInBrowser(fp);
+    return fp;
+  },
+  generateClosingPDF: async (closeData) => {
+    const fp = await invokeHttp("api:generateClosingPDF", closeData);
+    openPdfInBrowser(fp);
+    return fp;
+  },
+  generateDailyCashSummaryPDF: async (data) => {
+    const fp = await invokeHttp("api:generateDailyCashSummaryPDF", data);
+    openPdfInBrowser(fp);
+    return fp;
+  },
 
   // Sales with Items
   createSaleWithItems: (saleData) =>
@@ -492,6 +513,8 @@ export const apiFallback = {
     }),
   cancelClientMembership: (id, canceledBy) =>
     invokeHttp("api:cancelClientMembership", { id, canceledBy }),
+  updateClientMembership: (id: number, data: any) =>
+    invokeHttp("api:updateClientMembership", { id, ...data }),
   recordMembershipRenewal: (renewalData) =>
     invokeHttp("api:recordMembershipRenewal", renewalData),
 
@@ -651,12 +674,21 @@ export const apiFallback = {
   getSchedulerStatus: () => invokeHttp("backup:getSchedulerStatus"),
 
   // Printer & PDF
-  generateMembershipPDF: (pdfData) =>
-    invokeHttp("pdf:generateMembershipPDF", pdfData),
-  generateReservationPDF: (reservationData) =>
-    invokeHttp("pdf:generateReservationPDF", reservationData),
-  generateQuotationPDF: (quotationData) =>
-    invokeHttp("pdf:generateQuotationPDF", quotationData),
+  generateMembershipPDF: async (pdfData) => {
+    const fp = await invokeHttp("pdf:generateMembershipPDF", pdfData);
+    openPdfInBrowser(fp);
+    return fp;
+  },
+  generateReservationPDF: async (reservationData) => {
+    const fp = await invokeHttp("pdf:generateReservationPDF", reservationData);
+    openPdfInBrowser(fp);
+    return fp;
+  },
+  generateQuotationPDF: async (quotationData) => {
+    const fp = await invokeHttp("pdf:generateQuotationPDF", quotationData);
+    openPdfInBrowser(fp);
+    return fp;
+  },
 
   // Supplies
   getSupplyCategories: () => invokeHttp("api:getSupplyCategories"),

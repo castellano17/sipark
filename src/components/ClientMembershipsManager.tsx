@@ -16,6 +16,8 @@ import {
   TrendingUp,
   RefreshCcw,
   X,
+  Pencil,
+  Save,
 } from "lucide-react";
 import { Card } from "./ui/card";
 import { Button } from "./ui/button";
@@ -75,6 +77,13 @@ export function ClientMembershipsManager() {
     open: boolean;
     membershipId: number | null;
   }>({ open: false, membershipId: null });
+
+  const [editModal, setEditModal] = useState<{
+    open: boolean;
+    membership: ClientMembership | null;
+    saving: boolean;
+    form: { phone: string; id_card: string; total_hours: string; notes: string };
+  }>({ open: false, membership: null, saving: false, form: { phone: "", id_card: "", total_hours: "", notes: "" } });
 
   // ── Historial Modal ──
   const [historyModal, setHistoryModal] = useState<{
@@ -201,6 +210,34 @@ export function ClientMembershipsManager() {
       loadMemberships();
     } catch {
       error("Error al cancelar membresía");
+    }
+  };
+
+  const openEdit = (membership: ClientMembership) => {
+    setEditModal({
+      open: true,
+      membership,
+      saving: false,
+      form: {
+        phone: membership.phone || "",
+        id_card: membership.id_card || "",
+        total_hours: membership.total_hours || "",
+        notes: membership.notes || "",
+      },
+    });
+  };
+
+  const handleEditSave = async () => {
+    if (!editModal.membership) return;
+    setEditModal((prev) => ({ ...prev, saving: true }));
+    try {
+      await (window as any).api.updateClientMembership(editModal.membership.id, editModal.form);
+      success("Membresía actualizada correctamente");
+      setEditModal({ open: false, membership: null, saving: false, form: { phone: "", id_card: "", total_hours: "", notes: "" } });
+      loadMemberships();
+    } catch {
+      error("Error al actualizar membresía");
+      setEditModal((prev) => ({ ...prev, saving: false }));
     }
   };
 
@@ -331,6 +368,9 @@ export function ClientMembershipsManager() {
                 <span>Vence: {new Date(membership.end_date).toLocaleDateString()}</span>
               </div>
               <div className="flex items-center justify-end gap-2 pt-2">
+                <Button size="sm" variant="outline" onClick={() => openEdit(membership)} className="flex-none text-blue-600 hover:bg-blue-50" title="Editar membresía">
+                  <Pencil className="w-4 h-4" />
+                </Button>
                 <Button size="sm" variant="outline" onClick={() => openHistory(membership)} className="flex-1">
                   <History className="w-4 h-4 mr-2" /> Historial
                 </Button>
@@ -408,6 +448,15 @@ export function ClientMembershipsManager() {
                   <td className="px-4 py-3">{getStatusBadge(membership)}</td>
                   <td className="px-4 py-3">
                     <div className="flex items-center justify-center gap-0.5">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => openEdit(membership)}
+                        title="Editar membresía"
+                        className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                      >
+                        <Pencil className="w-3 h-3" />
+                      </Button>
                       <Button
                         size="sm"
                         variant="outline"
@@ -599,6 +648,93 @@ export function ClientMembershipsManager() {
                   Cerrar
                 </Button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal: Editar Membresía ── */}
+      {editModal.open && editModal.membership && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md flex flex-col overflow-hidden">
+            <div className="bg-gradient-to-r from-blue-600 to-blue-800 p-5 text-white">
+              <div className="flex items-start justify-between">
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <Pencil className="w-4 h-4 opacity-80" />
+                    <span className="text-sm font-medium opacity-80 uppercase tracking-wider">Editar Membresía</span>
+                  </div>
+                  <h2 className="text-xl font-bold">{editModal.membership.client_name}</h2>
+                  <p className="text-sm opacity-80">{editModal.membership.membership_name}</p>
+                </div>
+                <button
+                  onClick={() => setEditModal({ open: false, membership: null, saving: false, form: { phone: "", id_card: "", total_hours: "", notes: "" } })}
+                  className="ml-4 p-1.5 rounded-full hover:bg-white/20 transition"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">N° Tarjeta / Cédula</label>
+                <input
+                  type="text"
+                  value={editModal.form.id_card}
+                  onChange={(e) => setEditModal((prev) => ({ ...prev, form: { ...prev.form, id_card: e.target.value } }))}
+                  placeholder="Número de tarjeta o cédula"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">Teléfono</label>
+                <input
+                  type="text"
+                  value={editModal.form.phone}
+                  onChange={(e) => setEditModal((prev) => ({ ...prev, form: { ...prev.form, phone: e.target.value } }))}
+                  placeholder="Teléfono del titular"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">Horas / Entradas</label>
+                <input
+                  type="text"
+                  value={editModal.form.total_hours}
+                  onChange={(e) => setEditModal((prev) => ({ ...prev, form: { ...prev.form, total_hours: e.target.value } }))}
+                  placeholder="Ej: 10 horas, 20 entradas"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">Notas</label>
+                <textarea
+                  value={editModal.form.notes}
+                  onChange={(e) => setEditModal((prev) => ({ ...prev, form: { ...prev.form, notes: e.target.value } }))}
+                  placeholder="Observaciones adicionales"
+                  rows={3}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                />
+              </div>
+            </div>
+
+            <div className="px-6 pb-6 flex justify-end gap-3">
+              <Button
+                variant="outline"
+                onClick={() => setEditModal({ open: false, membership: null, saving: false, form: { phone: "", id_card: "", total_hours: "", notes: "" } })}
+                disabled={editModal.saving}
+              >
+                Cancelar
+              </Button>
+              <Button
+                onClick={handleEditSave}
+                disabled={editModal.saving}
+                className="bg-blue-600 hover:bg-blue-700 text-white gap-2"
+              >
+                <Save className="w-4 h-4" />
+                {editModal.saving ? "Guardando..." : "Guardar cambios"}
+              </Button>
             </div>
           </div>
         </div>

@@ -1,6 +1,6 @@
 {
   "name": "ludoteca-pos",
-  "version": "1.0.31",
+  "version": "2.0.2",
   "main": "main.cjs",
   "type": "module",
   "homepage": "./",

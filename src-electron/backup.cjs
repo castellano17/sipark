@@ -70,7 +70,7 @@ async function createLocalBackup(destinationPath = null) {
     // --clean: incluye comandos para eliminar objetos antes de crearlos
     // --if-exists: usa IF EXISTS al eliminar para evitar errores
     // --inserts: usa INSERT INTO en lugar de COPY para mejor legibilidad y compatibilidad
-    const command = `${pgDumpPath} -h ${config.host} -p ${config.port} -U ${config.user} -F p --clean --if-exists --inserts -f "${filePath}" ${config.database}`;
+    const command = `${pgDumpPath} -h ${config.host} -p ${config.port} -U ${config.user} -F p --clean --if-exists --inserts --no-owner --no-privileges -f "${filePath}" ${config.database}`;
 
     return new Promise((resolve) => {
       exec(command, { env }, (error, stdout, stderr) => {
@@ -182,11 +182,46 @@ async function restoreWithDialog() {
 }
 
 function listBackups() {
-  return [];
+  try {
+    const backupDir = getBackupPath();
+    if (!fs.existsSync(backupDir)) return [];
+
+    return fs.readdirSync(backupDir)
+      .filter((f) => f.endsWith(".sql"))
+      .map((f) => {
+        const filePath = path.join(backupDir, f);
+        const stats = fs.statSync(filePath);
+        return {
+          filename: f,
+          path: filePath,
+          size: stats.size,
+          sizeFormatted: `${(stats.size / (1024 * 1024)).toFixed(2)} MB`,
+          createdAt: stats.mtime,
+        };
+      })
+      .sort((a, b) => b.createdAt - a.createdAt);
+  } catch (error) {
+    return [];
+  }
 }
 
 function cleanOldBackups(keepCount = 10) {
-  return { deleted: 0, kept: 0 };
+  try {
+    const backupDir = getBackupPath();
+    if (!fs.existsSync(backupDir)) return { deleted: 0, kept: 0 };
+
+    const files = fs.readdirSync(backupDir)
+      .filter((f) => f.endsWith(".sql"))
+      .map((f) => ({ filename: f, path: path.join(backupDir, f), mtime: fs.statSync(path.join(backupDir, f)).mtime }))
+      .sort((a, b) => b.mtime - a.mtime);
+
+    const toDelete = files.slice(keepCount);
+    toDelete.forEach((f) => { try { fs.unlinkSync(f.path); } catch (_) {} });
+
+    return { deleted: toDelete.length, kept: Math.min(files.length, keepCount) };
+  } catch (error) {
+    return { deleted: 0, kept: 0 };
+  }
 }
 
 async function createAutoBackup() {

@@ -73,6 +73,20 @@ function startLocalServer() {
     }
     server.use('/brand', express.static(brandDir));
 
+    // Servir imágenes de productos para clientes de red (otra PC / celular)
+    const productImagesDir = path.join(app.getPath('userData'), 'sipark-data', 'product-images');
+    if (!fs.existsSync(productImagesDir)) {
+      fs.mkdirSync(productImagesDir, { recursive: true });
+    }
+    server.use('/product-images', express.static(productImagesDir));
+
+    // Servir PDFs generados para que los clientes de red puedan descargarlos
+    const pdfServeDir = path.join(app.getPath('userData'), 'pdfs');
+    if (!fs.existsSync(pdfServeDir)) {
+      fs.mkdirSync(pdfServeDir, { recursive: true });
+    }
+    server.use('/pdfs', express.static(pdfServeDir));
+
     // Ruta para el favicon dinámico
     server.get('/favicon.ico', async (req, res) => {
       try {
@@ -1270,6 +1284,9 @@ function setupIpcHandlers() {
   );
   ipcMain.handle("api:cancelClientMembership", (event, data) =>
     api.cancelClientMembership(data.id, data.canceledBy),
+  );
+  ipcMain.handle("api:updateClientMembership", (event, data) =>
+    api.updateClientMembership(data.id, data),
   );
   ipcMain.handle("api:recordMembershipRenewal", (event, renewalData) =>
     api.recordMembershipRenewal(renewalData),

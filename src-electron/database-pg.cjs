@@ -882,8 +882,11 @@ async function createTables() {
           ALTER TABLE reservations ADD COLUMN client_id_card VARCHAR(100);
         END IF;
 
-        -- 5. Si eliminamos 'Bebidas' y quedaron productos ahí (porque no existía 'Bebidas embotelladas'), 
-        --    podemos regresarlos a su tipo original o dejarlos para que el usuario les asigne una.
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='products_services' AND column_name='is_active') THEN
+          ALTER TABLE products_services ADD COLUMN is_active BOOLEAN DEFAULT TRUE;
+          UPDATE products_services SET is_active = TRUE WHERE is_active IS NULL;
+        END IF;
+
         END $$;
     `);
   } catch (error) {
