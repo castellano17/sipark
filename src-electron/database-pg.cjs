@@ -138,6 +138,7 @@ async function createTables() {
       total DECIMAL(10,2) NOT NULL,
       subtotal DECIMAL(10,2) NOT NULL,
       discount DECIMAL(10,2) DEFAULT 0,
+      payment_method VARCHAR(50),
       timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       cash_box_id INTEGER,
       user_id INTEGER,
@@ -731,6 +732,9 @@ async function createTables() {
 
         -- Migración para client_name en sales (agregado aquí para asegurar ejecución)
         ALTER TABLE sales ADD COLUMN IF NOT EXISTS client_name VARCHAR(255);
+
+        -- Migración para payment_method en sales
+        ALTER TABLE sales ADD COLUMN IF NOT EXISTS payment_method VARCHAR(50);
 
         -- Migración para columnas de características de paquetes
         IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='package_features' AND column_name='requires_quantity') THEN

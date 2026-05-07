@@ -8,6 +8,14 @@ echo.
 REM Buscar psql
 set PSQL_PATH=
 set PG_VERSION=
+if exist "C:\Program Files\PostgreSQL\18\bin\psql.exe" (
+    set PSQL_PATH=C:\Program Files\PostgreSQL\18\bin\psql.exe
+    set PG_VERSION=18
+)
+if exist "C:\Program Files\PostgreSQL\17\bin\psql.exe" (
+    set PSQL_PATH=C:\Program Files\PostgreSQL\17\bin\psql.exe
+    set PG_VERSION=17
+)
 if exist "C:\Program Files\PostgreSQL\16\bin\psql.exe" (
     set PSQL_PATH=C:\Program Files\PostgreSQL\16\bin\psql.exe
     set PG_VERSION=16
@@ -19,10 +27,6 @@ if exist "C:\Program Files\PostgreSQL\15\bin\psql.exe" (
 if exist "C:\Program Files\PostgreSQL\14\bin\psql.exe" (
     set PSQL_PATH=C:\Program Files\PostgreSQL\14\bin\psql.exe
     set PG_VERSION=14
-)
-if exist "C:\Program Files\PostgreSQL\17\bin\psql.exe" (
-    set PSQL_PATH=C:\Program Files\PostgreSQL\17\bin\psql.exe
-    set PG_VERSION=17
 )
 
 if "%PSQL_PATH%"=="" (

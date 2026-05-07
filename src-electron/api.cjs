@@ -2,11 +2,9 @@ const { runAsync, getAsync, allAsync } = require("./database-pg.cjs");
 
 // ============ HELPERS ============
 
-// Obtener timestamp local en formato SQLite (YYYY-MM-DD HH:MM:SS)
-function getLocalTimestamp() {
-  const date = new Date();
-  // Devolver timestamp en hora local, no UTC
-  // Esto asegura que el frontend y backend usen la misma zona horaria
+// Obtener timestamp local en formato compatible con la BD
+// Acepta una fecha opcional; si no se provee usa la hora actual.
+function getLocalTimestamp(date = new Date()) {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
@@ -263,8 +261,14 @@ async function endSession(sessionId, finalPrice) {
       throw new Error("Sesión no encontrada");
     }
 
+    // PostgreSQL devuelve TIMESTAMP como objeto Date; usar mismo formato local que getLocalTimestamp()
+    const startTimeStr =
+      session.start_time instanceof Date
+        ? getLocalTimestamp(session.start_time)
+        : String(session.start_time);
+
     // Calcular tiempo transcurrido
-    const startTime = new Date(session.start_time);
+    const startTime = new Date(startTimeStr);
     const endTime = new Date();
     const elapsedMinutes = Math.floor(
       (endTime.getTime() - startTime.getTime()) / 60000,
@@ -281,27 +285,23 @@ async function endSession(sessionId, finalPrice) {
     // Buscar si ya existe una visita para este cliente y este inicio de sesión
     let visit = await getAsync(
       `SELECT * FROM client_visits WHERE client_id = ? AND visit_date = ? AND check_in_time = ?`,
-      [session.client_id, session.start_time.split("T")[0], session.start_time],
+      [session.client_id, startTimeStr.split("T")[0], startTimeStr],
     );
 
     if (!visit) {
       // Crear visita
       await createClientVisit(
         session.client_id,
-        session.start_time.split("T")[0],
-        session.start_time,
+        startTimeStr.split("T")[0],
+        startTimeStr,
         finalPrice || 0,
         "",
-        "auto",
+        null,
       );
       // Buscar de nuevo para obtener el id
       visit = await getAsync(
         `SELECT * FROM client_visits WHERE client_id = ? AND visit_date = ? AND check_in_time = ?`,
-        [
-          session.client_id,
-          session.start_time.split("T")[0],
-          session.start_time,
-        ],
+        [session.client_id, startTimeStr.split("T")[0], startTimeStr],
       );
     }
     if (visit) {
@@ -321,7 +321,8 @@ async function endSession(sessionId, finalPrice) {
 
 async function getProductsServices() {
   try {
-    const sql = "SELECT * FROM products_services WHERE is_active IS NOT FALSE ORDER BY name";
+    const sql =
+      "SELECT * FROM products_services WHERE is_active IS NOT FALSE ORDER BY name";
     return await allAsync(sql);
   } catch (error) {
     throw error;
@@ -915,7 +916,7 @@ async function getCashBoxReport(cashBoxId) {
         END as sale_type
       FROM sales s
       LEFT JOIN clients c ON s.client_id = c.id
-      WHERE s.cash_box_id = $1 AND s.status != 'cancelled'
+      WHERE s.cash_box_id = $1 AND COALESCE(s.status, 'completed') != 'cancelled'
       ORDER BY s.timestamp ASC`,
       [cashBoxId],
     );
@@ -935,30 +936,36 @@ async function getCashBoxReport(cashBoxId) {
         COUNT(*) as count,
         COALESCE(SUM(total), 0) as total
       FROM sales
-      WHERE cash_box_id = $1 AND status != 'cancelled'
+      WHERE cash_box_id = $1 AND COALESCE(status, 'completed') != 'cancelled'
       GROUP BY payment_method`,
       [cashBoxId],
     );
 
     // Calcular totales
-    const salesTotal = sales.reduce((sum, s) => sum + s.total, 0);
+    const salesTotal = sales.reduce(
+      (sum, s) => sum + (parseFloat(s.total) || 0),
+      0,
+    );
     const cashSales = sales
       .filter((s) => s.payment_method === "cash")
-      .reduce((sum, s) => sum + s.total, 0);
+      .reduce((sum, s) => sum + (parseFloat(s.total) || 0), 0);
     const incomeMovements = movements
       .filter((m) => m.type === "income")
-      .reduce((sum, m) => sum + m.amount, 0);
+      .reduce((sum, m) => sum + (parseFloat(m.amount) || 0), 0);
     const expenseMovements = movements
       .filter((m) => m.type === "expense")
-      .reduce((sum, m) => sum + m.amount, 0);
+      .reduce((sum, m) => sum + (parseFloat(m.amount) || 0), 0);
 
     // Debug
 
     const expectedCash =
-      cashBox.opening_amount + cashSales + incomeMovements - expenseMovements;
+      (parseFloat(cashBox.opening_amount) || 0) +
+      cashSales +
+      incomeMovements -
+      expenseMovements;
 
     const difference = cashBox.closing_amount
-      ? cashBox.closing_amount - expectedCash
+      ? (parseFloat(cashBox.closing_amount) || 0) - expectedCash
       : 0;
 
     return {
@@ -972,7 +979,7 @@ async function getCashBoxReport(cashBoxId) {
         incomeMovements,
         expenseMovements,
         expectedCash,
-        actualCash: cashBox.closing_amount || 0,
+        actualCash: parseFloat(cashBox.closing_amount) || 0,
         difference,
       },
     };
@@ -1011,10 +1018,17 @@ async function getStockReport(categoryFilter = null, lowStockOnly = false) {
 
     const products = await allAsync(sql, params);
 
-    const totalValue = products.reduce((sum, p) => sum + (p.stock || 0) * p.price, 0);
+    const totalValue = products.reduce(
+      (sum, p) => sum + (p.stock || 0) * p.price,
+      0,
+    );
     const totalProducts = products.length;
     const lowStockCount = products.filter(
-      (p) => p.stock !== null && p.stock > 0 && p.stock < 10 && (p.requires_stock !== false),
+      (p) =>
+        p.stock !== null &&
+        p.stock > 0 &&
+        p.stock < 10 &&
+        p.requires_stock !== false,
     ).length;
     const outOfStockCount = products.filter(
       (p) => p.stock !== null && p.stock === 0 && p.requires_stock !== false,
@@ -1321,8 +1335,11 @@ async function resumeSession(sessionId) {
     // Nueva hora de inicio = hora de inicio anterior + duración de la pausa
     const newStartTime = new Date(startTime.getTime() + pausedDurationMs);
 
-    // Formatear para BD
-    const formattedNewStartTime = newStartTime.toISOString();
+    // Usar el mismo formato local que getLocalTimestamp() para mantener
+    // consistencia con cómo PostgreSQL almacena y devuelve los timestamps.
+    // toISOString() devuelve UTC real, pero pg trata TIMESTAMP WITHOUT TZ
+    // como hora local al leerlo, lo que provoca que el timer salte a 0.
+    const formattedNewStartTime = getLocalTimestamp(newStartTime);
 
     await runAsync(
       "UPDATE active_sessions SET is_paused = FALSE, pause_start_time = NULL, start_time = $1 WHERE id = $2",
@@ -1404,7 +1421,7 @@ async function closeCashBox(
 
     // Calcular totales de ventas (solo efectivo, excluir canceladas)
     const salesTotal = await getAsync(
-      "SELECT COALESCE(SUM(total), 0) as total FROM sales WHERE cash_box_id = ? AND payment_method = 'cash' AND status != 'cancelled'",
+      "SELECT COALESCE(SUM(total), 0) as total FROM sales WHERE cash_box_id = ? AND payment_method = 'cash' AND COALESCE(status, 'completed') != 'cancelled'",
       [cashBoxId],
     );
 
@@ -1417,21 +1434,21 @@ async function closeCashBox(
 
     // 1. Número total de transacciones (excluir canceladas)
     const transactionCount = await getAsync(
-      "SELECT COUNT(*) as count FROM sales WHERE cash_box_id = ? AND status != 'cancelled'",
+      "SELECT COUNT(*) as count FROM sales WHERE cash_box_id = ? AND COALESCE(status, 'completed') != 'cancelled'",
       [cashBoxId],
     );
 
     // 2. Desglose por método de pago (excluir canceladas)
     const paymentMethods = await allAsync(
       `SELECT payment_method, COUNT(*) as count, COALESCE(SUM(total), 0) as total
-       FROM sales WHERE cash_box_id = ? AND status != 'cancelled'
+       FROM sales WHERE cash_box_id = ? AND COALESCE(status, 'completed') != 'cancelled'
        GROUP BY payment_method`,
       [cashBoxId],
     );
 
     // 3. Descuentos aplicados (excluir canceladas)
     const discountsTotal = await getAsync(
-      "SELECT COALESCE(SUM(discount), 0) as total FROM sales WHERE cash_box_id = ? AND status != 'cancelled'",
+      "SELECT COALESCE(SUM(discount), 0) as total FROM sales WHERE cash_box_id = ? AND COALESCE(status, 'completed') != 'cancelled'",
       [cashBoxId],
     );
 
@@ -1613,7 +1630,7 @@ async function getCashBoxSales(cashBoxId) {
         ) as product_items_count
       FROM sales s
       LEFT JOIN clients c ON s.client_id = c.id
-      WHERE s.cash_box_id = ? AND s.status != 'cancelled'
+      WHERE s.cash_box_id = ? AND COALESCE(s.status, 'completed') != 'cancelled'
       ORDER BY s.timestamp ASC
     `;
     return await allAsync(sql, [cashBoxId]);
@@ -2441,7 +2458,10 @@ async function cancelClientMembership(id, canceledBy) {
   }
 }
 
-async function updateClientMembership(id, { phone, id_card, total_hours, notes }) {
+async function updateClientMembership(
+  id,
+  { phone, id_card, total_hours, notes },
+) {
   try {
     await runAsync(
       `UPDATE client_memberships SET phone = ?, id_card = ?, total_hours = ?, notes = ? WHERE id = ?`,

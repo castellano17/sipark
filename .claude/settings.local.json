@@ -7,7 +7,19 @@
       "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\Esmir\\\\Desktop\\\\sipark\" -Recurse -Directory)",
       "Bash(Select-Object -ExpandProperty FullName)",
       "Bash(grep -E \"\\\\.\\(js|ts|sql\\)$\")",
-      "Bash(npm run *)"
+      "Bash(npm run *)",
+      "PowerShell(Get-Command psql -ErrorAction SilentlyContinue)",
+      "Bash(Remove-Item -Recurse -Force node_modules\\\\electron -ErrorAction SilentlyContinue)",
+      "Bash(npm install *)",
+      "Bash(node node_modules/electron/install.js)",
+      "Bash(psql -U ludoteca_user -d ludoteca_pos -h 127.0.0.1 -c \"SELECT COUNT\\(*\\) FROM active_sessions;\")",
+      "PowerShell($env:PGPASSWORD = \"ludoteca2024\"; & \"C:\\\\Program Files\\\\PostgreSQL\\\\18\\\\bin\\\\psql.exe\" -U ludoteca_user -d ludoteca_pos -h 127.0.0.1 -c \"\\\\dt\" 2>&1)",
+      "PowerShell($env:PGPASSWORD = \"ludoteca2024\"; & \"C:\\\\Program Files\\\\PostgreSQL\\\\18\\\\bin\\\\psql.exe\" -U ludoteca_user -d ludoteca_pos -h 127.0.0.1 -c \"SELECT s.id, s.payment_method, s.timestamp::DATE as date FROM sales s LIMIT 5;\" 2>&1)",
+      "PowerShell($env:PGPASSWORD = \"ludoteca2024\"; & \"C:\\\\Program Files\\\\PostgreSQL\\\\18\\\\bin\\\\psql.exe\" -U ludoteca_user -d ludoteca_pos -h 127.0.0.1 -c \"ALTER TABLE sales ADD COLUMN IF NOT EXISTS payment_method VARCHAR\\(50\\);\" 2>&1)",
+      "PowerShell($env:PGPASSWORD = \"ludoteca2024\"; & \"C:\\\\Program Files\\\\PostgreSQL\\\\18\\\\bin\\\\psql.exe\" -U ludoteca_user -d ludoteca_pos -h 127.0.0.1 -c \"SELECT s.id, s.payment_method, s.timestamp::DATE as date, s.total, s.subtotal, s.discount, s.status FROM sales s LIMIT 3;\" 2>&1)",
+      "Bash(cat ~/sipark_api_debug.txt 2>/dev/null | tail -30 || echo \"No log file\")",
+      "Read(//c/Users/User/**)",
+      "PowerShell(Get-Content \"$env:USERPROFILE\\\\sipark_api_debug.txt\" -Tail 30 -ErrorAction SilentlyContinue; if \\(-not $?\\) { Write-Host \"No log file found\" })"
     ]
   }
 }

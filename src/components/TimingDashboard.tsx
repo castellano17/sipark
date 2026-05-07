@@ -144,11 +144,21 @@ export const TimingDashboard: React.FC<TimingDashboardProps> = ({
 
     try {
       if (session.is_paused) {
-        await resumeSession(sessionId);
-        success("Sesión reanudada");
+        const res = await resumeSession(sessionId);
+        if (res) {
+          success("Sesión reanudada");
+        } else {
+          errorNotification("Error al reanudar la sesión");
+          return;
+        }
       } else {
-        await pauseSession(sessionId);
-        warning("Sesión pausada");
+        const res = await pauseSession(sessionId);
+        if (res) {
+          warning("Sesión pausada");
+        } else {
+          errorNotification("Error al pausar la sesión");
+          return;
+        }
       }
       await loadSessions();
     } catch (err) {

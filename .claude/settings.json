@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(Get-Content \"$env:TEMP\\\\sipark_api_logs.txt\" -Tail 20 -ErrorAction SilentlyContinue; if \\(-not $?\\) { Write-Host \"No log file found\" })",
+      "Bash(pnpm run *)",
+      "PowerShell(Remove-Item -Recurse -Force \"$env:LOCALAPPDATA\\\\electron-builder\\\\Cache\\\\winCodeSign\" -ErrorAction SilentlyContinue; Write-Host \"Cache eliminado\")"
+    ]
+  }
+}

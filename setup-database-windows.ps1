@@ -6,11 +6,15 @@ Write-Host ""
 
 # Buscar la instalacion de PostgreSQL
 $pgPaths = @(
-    "C:\Program Files\PostgreSQL\15\bin",
+    "C:\Program Files\PostgreSQL\18\bin",
+    "C:\Program Files\PostgreSQL\17\bin",
     "C:\Program Files\PostgreSQL\16\bin",
+    "C:\Program Files\PostgreSQL\15\bin",
     "C:\Program Files\PostgreSQL\14\bin",
-    "C:\Program Files (x86)\PostgreSQL\15\bin",
-    "C:\Program Files (x86)\PostgreSQL\16\bin"
+    "C:\Program Files (x86)\PostgreSQL\18\bin",
+    "C:\Program Files (x86)\PostgreSQL\17\bin",
+    "C:\Program Files (x86)\PostgreSQL\16\bin",
+    "C:\Program Files (x86)\PostgreSQL\15\bin"
 )
 
 $psqlPath = $null

@@ -1,5 +1,17 @@
-import { useState, useEffect } from "react";
-import { TrendingUp, TrendingDown, Lock, Unlock, Printer, Clock, ShoppingBag, Receipt, AlertTriangle, CheckCircle, Ban } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import {
+  TrendingUp,
+  TrendingDown,
+  Lock,
+  Unlock,
+  Printer,
+  Clock,
+  ShoppingBag,
+  Receipt,
+  AlertTriangle,
+  CheckCircle,
+  Ban,
+} from "lucide-react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Card } from "./ui/card";
@@ -29,6 +41,8 @@ export function CashManagement() {
   const { error: showError, success } = useNotification();
   const { formatCurrency } = useCurrency();
   const {
+    loading: cashBoxLoading,
+    error: cashBoxError,
     openCashBox: openCashBoxAPI,
     getActiveCashBox,
     closeCashBox: closeCashBoxAPI,
@@ -54,17 +68,26 @@ export function CashManagement() {
   const [pendingCashBoxId, setPendingCashBoxId] = useState<number | null>(null);
   const [closeData, setCloseData] = useState<any>(null);
   const [savedClosingNotes, setSavedClosingNotes] = useState("");
+  const [isClosingCash, setIsClosingCash] = useState(false);
+  const closeAmountInputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    if (showCloseModal) {
+      // Esperar al siguiente frame para asegurar que el modal esté en el DOM.
+      requestAnimationFrame(() => closeAmountInputRef.current?.focus());
+    }
+  }, [showCloseModal]);
 
   useEffect(() => {
     loadCashBoxData();
 
     const handleRefresh = () => loadCashBoxData();
-    window.addEventListener('sale-cancelled', handleRefresh);
-    window.addEventListener('cash-movement-added', handleRefresh);
+    window.addEventListener("sale-cancelled", handleRefresh);
+    window.addEventListener("cash-movement-added", handleRefresh);
 
     return () => {
-      window.removeEventListener('sale-cancelled', handleRefresh);
-      window.removeEventListener('cash-movement-added', handleRefresh);
+      window.removeEventListener("sale-cancelled", handleRefresh);
+      window.removeEventListener("cash-movement-added", handleRefresh);
     };
   }, []);
 
@@ -153,7 +176,7 @@ export function CashManagement() {
     // Reemplazar coma por punto para asegurar la conversión correcta en Windows/diferentes locales
     const normalizedAmount = expenseAmount.trim().replace(",", ".");
     const amount = parseFloat(normalizedAmount);
-    
+
     if (isNaN(amount) || amount <= 0) {
       showError("Ingrese un monto válido");
       return;
@@ -187,7 +210,8 @@ export function CashManagement() {
   const handleCloseCashBox = async () => {
     if (!activeCashBox) return;
 
-    const amount = parseFloat(closingAmount);
+    const normalizedAmount = closingAmount.trim().replace(",", ".");
+    const amount = parseFloat(normalizedAmount);
     if (isNaN(amount) || amount < 0) {
       showError("Ingrese el monto contado");
       return;
@@ -203,14 +227,22 @@ export function CashManagement() {
       return;
     }
 
-    const result = await closeCashBoxAPI(
-      activeCashBox.id,
-      amount,
-      "Admin",
-      closingNotes,
-    );
+    try {
+      setIsClosingCash(true);
+      const result = await closeCashBoxAPI(
+        activeCashBox.id,
+        amount,
+        "Admin",
+        closingNotes,
+      );
 
-    if (result) {
+      if (!result) {
+        showError(
+          cashBoxError || "No se pudo cerrar la caja. Intente nuevamente.",
+        );
+        return;
+      }
+
       // Guardar datos para el modal de impresión incluyendo datos de la caja
       setCloseData({
         ...result,
@@ -228,6 +260,8 @@ export function CashManagement() {
       setClosingAmount("");
       setClosingNotes("");
       await loadCashBoxData();
+    } finally {
+      setIsClosingCash(false);
     }
   };
 
@@ -259,30 +293,56 @@ export function CashManagement() {
     }
 
     const today = new Date().toLocaleDateString("es-ES");
-    const now = new Date().toLocaleTimeString("es-ES", { hour: '2-digit', minute: '2-digit' });
-    
+    const now = new Date().toLocaleTimeString("es-ES", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+
     let ticketText = "\n";
     ticketText += "================================\n";
     ticketText += "   RESUMEN DE VENTAS DEL DIA    \n";
     ticketText += `   Fecha: ${today}  ${now}   \n`;
     ticketText += "================================\n\n";
-    
+
     // Usar totales oficiales del servidor para consistencia con el PDF
     const openingAmount = Number(closeData.openingAmount || 0);
-    const validSalesList = closeData.salesList.filter((s: any) => s.status !== 'cancelled');
-    const salesTotal = validSalesList.reduce((sum: number, s: any) => sum + Number(s.total), 0);
+    const validSalesList = closeData.salesList.filter(
+      (s: any) => s.status !== "cancelled",
+    );
+    const salesTotal = validSalesList.reduce(
+      (sum: number, s: any) => sum + Number(s.total),
+      0,
+    );
     const expensesTotal = Number(closeData.expensesTotal || 0);
-    const totalDescuentos = validSalesList.reduce((sum: number, s: any) => sum + Number(s.discount || 0), 0);
-    
+    const totalDescuentos = validSalesList.reduce(
+      (sum: number, s: any) => sum + Number(s.discount || 0),
+      0,
+    );
+
     const finalExpected = openingAmount + salesTotal - expensesTotal;
-    
-    const timeSales = validSalesList.filter((s: any) => s.time_items_count > 0 && s.product_items_count === 0);
-    const productSales = validSalesList.filter((s: any) => s.product_items_count > 0 && s.time_items_count === 0);
-    const mixedSales = validSalesList.filter((s: any) => s.time_items_count > 0 && s.product_items_count > 0);
-    
-    const timeTotal = timeSales.reduce((sum: number, s: any) => sum + Number(s.total), 0);
-    const productTotal = productSales.reduce((sum: number, s: any) => sum + Number(s.total), 0);
-    const mixedTotal = mixedSales.reduce((sum: number, s: any) => sum + Number(s.total), 0);
+
+    const timeSales = validSalesList.filter(
+      (s: any) => s.time_items_count > 0 && s.product_items_count === 0,
+    );
+    const productSales = validSalesList.filter(
+      (s: any) => s.product_items_count > 0 && s.time_items_count === 0,
+    );
+    const mixedSales = validSalesList.filter(
+      (s: any) => s.time_items_count > 0 && s.product_items_count > 0,
+    );
+
+    const timeTotal = timeSales.reduce(
+      (sum: number, s: any) => sum + Number(s.total),
+      0,
+    );
+    const productTotal = productSales.reduce(
+      (sum: number, s: any) => sum + Number(s.total),
+      0,
+    );
+    const mixedTotal = mixedSales.reduce(
+      (sum: number, s: any) => sum + Number(s.total),
+      0,
+    );
 
     ticketText += `DINERO APERTURA:   ${formatCurrency(openingAmount)}\n`;
     ticketText += `(+) VENTAS:        ${formatCurrency(salesTotal)}\n`;
@@ -297,25 +357,31 @@ export function CashManagement() {
     ticketText += `TOTAL EN CAJA:     ${formatCurrency(finalExpected)}\n`;
     ticketText += `Transacciones:     ${closeData.salesList.length}\n`;
     ticketText += "--------------------------------\n";
-    
+
     // Encabezado de lista
     ticketText += "ID   Hora   Detalle      Monto\n";
     ticketText += "--------------------------------\n";
-    
+
     // Ordenar por fecha (más antigua a más reciente)
-    const sortedSales = [...closeData.salesList].sort((a, b) => 
-      new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+    const sortedSales = [...closeData.salesList].sort(
+      (a, b) =>
+        new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
     );
 
     sortedSales.forEach((sale: any) => {
-      const time = new Date(sale.timestamp).toLocaleTimeString("es-ES", { hour: '2-digit', minute: '2-digit' });
+      const time = new Date(sale.timestamp).toLocaleTimeString("es-ES", {
+        hour: "2-digit",
+        minute: "2-digit",
+      });
       const amount = formatCurrency(sale.total);
-      
+
       // Formatear línea principal: #123 21:30          C$100.00
       ticketText += `#${String(sale.id).padEnd(3)} ${time} ${amount.padStart(20)}\n`;
-      
+
       // Mostrar lista de productos en la siguiente línea
-      const products = sale.products || (sale.client_name ? `Cliente: ${sale.client_name}` : "—");
+      const products =
+        sale.products ||
+        (sale.client_name ? `Cliente: ${sale.client_name}` : "—");
       ticketText += `${products}\n`;
       ticketText += "--------------------------------\n";
     });
@@ -350,15 +416,32 @@ export function CashManagement() {
       ticketText += `Cajero: ${closeData.cashBoxData.opened_by}\n`;
       ticketText += `ID Caja: #${closeData.cashBoxId}\n`;
       ticketText += "--------------------------------\n";
-      const validSales = closeData.salesList.filter((s: any) => s.status !== 'cancelled');
-      
-      const timeSales = validSales.filter((s: any) => s.time_items_count > 0 && s.product_items_count === 0);
-      const productSales = validSales.filter((s: any) => s.product_items_count > 0 && s.time_items_count === 0);
-      const mixedSales = validSales.filter((s: any) => s.time_items_count > 0 && s.product_items_count > 0);
-      
-      const timeTotal = timeSales.reduce((sum: number, s: any) => sum + Number(s.total), 0);
-      const productTotal = productSales.reduce((sum: number, s: any) => sum + Number(s.total), 0);
-      const mixedTotal = mixedSales.reduce((sum: number, s: any) => sum + Number(s.total), 0);
+      const validSales = closeData.salesList.filter(
+        (s: any) => s.status !== "cancelled",
+      );
+
+      const timeSales = validSales.filter(
+        (s: any) => s.time_items_count > 0 && s.product_items_count === 0,
+      );
+      const productSales = validSales.filter(
+        (s: any) => s.product_items_count > 0 && s.time_items_count === 0,
+      );
+      const mixedSales = validSales.filter(
+        (s: any) => s.time_items_count > 0 && s.product_items_count > 0,
+      );
+
+      const timeTotal = timeSales.reduce(
+        (sum: number, s: any) => sum + Number(s.total),
+        0,
+      );
+      const productTotal = productSales.reduce(
+        (sum: number, s: any) => sum + Number(s.total),
+        0,
+      );
+      const mixedTotal = mixedSales.reduce(
+        (sum: number, s: any) => sum + Number(s.total),
+        0,
+      );
 
       ticketText += `(+) APERTURA:    ${formatCurrency(closeData.openingAmount)}\n`;
       ticketText += `(+) VENTAS:      ${formatCurrency(closeData.salesTotal)}\n`;
@@ -426,7 +509,7 @@ export function CashManagement() {
   };
 
   const totalSales = sales
-    .filter(s => s.status !== 'cancelled' && s.payment_method === 'cash')
+    .filter((s) => s.status !== "cancelled" && s.payment_method === "cash")
     .reduce((sum, sale) => sum + parseFloat(String(sale.total)), 0);
   const totalExpenses = movements
     .filter((m) => m.type === "expense")
@@ -435,7 +518,10 @@ export function CashManagement() {
     .filter((m) => m.type === "income")
     .reduce((sum, m) => sum + Math.abs(parseFloat(String(m.amount))), 0);
   const currentBalance = activeCashBox
-    ? parseFloat(String(activeCashBox.opening_amount)) + totalSales + totalIncome - totalExpenses
+    ? parseFloat(String(activeCashBox.opening_amount)) +
+      totalSales +
+      totalIncome -
+      totalExpenses
     : 0;
 
   const handleManualOpenDrawer = async () => {
@@ -467,8 +553,8 @@ export function CashManagement() {
               Abrir Cajón
             </Button>
           )}
-          {!isCheckingStatus && (
-            activeCashBox ? (
+          {!isCheckingStatus &&
+            (activeCashBox ? (
               <div className="flex items-center gap-2 text-green-600">
                 <Unlock className="w-5 h-5" />
                 <span className="font-semibold">Caja Abierta</span>
@@ -478,8 +564,7 @@ export function CashManagement() {
                 <Lock className="w-5 h-5" />
                 <span className="font-semibold">Caja Cerrada</span>
               </div>
-            )
-          )}
+            ))}
         </div>
       </div>
 
@@ -509,7 +594,9 @@ export function CashManagement() {
               {totalIncome > 0 && (
                 <div>
                   <div className="text-gray-600">Ingresos</div>
-                  <div className="font-semibold text-teal-600">+{formatCurrency(totalIncome)}</div>
+                  <div className="font-semibold text-teal-600">
+                    +{formatCurrency(totalIncome)}
+                  </div>
                 </div>
               )}
               <div className="mt-2">
@@ -612,67 +699,94 @@ export function CashManagement() {
             ) : (
               <>
                 {/* Ventas */}
-                 {sales.map((sale) => {
-                   const isTimeSale = sale.time_items_count > 0;
-                   const isProductSale = sale.product_items_count > 0;
-                   const isMixed = isTimeSale && isProductSale;
+                {sales.map((sale) => {
+                  const isTimeSale = sale.time_items_count > 0;
+                  const isProductSale = sale.product_items_count > 0;
+                  const isMixed = isTimeSale && isProductSale;
 
-                   return (
-                     <div
-                       key={`sale-${sale.id}`}
-                       className={`flex items-center justify-between p-3 rounded border ${
-                         sale.status === 'cancelled' 
-                           ? 'bg-gray-50 border-gray-200 opacity-60 grayscale' 
-                           : 'bg-green-50 border-green-100'
-                       }`}
-                     >
-                       <div className="flex items-center gap-3">
-                         <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                           sale.status === 'cancelled' ? 'bg-gray-200 text-gray-500' :
-                           isTimeSale ? 'bg-blue-100 text-blue-600' : 'bg-green-100 text-green-600'
-                         }`}>
-                           {sale.status === 'cancelled' ? (
-                             <Ban className="w-5 h-5" />
-                           ) : isMixed ? (
-                             <div className="relative">
-                               <Clock className="w-4 h-4 absolute -top-1 -left-1" />
-                               <ShoppingBag className="w-4 h-4 absolute -bottom-1 -right-1" />
-                             </div>
-                           ) : isTimeSale ? (
-                             <Clock className="w-5 h-5" />
-                           ) : (
-                             <ShoppingBag className="w-5 h-5" />
-                           )}
-                         </div>
-                         <div>
-                           <div className="font-medium flex items-center gap-2">
-                             <span className={sale.status === 'cancelled' ? 'line-through text-gray-400' : ''}>
-                               Venta #{sale.id}
-                             </span>
-                             <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold uppercase ${
-                               sale.status === 'cancelled' ? 'bg-gray-200 text-gray-600' :
-                               isMixed ? 'bg-purple-100 text-purple-700' : 
-                               isTimeSale ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'
-                             }`}>
-                               {sale.status === 'cancelled' ? 'Anulada' : isMixed ? 'Mixta' : isTimeSale ? 'Tiempo' : 'Producto'}
-                             </span>
-                             {sale.client_name && (
-                               <span className={`font-normal ${sale.status === 'cancelled' ? 'line-through text-gray-400' : 'text-gray-500'}`}>
-                                 - {sale.client_name}
-                               </span>
-                             )}
-                           </div>
-                           <div className="text-sm text-gray-500">
-                             {formatDate(sale.timestamp)}
-                           </div>
-                         </div>
-                       </div>
-                       <div className={`text-lg font-semibold ${sale.status === 'cancelled' ? 'text-gray-400 line-through' : 'text-green-600'}`}>
-                         +{formatCurrency(sale.total)}
-                       </div>
-                     </div>
-                   );
-                 })}
+                  return (
+                    <div
+                      key={`sale-${sale.id}`}
+                      className={`flex items-center justify-between p-3 rounded border ${
+                        sale.status === "cancelled"
+                          ? "bg-gray-50 border-gray-200 opacity-60 grayscale"
+                          : "bg-green-50 border-green-100"
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div
+                          className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                            sale.status === "cancelled"
+                              ? "bg-gray-200 text-gray-500"
+                              : isTimeSale
+                                ? "bg-blue-100 text-blue-600"
+                                : "bg-green-100 text-green-600"
+                          }`}
+                        >
+                          {sale.status === "cancelled" ? (
+                            <Ban className="w-5 h-5" />
+                          ) : isMixed ? (
+                            <div className="relative">
+                              <Clock className="w-4 h-4 absolute -top-1 -left-1" />
+                              <ShoppingBag className="w-4 h-4 absolute -bottom-1 -right-1" />
+                            </div>
+                          ) : isTimeSale ? (
+                            <Clock className="w-5 h-5" />
+                          ) : (
+                            <ShoppingBag className="w-5 h-5" />
+                          )}
+                        </div>
+                        <div>
+                          <div className="font-medium flex items-center gap-2">
+                            <span
+                              className={
+                                sale.status === "cancelled"
+                                  ? "line-through text-gray-400"
+                                  : ""
+                              }
+                            >
+                              Venta #{sale.id}
+                            </span>
+                            <span
+                              className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold uppercase ${
+                                sale.status === "cancelled"
+                                  ? "bg-gray-200 text-gray-600"
+                                  : isMixed
+                                    ? "bg-purple-100 text-purple-700"
+                                    : isTimeSale
+                                      ? "bg-blue-100 text-blue-700"
+                                      : "bg-green-100 text-green-700"
+                              }`}
+                            >
+                              {sale.status === "cancelled"
+                                ? "Anulada"
+                                : isMixed
+                                  ? "Mixta"
+                                  : isTimeSale
+                                    ? "Tiempo"
+                                    : "Producto"}
+                            </span>
+                            {sale.client_name && (
+                              <span
+                                className={`font-normal ${sale.status === "cancelled" ? "line-through text-gray-400" : "text-gray-500"}`}
+                              >
+                                - {sale.client_name}
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-sm text-gray-500">
+                            {formatDate(sale.timestamp)}
+                          </div>
+                        </div>
+                      </div>
+                      <div
+                        className={`text-lg font-semibold ${sale.status === "cancelled" ? "text-gray-400 line-through" : "text-green-600"}`}
+                      >
+                        +{formatCurrency(sale.total)}
+                      </div>
+                    </div>
+                  );
+                })}
 
                 {/* Gastos */}
                 {movements
@@ -725,10 +839,12 @@ export function CashManagement() {
                   Monto Contado (Real)
                 </label>
                 <Input
+                  ref={closeAmountInputRef}
                   type="number"
                   step="0.01"
                   value={closingAmount}
                   onChange={(e) => setClosingAmount(e.target.value)}
+                  onKeyDown={(e) => e.stopPropagation()}
                   placeholder="0.00"
                   autoFocus
                 />
@@ -769,6 +885,7 @@ export function CashManagement() {
                   type="text"
                   value={closingNotes}
                   onChange={(e) => setClosingNotes(e.target.value)}
+                  onKeyDown={(e) => e.stopPropagation()}
                   placeholder="Observaciones del cierre..."
                 />
               </div>
@@ -784,11 +901,13 @@ export function CashManagement() {
               </Button>
               <Button
                 onClick={handleCloseCashBox}
-                disabled={!closingAmount}
+                disabled={
+                  !closingAmount.trim() || isClosingCash || cashBoxLoading
+                }
                 className="flex-1 gap-2"
               >
                 <Printer className="w-4 h-4" />
-                Cerrar e Imprimir
+                {isClosingCash ? "Cerrando..." : "Cerrar e Imprimir"}
               </Button>
             </div>
           </Card>
@@ -850,32 +969,55 @@ export function CashManagement() {
       <Dialog open={showClosePrintModal} onOpenChange={setShowClosePrintModal}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="text-2xl">📊 Reporte de Cierre de Caja</DialogTitle>
+            <DialogTitle className="text-2xl">
+              📊 Reporte de Cierre de Caja
+            </DialogTitle>
             <DialogDescription>
-              Resumen completo del turno - {closeData?.cashBoxData?.opened_at ? new Date(closeData.cashBoxData.opened_at).toLocaleString('es-ES') : ''}
+              Resumen completo del turno -{" "}
+              {closeData?.cashBoxData?.opened_at
+                ? new Date(closeData.cashBoxData.opened_at).toLocaleString(
+                    "es-ES",
+                  )
+                : ""}
             </DialogDescription>
           </DialogHeader>
 
           <div className="py-4 space-y-4">
-            <div className={`p-6 rounded-xl border-2 ${
-              Math.abs(closeData?.difference || 0) < 0.005
-                ? "bg-green-50 border-green-200"
-                : "bg-amber-50 border-amber-200"
-            }`}>
+            <div
+              className={`p-6 rounded-xl border-2 ${
+                Math.abs(closeData?.difference || 0) < 0.005
+                  ? "bg-green-50 border-green-200"
+                  : "bg-amber-50 border-amber-200"
+              }`}
+            >
               <div className="flex items-center justify-between mb-4">
                 <div>
-                  <p className="text-sm font-medium text-slate-600 uppercase tracking-wider">Estado del Cuadre</p>
-                  <h3 className={`text-2xl font-bold ${
-                    Math.abs(closeData?.difference || 0) < 0.005 ? "text-green-700" : "text-amber-700"
-                  }`}>
-                    {Math.abs(closeData?.difference || 0) < 0.005 ? "✓ Caja Cuadrada" : "⚠ Diferencia Detectada"}
+                  <p className="text-sm font-medium text-slate-600 uppercase tracking-wider">
+                    Estado del Cuadre
+                  </p>
+                  <h3
+                    className={`text-2xl font-bold ${
+                      Math.abs(closeData?.difference || 0) < 0.005
+                        ? "text-green-700"
+                        : "text-amber-700"
+                    }`}
+                  >
+                    {Math.abs(closeData?.difference || 0) < 0.005
+                      ? "✓ Caja Cuadrada"
+                      : "⚠ Diferencia Detectada"}
                   </h3>
                 </div>
                 <div className="text-right">
-                  <p className="text-sm font-medium text-slate-600">Diferencia</p>
-                  <p className={`text-2xl font-bold ${
-                    closeData?.difference >= 0 ? "text-green-600" : "text-red-600"
-                  }`}>
+                  <p className="text-sm font-medium text-slate-600">
+                    Diferencia
+                  </p>
+                  <p
+                    className={`text-2xl font-bold ${
+                      closeData?.difference >= 0
+                        ? "text-green-600"
+                        : "text-red-600"
+                    }`}
+                  >
                     {closeData?.difference > 0 ? "+" : ""}
                     {formatCurrency(closeData?.difference || 0)}
                   </p>
@@ -884,12 +1026,15 @@ export function CashManagement() {
 
               <div className="grid grid-cols-2 gap-y-3 gap-x-8 pt-4 border-t border-slate-200">
                 <div className="flex justify-between items-center">
-                  <span className="text-slate-600 text-sm">Monto Apertura:</span>
-                  <span className="font-semibold">{formatCurrency(closeData?.openingAmount || 0)}</span>
+                  <span className="text-slate-600 text-sm">
+                    Monto Apertura:
+                  </span>
+                  <span className="font-semibold">
+                    {formatCurrency(closeData?.openingAmount || 0)}
+                  </span>
                 </div>
               </div>
             </div>
-
           </div>
 
           <DialogFooter className="flex-col sm:flex-row gap-2">
