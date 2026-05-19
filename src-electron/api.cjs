@@ -388,6 +388,36 @@ async function updateProductService(
   }
 }
 
+async function saveProductImageData(productId, base64Data) {
+  try {
+    const sql = "UPDATE products_services SET image_data = ? WHERE id = ?";
+    await runAsync(sql, [base64Data, productId]);
+    return true;
+  } catch (error) {
+    throw error;
+  }
+}
+
+async function getProductImageData(productId) {
+  try {
+    const sql = "SELECT image_data FROM products_services WHERE id = ?";
+    const row = await getAsync(sql, [productId]);
+    return row ? row.image_data : null;
+  } catch (error) {
+    return null;
+  }
+}
+
+async function deleteProductImageData(productId) {
+  try {
+    const sql = "UPDATE products_services SET image_data = NULL WHERE id = ?";
+    await runAsync(sql, [productId]);
+    return true;
+  } catch (error) {
+    throw error;
+  }
+}
+
 async function updateProductCategory(productId, categoryName) {
   try {
     // Buscar el tipo de la categoría seleccionada
@@ -1131,18 +1161,23 @@ async function selectSystemLogo() {
 
   if (!result.canceled && result.filePaths.length > 0) {
     const sourcePath = result.filePaths[0];
-    const extension = path.extname(sourcePath);
+    const extension = path.extname(sourcePath).toLowerCase().replace(".", "");
     const destDir = path.join(app.getPath("userData"), "brand");
 
     if (!fs.existsSync(destDir)) fs.mkdirSync(destDir, { recursive: true });
 
-    // Generar un nombre único para forzar refresco del navegador (cache bust)
-    const fileName = `logo_${Date.now()}${extension}`;
+    // Copiar archivo (para favicon del Express y compatibilidad)
+    const fileName = `logo_${Date.now()}.${extension}`;
     const destPath = path.join(destDir, fileName);
     fs.copyFileSync(sourcePath, destPath);
 
-    // Guardar solo el nombre del archivo en la DB (Express servirá la carpeta 'brand')
-    await setSetting("system_logo", fileName);
+    // Guardar como base64 en DB para que funcione en cualquier PC sin depender del archivo
+    const buffer = fs.readFileSync(sourcePath);
+    const mimeType = `image/${extension === "jpg" ? "jpeg" : extension}`;
+    const dataUrl = `data:${mimeType};base64,${buffer.toString("base64")}`;
+    await setSetting("system_logo", dataUrl);
+    // Mantener el nombre del archivo para el favicon de Express
+    await setSetting("system_logo_file", fileName);
 
     // Actualizar icono de ventana manualmente (Electron Main Process)
     try {
@@ -1150,7 +1185,7 @@ async function selectSystemLogo() {
       ipcMain.emit("api:updateAppIcon", { sender: null }, destPath);
     } catch (e) {}
 
-    return fileName;
+    return dataUrl;
   }
   return null;
 }
@@ -1357,6 +1392,18 @@ async function setPackageIsStandardEntry(packageId, isStandardEntry) {
     await runAsync(
       "UPDATE products_services SET is_standard_entry = $1 WHERE id = $2",
       [isStandardEntry ? 1 : 0, packageId],
+    );
+    return true;
+  } catch (error) {
+    throw error;
+  }
+}
+
+async function setPackageFixedPrice({ packageId, fixedPrice, minChildren }) {
+  try {
+    await runAsync(
+      "UPDATE products_services SET fixed_price = $1, min_children = $2 WHERE id = $3",
+      [fixedPrice ? true : false, minChildren || 1, packageId],
     );
     return true;
   } catch (error) {
@@ -2384,6 +2431,8 @@ async function assignMembership(
   id_card = null,
   acquisition_date = null,
   total_hours = null,
+  startDateOverride = null,
+  endDateOverride = null,
 ) {
   try {
     // Obtener duración de la membresía
@@ -2393,16 +2442,18 @@ async function assignMembership(
     );
     if (!membership) throw new Error("Membresía no encontrada");
 
-    const startDate = getLocalTimestamp().split(" ")[0]; // YYYY-MM-DD
-    const endDate = new Date();
-    // Usar la fecha actual del sistema local para calcular el fin
-    endDate.setDate(endDate.getDate() + membership.duration_days);
-
-    // Formatear endDate a YYYY-MM-DD local
-    const year = endDate.getFullYear();
-    const month = String(endDate.getMonth() + 1).padStart(2, "0");
-    const day = String(endDate.getDate()).padStart(2, "0");
-    const endDateStr = `${year}-${month}-${day}`;
+    const startDate = startDateOverride || getLocalTimestamp().split(" ")[0];
+    let endDateStr;
+    if (endDateOverride) {
+      endDateStr = endDateOverride.split("T")[0];
+    } else {
+      const endDate = new Date();
+      endDate.setDate(endDate.getDate() + membership.duration_days);
+      const year = endDate.getFullYear();
+      const month = String(endDate.getMonth() + 1).padStart(2, "0");
+      const day = String(endDate.getDate()).padStart(2, "0");
+      endDateStr = `${year}-${month}-${day}`;
+    }
 
     let userId = null;
     if (createdBy) {
@@ -2468,6 +2519,34 @@ async function updateClientMembership(
       [phone || null, id_card || null, total_hours || null, notes || null, id],
     );
     return true;
+  } catch (error) {
+    throw error;
+  }
+}
+
+async function renewClientMembership(
+  id,
+  { membership_id, start_date, end_date, payment_amount, phone, id_card, total_hours, notes },
+) {
+  try {
+    await runAsync(
+      `UPDATE client_memberships
+       SET membership_id = ?, start_date = ?, end_date = ?, payment_amount = ?,
+           phone = ?, id_card = ?, total_hours = ?, notes = ?, status = 'active'
+       WHERE id = ?`,
+      [
+        membership_id,
+        start_date,
+        end_date,
+        payment_amount,
+        phone || null,
+        id_card || null,
+        total_hours || null,
+        notes || null,
+        id,
+      ],
+    );
+    return id;
   } catch (error) {
     throw error;
   }
@@ -4237,8 +4316,10 @@ async function getHourlyOccupancy(startDate, endDate) {
 async function getActiveMemberships(statusFilter = "all") {
   try {
     let sql = `
-      SELECT 
+      SELECT
         cm.id,
+        cm.client_id,
+        cm.membership_id,
         c.name as client_name,
         c.phone as client_phone,
         m.name as membership_name,
@@ -5356,6 +5437,9 @@ module.exports = {
   updateProductService,
   updateProductCategory,
   deleteProductService,
+  saveProductImageData,
+  getProductImageData,
+  deleteProductImageData,
   getSales,
   getDailyStats,
   cancelSale,
@@ -5445,6 +5529,7 @@ module.exports = {
   assignMembership,
   cancelClientMembership,
   updateClientMembership,
+  renewClientMembership,
   recordMembershipRenewal,
   getClientVisits,
   createClientVisit,
@@ -5466,6 +5551,7 @@ module.exports = {
   updateWaiterOrderStatus,
   deleteWaiterOrder,
   setPackageIsStandardEntry,
+  setPackageFixedPrice,
 };
 
 async function openCashDrawerWithAudit(

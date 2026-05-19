@@ -82,6 +82,8 @@ export interface ProductService {
   min_stock?: number;
   requires_stock?: boolean | number;
   duration_minutes?: number;
+  fixed_price?: boolean;
+  min_children?: number;
   created_at: string;
 }
 

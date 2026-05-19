@@ -133,6 +133,8 @@ contextBridge.exposeInMainWorld("api", {
     ipcRenderer.invoke("api:getProductImage", productId),
   deleteProductImage: (productId) =>
     ipcRenderer.invoke("api:deleteProductImage", productId),
+  migrateImagesToDb: () =>
+    ipcRenderer.invoke("api:migrateImagesToDb"),
 
   // Sales
   getSales: (limit) => ipcRenderer.invoke("api:getSales", limit),
@@ -323,6 +325,8 @@ contextBridge.exposeInMainWorld("api", {
     ipcRenderer.invoke("api:startTimerSession", { sessionId }),
   setPackageIsStandardEntry: (data) =>
     ipcRenderer.invoke("api:setPackageIsStandardEntry", data),
+  setPackageFixedPrice: (data) =>
+    ipcRenderer.invoke("api:setPackageFixedPrice", data),
 
   // Health Check
   checkDatabaseConnection: () =>
@@ -494,6 +498,8 @@ contextBridge.exposeInMainWorld("api", {
     }),
   cancelClientMembership: (id, canceledBy) =>
     ipcRenderer.invoke("api:cancelClientMembership", { id, canceledBy }),
+  renewClientMembership: (id, data) =>
+    ipcRenderer.invoke("api:renewClientMembership", { id, data }),
   recordMembershipRenewal: (renewalData) =>
     ipcRenderer.invoke("api:recordMembershipRenewal", renewalData),
 

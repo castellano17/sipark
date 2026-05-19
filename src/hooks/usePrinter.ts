@@ -441,6 +441,7 @@ export function usePrinter() {
 
       try {
         await (window as any).api.printTicket(ticketPrinter, ticketText);
+        await (window as any).api.printTicket(ticketPrinter, ticketText);
       } catch (err) {
       }
 

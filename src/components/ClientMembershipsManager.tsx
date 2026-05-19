@@ -18,6 +18,7 @@ import {
   X,
   Pencil,
   Save,
+  RotateCcw,
 } from "lucide-react";
 import { Card } from "./ui/card";
 import { Button } from "./ui/button";
@@ -33,6 +34,7 @@ import {
 import { useCurrency } from "../hooks/useCurrency";
 import { useNotification } from "../hooks/useNotification";
 import { usePrinter } from "../hooks/usePrinter";
+import { useCashBox } from "../hooks/useCashBox";
 
 interface ClientMembership {
   id: number;
@@ -54,6 +56,15 @@ interface ClientMembership {
   total_hours?: string;
   balance?: number;
   nfc_uid?: string;
+}
+
+interface MembershipType {
+  id: number;
+  name: string;
+  price: number;
+  duration_days: number;
+  total_hours?: string;
+  is_active?: number | boolean;
 }
 
 interface NfcTransaction {
@@ -85,6 +96,39 @@ export function ClientMembershipsManager() {
     form: { phone: string; id_card: string; total_hours: string; notes: string };
   }>({ open: false, membership: null, saving: false, form: { phone: "", id_card: "", total_hours: "", notes: "" } });
 
+  const [membershipTypes, setMembershipTypes] = useState<MembershipType[]>([]);
+  const [renewModal, setRenewModal] = useState<{
+    open: boolean;
+    membership: ClientMembership | null;
+    saving: boolean;
+    form: {
+      selectedMembershipTypeId: number | "";
+      customPrice: number | "";
+      discount: number;
+      paymentMethod: string;
+      phone: string;
+      id_card: string;
+      acquisitionDate: string;
+      total_hours: string;
+      notes: string;
+    };
+  }>({
+    open: false,
+    membership: null,
+    saving: false,
+    form: {
+      selectedMembershipTypeId: "",
+      customPrice: "",
+      discount: 0,
+      paymentMethod: "cash",
+      phone: "",
+      id_card: "",
+      acquisitionDate: new Date().toLocaleDateString("sv-SE"),
+      total_hours: "",
+      notes: "",
+    },
+  });
+
   // ── Historial Modal ──
   const [historyModal, setHistoryModal] = useState<{
     open: boolean;
@@ -96,9 +140,11 @@ export function ClientMembershipsManager() {
   const { formatCurrency } = useCurrency();
   const { success, error } = useNotification();
   const { printMembershipTicket, printMembershipInvoice, printMembershipHistoryTicket } = usePrinter();
+  const { getActiveCashBox } = useCashBox();
 
   useEffect(() => {
     loadMemberships();
+    loadMembershipTypes();
     const handleUpdate = () => loadMemberships();
     window.addEventListener("memberships-updated", handleUpdate);
     return () => window.removeEventListener("memberships-updated", handleUpdate);
@@ -117,6 +163,15 @@ export function ClientMembershipsManager() {
       error("Error al cargar membresías");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadMembershipTypes = async () => {
+    try {
+      const data = await (window as any).api.getMemberships();
+      setMembershipTypes((data || []).filter((m: MembershipType) => m.is_active));
+    } catch {
+      // silently fail
     }
   };
 
@@ -238,6 +293,118 @@ export function ClientMembershipsManager() {
     } catch {
       error("Error al actualizar membresía");
       setEditModal((prev) => ({ ...prev, saving: false }));
+    }
+  };
+
+  const calculateRenewEndDate = (currentEndDate: string, durationDays: number): string => {
+    const endDate = new Date(currentEndDate);
+    const today = new Date();
+    const startDate = endDate > today ? endDate : today;
+    const newEnd = new Date(startDate);
+    newEnd.setDate(newEnd.getDate() + durationDays);
+    return newEnd.toLocaleDateString("es-ES");
+  };
+
+  const openRenewModal = (membership: ClientMembership) => {
+    const sameType = membershipTypes.find((t) => t.id === membership.membership_id);
+    setRenewModal({
+      open: true,
+      membership,
+      saving: false,
+      form: {
+        selectedMembershipTypeId: sameType ? sameType.id : "",
+        customPrice: sameType ? sameType.price : "",
+        discount: 0,
+        paymentMethod: "cash",
+        phone: membership.phone || "",
+        id_card: membership.id_card || "",
+        acquisitionDate: new Date().toLocaleDateString("sv-SE"),
+        total_hours: sameType?.total_hours || membership.total_hours || "",
+        notes: "",
+      },
+    });
+  };
+
+  const closeRenewModal = () =>
+    setRenewModal((prev) => ({ ...prev, open: false, membership: null }));
+
+  const handleRenew = async () => {
+    const { membership, form } = renewModal;
+    if (!membership || !form.selectedMembershipTypeId) {
+      error("Selecciona un tipo de membresía");
+      return;
+    }
+    const selectedType = membershipTypes.find((t) => t.id === form.selectedMembershipTypeId);
+    if (!selectedType) { error("Tipo de membresía no válido"); return; }
+    if (selectedType.total_hours && !form.total_hours) { error("El campo Horas / Entradas es obligatorio"); return; }
+
+    const activeCashBox = await getActiveCashBox();
+    if (!activeCashBox) {
+      error("No hay caja abierta. Abre la caja antes de procesar una renovación.");
+      return;
+    }
+
+    setRenewModal((prev) => ({ ...prev, saving: true }));
+    try {
+      const currentUser = JSON.parse(localStorage.getItem("currentUser") || "{}");
+      const basePrice = typeof form.customPrice === "number" ? form.customPrice : selectedType.price;
+      const finalAmount = basePrice - form.discount;
+
+      const currentEndDate = new Date(membership.end_date);
+      const today = new Date();
+      const startDate = currentEndDate > today ? currentEndDate : today;
+      const newEndDate = new Date(startDate);
+      newEndDate.setDate(newEndDate.getDate() + selectedType.duration_days);
+
+      await (window as any).api.renewClientMembership(membership.id, {
+        membership_id: selectedType.id,
+        start_date: startDate.toISOString().split("T")[0],
+        end_date: newEndDate.toISOString().split("T")[0],
+        payment_amount: finalAmount,
+        phone: form.phone || null,
+        id_card: form.id_card || null,
+        total_hours: form.total_hours || null,
+        notes: form.notes || null,
+      });
+
+      await (window as any).api.createSaleWithItems({
+        cash_box_id: activeCashBox.id,
+        client_id: membership.client_id,
+        client_name: membership.client_name,
+        items: [{
+          product_id: null,
+          product_name: `Renovación ${selectedType.name}`,
+          quantity: 1,
+          unit_price: selectedType.price,
+          discount: form.discount,
+          subtotal: finalAmount,
+        }],
+        subtotal: selectedType.price,
+        discount: form.discount,
+        total: finalAmount,
+        payment_method: form.paymentMethod,
+        notes: `Renovación de membresía${form.notes ? " - " + form.notes : ""}`,
+      });
+
+      await printMembershipTicket({
+        id: membership.id,
+        client_name: membership.client_name,
+        membership_name: selectedType.name,
+        start_date: startDate.toISOString(),
+        end_date: newEndDate.toISOString(),
+        payment_amount: finalAmount,
+        payment_method: form.paymentMethod,
+        phone: form.phone,
+        id_card: form.id_card,
+        total_hours: form.total_hours,
+      });
+
+      success("Membresía renovada exitosamente");
+      closeRenewModal();
+      loadMemberships();
+    } catch (err: any) {
+      error("Error al renovar: " + (err?.message || "Error desconocido"));
+      setRenewModal((prev) => ({ ...prev, saving: false }));
     }
   };
 
@@ -472,6 +639,17 @@ export function ClientMembershipsManager() {
                       <Button size="sm" variant="outline" onClick={() => handlePrint(membership, "invoice")} title="Generar Factura PDF">
                         <FileText className="w-3 h-3" />
                       </Button>
+                      {membership.status !== "cancelled" && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => openRenewModal(membership)}
+                          title="Renovar Membresía"
+                          className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                        >
+                          <RotateCcw className="w-3 h-3" />
+                        </Button>
+                      )}
                       {membership.status === "active" && membership.days_remaining > 0 && (
                         <Button
                           size="sm"
@@ -739,6 +917,203 @@ export function ClientMembershipsManager() {
           </div>
         </div>
       )}
+
+      {/* ── Modal: Renovar Membresía ── */}
+      {renewModal.open && renewModal.membership && (() => {
+        const selectedType = membershipTypes.find((t) => t.id === renewModal.form.selectedMembershipTypeId);
+        const basePrice = typeof renewModal.form.customPrice === "number" ? renewModal.form.customPrice : (selectedType?.price ?? 0);
+        const finalAmount = basePrice - renewModal.form.discount;
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg flex flex-col overflow-hidden max-h-[90vh]">
+              <div className="bg-gradient-to-r from-green-600 to-emerald-700 p-5 text-white flex-shrink-0">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <RotateCcw className="w-4 h-4 opacity-80" />
+                      <span className="text-sm font-medium opacity-80 uppercase tracking-wider">Renovar Membresía</span>
+                    </div>
+                    <h2 className="text-xl font-bold">{renewModal.membership.client_name}</h2>
+                    <p className="text-sm opacity-80">{renewModal.membership.membership_name}</p>
+                  </div>
+                  <button onClick={closeRenewModal} className="ml-4 p-1.5 rounded-full hover:bg-white/20 transition">
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+              </div>
+
+              <div className="p-6 space-y-4 overflow-y-auto flex-1">
+                {/* Info actual */}
+                <div className="p-3 bg-gray-50 rounded-lg text-xs text-gray-600 space-y-1">
+                  <div className="flex justify-between">
+                    <span>Membresía actual:</span>
+                    <span className="font-semibold">{renewModal.membership.membership_name}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Vence actualmente:</span>
+                    <span className="font-semibold">{new Date(renewModal.membership.end_date).toLocaleDateString("es-ES")}</span>
+                  </div>
+                  {selectedType && (
+                    <div className="flex justify-between text-green-700 font-semibold">
+                      <span>Nueva fecha estimada:</span>
+                      <span>{calculateRenewEndDate(renewModal.membership.end_date, selectedType.duration_days)}</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Tipo de membresía */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Tipo de Membresía *</label>
+                  <select
+                    value={renewModal.form.selectedMembershipTypeId}
+                    onChange={(e) => {
+                      const id = parseInt(e.target.value);
+                      const t = membershipTypes.find((m) => m.id === id);
+                      setRenewModal((prev) => ({
+                        ...prev,
+                        form: {
+                          ...prev.form,
+                          selectedMembershipTypeId: id || "",
+                          customPrice: t ? t.price : "",
+                          total_hours: t?.total_hours || prev.form.total_hours,
+                        },
+                      }));
+                    }}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                  >
+                    <option value="">Seleccionar tipo...</option>
+                    {membershipTypes.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.name} — {formatCurrency(t.price)} ({t.duration_days} días)
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Precio / descuento */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">Precio</label>
+                    <input
+                      type="number" min="0" step="0.01"
+                      value={renewModal.form.customPrice}
+                      onChange={(e) => setRenewModal((prev) => ({ ...prev, form: { ...prev.form, customPrice: parseFloat(e.target.value) || "" } }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">Descuento</label>
+                    <input
+                      type="number" min="0" step="0.01"
+                      value={renewModal.form.discount || ""}
+                      onChange={(e) => setRenewModal((prev) => ({ ...prev, form: { ...prev.form, discount: parseFloat(e.target.value) || 0 } }))}
+                      placeholder="0.00"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                    />
+                  </div>
+                </div>
+
+                {/* Método de pago */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Método de Pago</label>
+                  <select
+                    value={renewModal.form.paymentMethod}
+                    onChange={(e) => setRenewModal((prev) => ({ ...prev, form: { ...prev.form, paymentMethod: e.target.value } }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                  >
+                    <option value="cash">Efectivo</option>
+                    <option value="card">Tarjeta</option>
+                    <option value="transfer">Transferencia</option>
+                  </select>
+                </div>
+
+                {/* Teléfono / Cédula */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">Teléfono</label>
+                    <input type="text" value={renewModal.form.phone}
+                      onChange={(e) => setRenewModal((prev) => ({ ...prev, form: { ...prev.form, phone: e.target.value } }))}
+                      placeholder="8888-8888"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">Cédula</label>
+                    <input type="text" value={renewModal.form.id_card}
+                      onChange={(e) => setRenewModal((prev) => ({ ...prev, form: { ...prev.form, id_card: e.target.value } }))}
+                      placeholder="###-######-####L"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                    />
+                  </div>
+                </div>
+
+                {/* Fecha adquisición / Horas */}
+                <div className={`grid gap-3 ${selectedType?.total_hours ? "grid-cols-2" : "grid-cols-1"}`}>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">Fecha Adquisición</label>
+                    <input type="date" value={renewModal.form.acquisitionDate}
+                      onChange={(e) => setRenewModal((prev) => ({ ...prev, form: { ...prev.form, acquisitionDate: e.target.value } }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                    />
+                  </div>
+                  {selectedType?.total_hours && (
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1">Horas / Entradas *</label>
+                      <input type="text" value={renewModal.form.total_hours}
+                        onChange={(e) => setRenewModal((prev) => ({ ...prev, form: { ...prev.form, total_hours: e.target.value } }))}
+                        placeholder="Ej: 10 horas"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {/* Notas */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Notas (opcional)</label>
+                  <textarea value={renewModal.form.notes}
+                    onChange={(e) => setRenewModal((prev) => ({ ...prev, form: { ...prev.form, notes: e.target.value } }))}
+                    rows={2} placeholder="Observaciones..."
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-none"
+                  />
+                </div>
+
+                {/* Total */}
+                {selectedType && (
+                  <div className="p-3 bg-green-50 border border-green-200 rounded-lg text-sm">
+                    <div className="flex justify-between text-gray-600">
+                      <span>Precio base:</span><span>{formatCurrency(basePrice)}</span>
+                    </div>
+                    {renewModal.form.discount > 0 && (
+                      <div className="flex justify-between text-red-600">
+                        <span>Descuento:</span><span>-{formatCurrency(renewModal.form.discount)}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between font-bold text-green-700 border-t border-green-200 mt-1 pt-1">
+                      <span>Total a cobrar:</span>
+                      <span className="text-lg">{formatCurrency(finalAmount)}</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="px-6 pb-6 pt-2 flex justify-end gap-3 flex-shrink-0 border-t">
+                <Button variant="outline" onClick={closeRenewModal} disabled={renewModal.saving}>
+                  Cancelar
+                </Button>
+                <Button
+                  onClick={handleRenew}
+                  disabled={renewModal.saving || !renewModal.form.selectedMembershipTypeId}
+                  className="bg-green-600 hover:bg-green-700 text-white gap-2"
+                >
+                  <RotateCcw className="w-4 h-4" />
+                  {renewModal.saving ? "Procesando..." : "Renovar Membresía"}
+                </Button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Dialog de Confirmación de Cancelación */}
       <Dialog

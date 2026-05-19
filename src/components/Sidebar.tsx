@@ -66,10 +66,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
       
       const logo = await getSetting("system_logo");
       if (logo) {
-        const isVite = window.location.port === "5173";
-        const serverPort = isVite ? "9595" : (window.location.port || "80");
-        const baseUrl = `http://${window.location.hostname}:${serverPort}`;
-        setSystemLogo(`${baseUrl}/brand/${logo}`);
+        if (logo.startsWith("data:")) {
+          setSystemLogo(logo);
+        } else {
+          const isVite = window.location.port === "5173";
+          const serverPort = isVite ? "9595" : (window.location.port || "80");
+          const baseUrl = `http://${window.location.hostname}:${serverPort}`;
+          setSystemLogo(`${baseUrl}/brand/${logo}`);
+        }
       }
     } catch (e) {}
   };

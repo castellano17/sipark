@@ -597,12 +597,43 @@ export const Settings: React.FC = () => {
                         const isVite = window.location.port === "5173";
                         const serverPort = isVite ? "9595" : (window.location.port || "80");
                         const baseUrl = `http://${window.location.hostname}:${serverPort}`;
-                        return <img src={systemLogo ? `${baseUrl}/brand/${systemLogo}` : "./icon.png"} className="w-8 h-8 object-contain" onError={(e) => e.currentTarget.style.display = 'none'} />;
+                        const logoSrc = systemLogo
+                        ? (systemLogo.startsWith("data:") ? systemLogo : `${baseUrl}/brand/${systemLogo}`)
+                        : "./icon.png";
+                      return <img src={logoSrc} className="w-8 h-8 object-contain" onError={(e) => e.currentTarget.style.display = 'none'} />;
                       })()}
                       Seleccionar Logo de Marca
                     </Button>
                     <p className="text-[10px] text-slate-500 italic">Formatos: PNG, JPG (Se recomienda cuadrado)</p>
                   </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-slate-900 mb-2">
+                    Imágenes de Productos en Base de Datos
+                  </label>
+                  <p className="text-xs text-slate-500 mb-2">
+                    Las imágenes nuevas ya se guardan en la BD. Este botón migra las imágenes antiguas que aún están en disco para que funcionen en cualquier PC y en los respaldos.
+                  </p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={async () => {
+                      try {
+                        const result = await (window as any).api.migrateImagesToDb();
+                        if (result.migrated === 0) {
+                          success(`No hay imágenes pendientes (${result.skipped} ya estaban en BD).`);
+                        } else {
+                          success(`✓ ${result.migrated} imagen(es) migradas a la BD. ${result.skipped} ya estaban migradas.`);
+                        }
+                      } catch (err) {
+                        errorNotification("Error al migrar imágenes");
+                      }
+                    }}
+                    className="text-xs gap-2 border-slate-300 hover:bg-slate-50 font-semibold"
+                  >
+                    Migrar Imágenes al Respaldo
+                  </Button>
                 </div>
 
                 <div>

@@ -84,11 +84,15 @@ export default function MainLayout({ currentUser, onLogout }: MainLayoutProps) {
       
       const logo = await (window as any).api.getSetting("system_logo");
       if (logo) {
-        // En desarrollo Vite corre en 5173 pero Express en 9595
-        const isVite = window.location.port === "5173";
-        const serverPort = isVite ? "9595" : (window.location.port || "80");
-        const baseUrl = `http://${window.location.hostname}:${serverPort}`;
-        setSystemLogo(`${baseUrl}/brand/${logo}`);
+        if (logo.startsWith("data:")) {
+          setSystemLogo(logo);
+        } else {
+          // En desarrollo Vite corre en 5173 pero Express en 9595
+          const isVite = window.location.port === "5173";
+          const serverPort = isVite ? "9595" : (window.location.port || "80");
+          const baseUrl = `http://${window.location.hostname}:${serverPort}`;
+          setSystemLogo(`${baseUrl}/brand/${logo}`);
+        }
       }
     } catch {}
   };

@@ -891,6 +891,19 @@ async function createTables() {
           UPDATE products_services SET is_active = TRUE WHERE is_active IS NULL;
         END IF;
 
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='products_services' AND column_name='fixed_price') THEN
+          ALTER TABLE products_services ADD COLUMN fixed_price BOOLEAN DEFAULT FALSE;
+        END IF;
+
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='products_services' AND column_name='min_children') THEN
+          ALTER TABLE products_services ADD COLUMN min_children INTEGER DEFAULT 1;
+        END IF;
+
+        -- Migración para image_data en products_services (imagen almacenada en DB, no en disco)
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='products_services' AND column_name='image_data') THEN
+          ALTER TABLE products_services ADD COLUMN image_data TEXT;
+        END IF;
+
         END $$;
     `);
   } catch (error) {

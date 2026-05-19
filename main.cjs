@@ -91,9 +91,18 @@ function startLocalServer() {
     server.get('/favicon.ico', async (req, res) => {
       try {
         const api = require('./src-electron/api.cjs');
-        const logoName = await api.getSetting("system_logo");
-        if (logoName) {
-          const logoPath = path.join(brandDir, logoName);
+        // Intentar con el nombre de archivo guardado (system_logo_file)
+        const logoFile = await api.getSetting("system_logo_file");
+        if (logoFile) {
+          const logoPath = path.join(brandDir, logoFile);
+          if (fs.existsSync(logoPath)) {
+            return res.sendFile(logoPath);
+          }
+        }
+        // Fallback: system_logo puede ser un nombre de archivo antiguo
+        const logoSetting = await api.getSetting("system_logo");
+        if (logoSetting && !logoSetting.startsWith("data:")) {
+          const logoPath = path.join(brandDir, logoSetting);
           if (fs.existsSync(logoPath)) {
             return res.sendFile(logoPath);
           }
@@ -759,16 +768,37 @@ function setupIpcHandlers() {
     api.deleteProductService(data.id),
   );
   
-  // Product Images
-  ipcMain.handle("api:saveProductImage", (event, data) =>
-    fileHandler.saveProductImage(data.productId, data.base64Data, data.extension),
-  );
-  ipcMain.handle("api:getProductImage", (event, productId) =>
-    fileHandler.getProductImage(productId),
-  );
-  ipcMain.handle("api:deleteProductImage", (event, productId) =>
-    fileHandler.deleteProductImage(productId),
-  );
+  // Migración: mover imágenes existentes en disco a la DB
+  ipcMain.handle("api:migrateImagesToDb", async () => {
+    const products = await api.getProductsServices();
+    let migrated = 0;
+    let skipped = 0;
+    for (const product of products) {
+      if (product.image_data) { skipped++; continue; }
+      const imageData = await fileHandler.getProductImage(product.id);
+      if (imageData) {
+        await api.saveProductImageData(product.id, imageData);
+        migrated++;
+      }
+    }
+    return { migrated, skipped, total: products.length };
+  });
+
+  // Product Images (guardadas en DB; fallback a archivo para imágenes antiguas)
+  ipcMain.handle("api:saveProductImage", async (event, data) => {
+    await api.saveProductImageData(data.productId, data.base64Data);
+    return true;
+  });
+  ipcMain.handle("api:getProductImage", async (event, productId) => {
+    const dbData = await api.getProductImageData(productId);
+    if (dbData) return dbData;
+    return fileHandler.getProductImage(productId);
+  });
+  ipcMain.handle("api:deleteProductImage", async (event, productId) => {
+    await api.deleteProductImageData(productId);
+    await fileHandler.deleteProductImage(productId);
+    return true;
+  });
 
   // Sales
   ipcMain.handle("api:getSales", (event, limit) => api.getSales(limit));
@@ -1030,6 +1060,9 @@ function setupIpcHandlers() {
   ipcMain.handle("api:setPackageIsStandardEntry", (event, data) =>
     api.setPackageIsStandardEntry(data.packageId, data.isStandardEntry),
   );
+  ipcMain.handle("api:setPackageFixedPrice", (event, data) =>
+    api.setPackageFixedPrice(data),
+  );
 
   // Health Check
   ipcMain.handle("api:checkDatabaseConnection", () =>
@@ -1285,6 +1318,9 @@ function setupIpcHandlers() {
   ipcMain.handle("api:cancelClientMembership", (event, data) =>
     api.cancelClientMembership(data.id, data.canceledBy),
   );
+  ipcMain.handle("api:renewClientMembership", (event, { id, data }) =>
+    api.renewClientMembership(id, data),
+  );
   ipcMain.handle("api:updateClientMembership", (event, data) =>
     api.updateClientMembership(data.id, data),
   );
@@ -1378,14 +1414,21 @@ function setupIpcHandlers() {
     api.checkPermission(data.userId, data.module, data.action),
   );
 
-  // File Handlers (Logos)
-  ipcMain.handle("file:saveLogo", (event, data) =>
-    fileHandler.saveLogo(data.type, data.base64Data, data.extension),
-  );
-  ipcMain.handle("file:getLogo", (event, type) => fileHandler.getLogo(type));
-  ipcMain.handle("file:deleteLogo", (event, type) =>
-    fileHandler.deleteLogo(type),
-  );
+  // File Handlers (Logos — guardados en DB settings; fallback a archivo para logos antiguos)
+  ipcMain.handle("file:saveLogo", async (event, data) => {
+    await api.setSetting(`${data.type}_logo_data`, data.base64Data);
+    return true;
+  });
+  ipcMain.handle("file:getLogo", async (event, type) => {
+    const dbData = await api.getSetting(`${type}_logo_data`);
+    if (dbData) return dbData;
+    return fileHandler.getLogo(type);
+  });
+  ipcMain.handle("file:deleteLogo", async (event, type) => {
+    await api.setSetting(`${type}_logo_data`, null);
+    await fileHandler.deleteLogo(type);
+    return true;
+  });
 
   // Backup Handlers
   ipcMain.handle("backup:createLocal", () => backup.createBackupWithDialog());

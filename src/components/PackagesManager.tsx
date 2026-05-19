@@ -27,6 +27,8 @@ interface FormData {
   durationUnit: "minutes" | "hours";
   description: string;
   isStandardEntry: boolean;
+  fixedPrice: boolean;
+  minChildren: string;
 }
 
 interface PackageFeature {
@@ -53,6 +55,8 @@ export const PackagesManager: React.FC = () => {
     durationUnit: "hours",
     description: "",
     isStandardEntry: false,
+    fixedPrice: false,
+    minChildren: "1",
   });
   const [deleteTarget, setDeleteTarget] = useState<ProductService | null>(null);
   const {
@@ -107,6 +111,8 @@ export const PackagesManager: React.FC = () => {
       durationUnit: "hours",
       description: "",
       isStandardEntry: false,
+      fixedPrice: false,
+      minChildren: "1",
     });
     setFeatureSelections({});
     setModalMode("create");
@@ -128,6 +134,8 @@ export const PackagesManager: React.FC = () => {
       durationUnit: isHours ? "hours" : "minutes",
       description: pkg.category || "",
       isStandardEntry: !!(pkg as any).is_standard_entry,
+      fixedPrice: !!(pkg as any).fixed_price,
+      minChildren: ((pkg as any).min_children || 1).toString(),
     });
 
     // Cargar características incluidas
@@ -164,6 +172,8 @@ export const PackagesManager: React.FC = () => {
       durationUnit: "hours",
       description: "",
       isStandardEntry: false,
+      fixedPrice: false,
+      minChildren: "1",
     });
     setFeatureSelections({});
   };
@@ -249,10 +259,15 @@ export const PackagesManager: React.FC = () => {
           selectionsArray,
         );
 
-        // Guardar flag de entrada estándar
         await (window as any).api.setPackageIsStandardEntry({
           packageId,
           isStandardEntry: formData.isStandardEntry,
+        });
+
+        await (window as any).api.setPackageFixedPrice({
+          packageId,
+          fixedPrice: formData.fixedPrice,
+          minChildren: parseInt(formData.minChildren) || 1,
         });
       }
 
@@ -624,6 +639,41 @@ export const PackagesManager: React.FC = () => {
                   />
                   <div className="w-11 h-6 bg-slate-300 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
                 </label>
+              </div>
+
+              {/* Precio Fijo toggle */}
+              <div className="border border-slate-200 rounded-lg bg-slate-50 overflow-hidden">
+                <div className="flex items-center justify-between p-4">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-900">Precio Fijo por Paquete</p>
+                    <p className="text-xs text-slate-500 mt-0.5">El precio NO se multiplica por la cantidad de paquetes seleccionados.</p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={formData.fixedPrice}
+                      onChange={(e) => setFormData({ ...formData, fixedPrice: e.target.checked })}
+                      className="sr-only peer"
+                    />
+                    <div className="w-11 h-6 bg-slate-300 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-orange-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-orange-500"></div>
+                  </label>
+                </div>
+                {formData.fixedPrice && (
+                  <div className="px-4 pb-4 border-t border-slate-200 pt-3">
+                    <label className="block text-sm font-medium text-slate-700 mb-1">
+                      Mínimo de niños por paquete
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={formData.minChildren}
+                      onChange={(e) => setFormData({ ...formData, minChildren: e.target.value })}
+                      className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                      placeholder="Ej: 10"
+                    />
+                    <p className="text-xs text-slate-400 mt-1">Cuántos niños cubre este paquete como mínimo.</p>
+                  </div>
+                )}
               </div>
 
             {/* Características Incluidas */}

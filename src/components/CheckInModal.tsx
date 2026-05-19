@@ -24,6 +24,8 @@ interface CheckInModalProps {
     packageName: string;
     packagePrice: number;
     durationMinutes?: number;
+    childrenCount?: number;
+    isStandardEntry?: boolean;
   }) => void;
 }
 
@@ -58,6 +60,7 @@ export const CheckInModal: React.FC<CheckInModalProps> = ({
     packageCount: 1,
   });
   const [selectedPackageIsStandard, setSelectedPackageIsStandard] = useState(false);
+  const [selectedPackageIsFixed, setSelectedPackageIsFixed] = useState(false);
   const [packages, setPackages] = useState<ProductService[]>([]);
   const {
     loading,
@@ -145,6 +148,7 @@ export const CheckInModal: React.FC<CheckInModalProps> = ({
     if (timePackages.length > 0) {
       setFormData((prev) => ({ ...prev, packageId: timePackages[0].id }));
       setSelectedPackageIsStandard(!!(timePackages[0] as any).is_standard_entry);
+      setSelectedPackageIsFixed(!!(timePackages[0] as any).fixed_price);
     }
   };
 
@@ -193,7 +197,9 @@ export const CheckInModal: React.FC<CheckInModalProps> = ({
         clientName,
         packageId: formData.packageId,
         packageName: `${selectedPackage?.name || ""}${formData.packageCount > 1 ? ` (x${formData.packageCount})` : ""}`,
-        packagePrice: (selectedPackage?.price || 0) * formData.packageCount,
+        packagePrice: selectedPackageIsFixed
+          ? (selectedPackage?.price || 0)
+          : (selectedPackage?.price || 0) * formData.packageCount,
         durationMinutes: (selectedPackage?.duration_minutes || 60) * formData.packageCount,
         childrenCount: formData.childrenCount,
         isStandardEntry: selectedPackageIsStandard,
@@ -490,7 +496,7 @@ export const CheckInModal: React.FC<CheckInModalProps> = ({
 
                         <div className="md:col-span-1">
                           <label className="block text-sm font-medium text-slate-700 mb-1">
-                            Teléfono Principal *
+                            Teléfono Principal
                           </label>
                           <input
                             type="tel"
@@ -503,7 +509,6 @@ export const CheckInModal: React.FC<CheckInModalProps> = ({
                             }
                             className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                             placeholder="555-0001"
-                            required
                           />
                         </div>
 
@@ -609,11 +614,14 @@ export const CheckInModal: React.FC<CheckInModalProps> = ({
                     key={pkg.id}
                     onClick={() => {
                       const isStd = !!(pkg as any).is_standard_entry;
+                      const isFixed = !!(pkg as any).fixed_price;
                       setSelectedPackageIsStandard(isStd);
+                      setSelectedPackageIsFixed(isFixed);
                       setFormData({
                         ...formData,
                         packageId: pkg.id,
                         childrenCount: isStd ? 1 : formData.childrenCount,
+                        packageCount: isFixed ? 1 : formData.packageCount,
                       });
                     }}
                     className={`relative p-4 rounded-xl cursor-pointer transition-all duration-200 ${
@@ -721,8 +729,8 @@ export const CheckInModal: React.FC<CheckInModalProps> = ({
 
             {/* Número de Niños y Cantidad de Paquetes */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Selector Niños */}
-              <div className="space-y-3 p-4 bg-blue-50/50 rounded-xl border border-blue-100">
+              {/* Selector Niños — oculto si el paquete tiene precio fijo */}
+              {!selectedPackageIsFixed && <div className="space-y-3 p-4 bg-blue-50/50 rounded-xl border border-blue-100">
                 <div className="flex items-center justify-between">
                   <div>
                     <label className="block text-sm font-bold text-blue-900">
@@ -754,36 +762,36 @@ export const CheckInModal: React.FC<CheckInModalProps> = ({
                     </button>
                   </div>
                 </div>
-              </div>
+              </div>}
 
               {/* Selector Paquetes (Horas) */}
               <div className="space-y-3 p-4 bg-purple-50/50 rounded-xl border border-purple-100">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <label className="block text-sm font-bold text-purple-900">
-                      Cantidad de Paquetes
-                    </label>
-                    <p className="text-xs text-purple-600">Multiplica el tiempo y precio</p>
-                  </div>
-                  <div className="flex items-center gap-3 bg-white p-2 rounded-lg border border-purple-200">
-                    <button
-                      type="button"
-                      onClick={() => setFormData(prev => ({ ...prev, packageCount: Math.max(1, prev.packageCount - 1) }))}
-                      className="p-1 hover:bg-slate-100 rounded text-purple-600"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-                    </button>
-                    <span className="text-xl font-bold text-slate-800 w-8 text-center">{formData.packageCount}</span>
-                    <button
-                      type="button"
-                      onClick={() => setFormData(prev => ({ ...prev, packageCount: prev.packageCount + 1 }))}
-                      className="p-1 hover:bg-slate-100 rounded text-purple-600"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-                    </button>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <label className="block text-sm font-bold text-purple-900">
+                        Cantidad de Paquetes
+                      </label>
+                      <p className="text-xs text-purple-600">Multiplica el tiempo y precio</p>
+                    </div>
+                    <div className="flex items-center gap-3 bg-white p-2 rounded-lg border border-purple-200">
+                      <button
+                        type="button"
+                        onClick={() => setFormData(prev => ({ ...prev, packageCount: Math.max(1, prev.packageCount - 1) }))}
+                        className="p-1 hover:bg-slate-100 rounded text-purple-600"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                      </button>
+                      <span className="text-xl font-bold text-slate-800 w-8 text-center">{formData.packageCount}</span>
+                      <button
+                        type="button"
+                        onClick={() => setFormData(prev => ({ ...prev, packageCount: prev.packageCount + 1 }))}
+                        className="p-1 hover:bg-slate-100 rounded text-purple-600"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
             </div>
 
             {/* Error */}

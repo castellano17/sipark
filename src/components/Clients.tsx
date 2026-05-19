@@ -27,7 +27,7 @@ interface Client {
   id: number;
   name: string;
   parent_name?: string;
-  phone: string;
+  phone?: string;
   child_name?: string;
   child_age?: number;
   allergies?: string;
@@ -118,7 +118,7 @@ export function Clients() {
       setFormData({
         name: client.name,
         parent_name: client.parent_name || "",
-        phone: client.phone,
+        phone: client.phone || "",
         child_name: client.child_name || "",
         child_age: client.child_age?.toString() || "",
         allergies: client.allergies || "",
@@ -216,7 +216,7 @@ export function Clients() {
   const filteredClients = clients.filter(
     (client) =>
       client.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      client.phone.includes(searchTerm) ||
+      (client.phone?.toLowerCase().includes(searchTerm.toLowerCase())) ||
       (client.child_name &&
         client.child_name.toLowerCase().includes(searchTerm.toLowerCase())),
   );

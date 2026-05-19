@@ -19,7 +19,10 @@
       "PowerShell($env:PGPASSWORD = \"ludoteca2024\"; & \"C:\\\\Program Files\\\\PostgreSQL\\\\18\\\\bin\\\\psql.exe\" -U ludoteca_user -d ludoteca_pos -h 127.0.0.1 -c \"SELECT s.id, s.payment_method, s.timestamp::DATE as date, s.total, s.subtotal, s.discount, s.status FROM sales s LIMIT 3;\" 2>&1)",
       "Bash(cat ~/sipark_api_debug.txt 2>/dev/null | tail -30 || echo \"No log file\")",
       "Read(//c/Users/User/**)",
-      "PowerShell(Get-Content \"$env:USERPROFILE\\\\sipark_api_debug.txt\" -Tail 30 -ErrorAction SilentlyContinue; if \\(-not $?\\) { Write-Host \"No log file found\" })"
+      "PowerShell(Get-Content \"$env:USERPROFILE\\\\sipark_api_debug.txt\" -Tail 30 -ErrorAction SilentlyContinue; if \\(-not $?\\) { Write-Host \"No log file found\" })",
+      "Bash(grep -E \"\\\\.ts$|\\\\.js$\")",
+      "Bash(Get-ChildItem -Recurse -Path \"c:\\\\Users\\\\Esmir\\\\Desktop\\\\sipark\\\\src-electron\" -Filter \"*.cjs\")",
+      "Bash(npm test *)"
     ]
   }
 }

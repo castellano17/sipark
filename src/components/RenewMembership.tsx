@@ -211,7 +211,7 @@ export function RenewMembership() {
       return;
     }
 
-    if (!totalHours) {
+    if (selectedMembership?.total_hours && !totalHours) {
       error("El campo N° de Entradas en horas es obligatorio");
       return;
     }
@@ -240,32 +240,16 @@ export function RenewMembership() {
         newEndDate.getDate() + selectedMembership.duration_days,
       );
 
-      // Crear nueva membresía
-      const newMembershipId = await (window as any).api.assignMembership(
-        selectedClient.id,
-        selectedMembership.id,
-        finalAmount,
-        notes,
-        currentUser.id || null,
-        phone,
-        idCard,
-        acquisitionDate,
-        totalHours
-      );
-
-      // Registrar renovación en historial
-      await (window as any).api.recordMembershipRenewal({
-        client_id: selectedClient.id,
-        old_membership_id: selectedClientMembership.id,
-        new_membership_id: newMembershipId,
-        renewal_date: new Date().toISOString(),
-        old_end_date: selectedClientMembership.end_date,
-        new_end_date: newEndDate.toISOString(),
+      // Actualizar membresía existente (no crear nueva)
+      await (window as any).api.renewClientMembership(selectedClientMembership.id, {
+        membership_id: selectedMembership.id,
+        start_date: startDate.toISOString().split("T")[0],
+        end_date: newEndDate.toISOString().split("T")[0],
         payment_amount: finalAmount,
-        payment_method: paymentMethod,
-        discount_applied: discount,
-        notes: notes,
-        processed_by: currentUser.id || null,
+        phone: phone || null,
+        id_card: idCard || null,
+        total_hours: totalHours || null,
+        notes: notes || null,
       });
 
       // Registrar venta en caja
@@ -294,7 +278,7 @@ export function RenewMembership() {
 
       // Preparamos datos para la impresión (opcional, si se quiere imprimir al renovar)
       const membershipData = {
-        id: newMembershipId,
+        id: selectedClientMembership.id,
         client_name: selectedClient.name,
         membership_name: selectedMembership.name,
         start_date: startDate.toISOString(),
@@ -638,15 +622,17 @@ export function RenewMembership() {
                         className="h-9"
                       />
                     </div>
-                    <div>
-                      <label className="text-xs font-medium mb-1 block">Horas</label>
-                      <Input
-                        value={totalHours}
-                        readOnly
-                        placeholder="Ej: 10 horas"
-                        className="h-9 bg-gray-50 cursor-not-allowed"
-                      />
-                    </div>
+                    {selectedMembership?.total_hours && (
+                      <div>
+                        <label className="text-xs font-medium mb-1 block">Horas</label>
+                        <Input
+                          value={totalHours}
+                          readOnly
+                          placeholder="Ej: 10 horas"
+                          className="h-9 bg-gray-50 cursor-not-allowed"
+                        />
+                      </div>
+                    )}
                   </div>
 
                   <div>
